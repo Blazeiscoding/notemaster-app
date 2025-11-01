@@ -1,0 +1,84 @@
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto"
+
+import type { ChecklistItem } from "@/types/note"
+
+const ALGORITHM = "aes-256-gcm"
+const IV_LENGTH = 12
+const AUTH_TAG_LENGTH = 16
+
+const rawKey = process.env.NOTES_ENCRYPTION_KEY
+
+if (!rawKey) {
+  throw new Error("NOTES_ENCRYPTION_KEY environment variable is not set")
+}
+
+const KEY = createHash("sha256").update(rawKey).digest()
+
+const encode = (buffer: Buffer) => buffer.toString("base64")
+const decode = (value: string) => Buffer.from(value, "base64")
+
+export const encryptString = (plainText: string): string => {
+  const iv = randomBytes(IV_LENGTH)
+  const cipher = createCipheriv(ALGORITHM, KEY, iv)
+  const encrypted = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  return encode(Buffer.concat([iv, authTag, encrypted]))
+}
+
+export const decryptString = (encrypted: string): string => {
+  if (!encrypted) {
+    return ""
+  }
+
+  try {
+    const buffer = decode(encrypted)
+    const iv = buffer.subarray(0, IV_LENGTH)
+    const authTag = buffer.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
+    const ciphertext = buffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH)
+
+    const decipher = createDecipheriv(ALGORITHM, KEY, iv)
+    decipher.setAuthTag(authTag)
+
+    const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+    return decrypted.toString("utf8")
+  } catch (error) {
+    return encrypted
+  }
+}
+
+export const encryptStringArray = (values: string[] = []): string[] => values.map(encryptString)
+
+export const decryptStringArray = (values: string[] = []): string[] => values.map(decryptString)
+
+export const encryptChecklist = (items: ChecklistItem[] = []): ChecklistItem[] =>
+  items.map((item) => ({
+    ...item,
+    text: encryptString(item.text ?? ""),
+  }))
+
+export const decryptChecklist = (value: unknown): ChecklistItem[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null
+      }
+
+      const { id, text, checked } = item as Partial<ChecklistItem>
+
+      if (typeof id !== "string") {
+        return null
+      }
+
+      return {
+        id,
+        checked: Boolean(checked),
+        text: decryptString(typeof text === "string" ? text : ""),
+      }
+    })
+    .filter((item): item is ChecklistItem => item !== null)
+}

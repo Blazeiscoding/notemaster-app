@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/prisma"
 import type { NotePayload } from "@/types/note"
 import { serializeNote } from "./utils"
+import { encryptChecklist, encryptString, encryptStringArray } from "@/lib/encryption"
 
 export async function GET() {
   const { userId } = await auth()
@@ -42,10 +43,10 @@ export async function POST(request: Request) {
     data: {
       id: payload.id,
       userId,
-      title: payload.title ?? "",
-      content: payload.content ?? "",
-      tags: payload.tags ?? [],
-      checklist: payload.checklist ?? [],
+      title: encryptString(payload.title ?? ""),
+      content: encryptString(payload.content ?? ""),
+      tags: encryptStringArray(payload.tags ?? []),
+      checklist: encryptChecklist(payload.checklist ?? []),
       type: payload.type ?? "note",
       pinned: payload.pinned ?? false,
       archived: payload.archived ?? false,

@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { serializeNote } from "../utils"
+import { encryptChecklist, encryptString, encryptStringArray } from "@/lib/encryption"
 import type { NotePayload } from "@/types/note"
 
 type ParamsPromise = Promise<{ id: string }>
@@ -32,19 +33,19 @@ export async function PATCH(request: NextRequest, { params }: { params: ParamsPr
   const data: Prisma.NoteUpdateInput = {}
 
   if (typeof payload.title === "string") {
-    data.title = payload.title
+    data.title = encryptString(payload.title)
   }
 
   if (typeof payload.content === "string") {
-    data.content = payload.content
+    data.content = encryptString(payload.content)
   }
 
   if (Array.isArray(payload.tags)) {
-    data.tags = payload.tags
+    data.tags = encryptStringArray(payload.tags)
   }
 
   if (Array.isArray(payload.checklist)) {
-    data.checklist = payload.checklist as Prisma.InputJsonValue
+    data.checklist = encryptChecklist(payload.checklist) as Prisma.InputJsonValue
   }
 
   if (typeof payload.type === "string") {
