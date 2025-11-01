@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
-import withPWA from "next-pwa";
+import nextPWA from "next-pwa";
+
+const withPWA = ((nextPWA as unknown as { default?: unknown }).default ?? nextPWA) as (
+  options?: Record<string, unknown>
+) => (config: NextConfig) => NextConfig;
 
 const withPWAFn = withPWA({
   dest: "public",

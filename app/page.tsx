@@ -12,6 +12,7 @@ import {
   Pin,
   Plus,
   Search,
+  Share,
   Sun,
   Tag,
   Trash2,
@@ -37,6 +38,7 @@ import {
   UserButton,
   useUser,
 } from "@clerk/nextjs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type ChecklistItem = { id: number; text: string; checked: boolean };
 type Note = {
@@ -69,6 +71,7 @@ const NoteApp = () => {
     userChoice?: Promise<{ outcome: string }>;
   } | null>(null);
   const [canInstall, setCanInstall] = useState(false);
+  const [showIosInstallTip, setShowIosInstallTip] = useState(false);
 
   const { user } = useUser();
   const userFirstName = (user as { firstName?: string } | null)?.firstName;
@@ -124,6 +127,62 @@ const NoteApp = () => {
         handler as EventListener
       );
     };
+  }, []);
+
+  // Detect standalone mode or show manual install hint on iOS Safari
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const matchStandalone = window.matchMedia("(display-mode: standalone)");
+
+    const isStandalone = () =>
+      matchStandalone.matches ||
+      // @ts-expect-error standalone is only available in iOS Safari
+      window.navigator.standalone === true;
+
+    const isiOSSafari = () => {
+      const navigatorAny = window.navigator as Navigator & {
+        platform?: string;
+        maxTouchPoints?: number;
+      } & { standalone?: boolean };
+      const ua = navigatorAny.userAgent || "";
+      const platform = navigatorAny.platform || "";
+      const maxTouchPoints = navigatorAny.maxTouchPoints ?? 0;
+      const iOSDevice =
+        /iPad|iPhone|iPod/i.test(ua) ||
+        (platform === "MacIntel" && maxTouchPoints > 1);
+      const isSafari =
+        /Safari/i.test(ua) &&
+        !/Chrome/i.test(ua) &&
+        !/CriOS/i.test(ua) &&
+        !/FxiOS/i.test(ua);
+      return iOSDevice && isSafari;
+    };
+
+    const updateInstallState = () => {
+      if (isStandalone()) {
+        setCanInstall(false);
+        setShowIosInstallTip(false);
+        return;
+      }
+
+      if (isiOSSafari()) {
+        setShowIosInstallTip(true);
+      }
+    };
+
+    updateInstallState();
+
+    const handleChange = () => updateInstallState();
+
+    if (matchStandalone.addEventListener) {
+      matchStandalone.addEventListener("change", handleChange);
+      return () => {
+        matchStandalone.removeEventListener("change", handleChange);
+      };
+    }
+
+    return undefined;
   }, []);
 
   // Save notes to storage whenever they change
@@ -414,6 +473,30 @@ const NoteApp = () => {
             </SignedIn>
           </div>
         </header>
+
+        {showIosInstallTip && (
+          <Alert className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <AlertTitle>Install NoteMaster on your device</AlertTitle>
+              <AlertDescription>
+                <p>
+                  On iPhone or iPad, tap the
+                  <span className="inline-flex items-center gap-1 font-medium">
+                    <Share className="size-4" /> Share
+                  </span>
+                  button in Safari, then choose <strong>Add to Home Screen</strong>.
+                </p>
+              </AlertDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowIosInstallTip(false)}
+            >
+              Got it
+            </Button>
+          </Alert>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <aside
