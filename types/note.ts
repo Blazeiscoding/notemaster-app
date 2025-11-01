@@ -6,7 +6,7 @@ export type ChecklistItem = {
 
 export type NotePayload = {
   id: string
-  userId: string
+  userId: string | null
   title: string
   content: string
   tags: string[]

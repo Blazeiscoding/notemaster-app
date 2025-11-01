@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
-import type { NotePayload, ChecklistItem as ChecklistItemPayload } from "@/types/note";
+import type { NotePayload } from "@/types/note";
 import {
   Archive,
   ArchiveRestore,
@@ -42,24 +42,16 @@ import {
 } from "@clerk/nextjs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-type ChecklistItem = { id: number; text: string; checked: boolean };
-type Note = {
-  id: number;
-  title: string;
-  content: string;
-  tags: string[];
-  checklist: ChecklistItem[];
-  type: "note";
-  createdAt: string;
-  updatedAt: string;
-  pinned?: boolean;
-  archived?: boolean;
-  trashed?: boolean;
+const generateId = () => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 };
 
 const NoteApp = () => {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [currentNote, setCurrentNote] = useState<Note | null>(null);
+  const [notes, setNotes] = useState<NotePayload[]>([]);
+  const [currentNote, setCurrentNote] = useState<NotePayload | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
   const [showSidebar, setShowSidebar] = useState(false);
@@ -86,7 +78,74 @@ const NoteApp = () => {
 
   const { user } = useUser();
   const userFirstName = (user as { firstName?: string } | null)?.firstName;
-  const storageKey = `notemaster-notes-${user?.id ?? "guest"}`;
+  const userId = user?.id ?? null;
+  const isAuthenticated = Boolean(userId);
+  const storageKey = `notemaster-notes-${userId ?? "guest"}`;
+
+  const fetchNotesFromServer = useCallback(async () => {
+    const response = await fetch("/api/notes", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Failed to fetch notes");
+    }
+    return (await response.json()) as NotePayload[];
+  }, []);
+
+  const createNoteOnServer = useCallback(async (note: NotePayload) => {
+    const response = await fetch("/api/notes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(note),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to create note");
+    }
+    return (await response.json()) as NotePayload;
+  }, []);
+
+  const updateNoteOnServer = useCallback(async (id: string, updates: Partial<NotePayload>) => {
+    const response = await fetch(`/api/notes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(updates),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update note");
+    }
+    return (await response.json()) as NotePayload;
+  }, []);
+
+  const deleteNoteOnServer = useCallback(async (id: string) => {
+    const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error("Failed to delete note");
+    }
+  }, []);
+
+  const loadNotes = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      if (isAuthenticated) {
+        const remoteNotes = await fetchNotesFromServer();
+        setNotes(remoteNotes);
+      } else if (typeof window !== "undefined" && window.localStorage) {
+        const raw = window.localStorage.getItem(storageKey);
+        setNotes(raw ? JSON.parse(raw) : []);
+      } else {
+        setNotes([]);
+      }
+    } catch (error) {
+      console.error("Failed to load notes", error);
+      if (!isAuthenticated) {
+        setNotes([]);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isAuthenticated, storageKey, fetchNotesFromServer]);
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
 
   const sectionCounts = useMemo(
     () => ({
@@ -96,29 +155,6 @@ const NoteApp = () => {
     }),
     [notes]
   );
-
-  // Load notes from storage on mount and when user changes
-  useEffect(() => {
-    loadNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storageKey]);
-
-  // (moved) save notes effect is defined below
-
-  const loadNotes = async () => {
-    try {
-      if (typeof window !== "undefined" && window.localStorage) {
-        const raw = window.localStorage.getItem(storageKey);
-        if (raw) {
-          setNotes(JSON.parse(raw));
-        }
-      }
-    } catch {
-      console.log("No existing notes found, starting fresh");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   // Sync `.dark` class on <html> so Tailwind dark: variants work
   useEffect(() => {
@@ -205,9 +241,9 @@ const NoteApp = () => {
     return undefined;
   }, []);
 
-  // Save notes to storage whenever they change
+  // Save notes to storage whenever they change (guests only)
   useEffect(() => {
-    if (!isLoading) {
+    if (!isAuthenticated && !isLoading) {
       try {
         if (typeof window !== "undefined" && window.localStorage) {
           window.localStorage.setItem(storageKey, JSON.stringify(notes));
@@ -216,7 +252,7 @@ const NoteApp = () => {
         console.error("Failed to save notes:", err);
       }
     }
-  }, [notes, isLoading, storageKey]);
+  }, [notes, isLoading, isAuthenticated, storageKey]);
 
   const installApp = async () => {
     if (deferredPrompt) {
@@ -233,83 +269,111 @@ const NoteApp = () => {
     }
   };
 
-  const createNote = () => {
+  const createNote = useCallback(() => {
     setActiveSection("notes");
-    const newNote: Note = {
-      id: Date.now(),
+    const now = new Date().toISOString();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    const newNote: NotePayload = {
+      id: generateId(),
+      userId: ownerId,
       title: "",
       content: "",
       tags: [],
       checklist: [],
       type: "note",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
       pinned: false,
       archived: false,
       trashed: false,
     };
     setCurrentNote(newNote);
     setShowSidebar(false);
-  };
+  }, [isAuthenticated, userId]);
 
-  const saveCurrentNote = () => {
+  const saveCurrentNote = useCallback(async () => {
     if (
-      currentNote &&
-      (currentNote.title ||
-        currentNote.content ||
-        currentNote.checklist.length > 0)
+      !currentNote ||
+      (!currentNote.title &&
+        !currentNote.content &&
+        currentNote.checklist.length === 0)
     ) {
-      const updatedNote = {
-        ...currentNote,
-        updatedAt: new Date().toISOString(),
-      };
-      const existingIndex = notes.findIndex((n) => n.id === currentNote.id);
-
-      if (existingIndex >= 0) {
-        const newNotes = [...notes];
-        newNotes[existingIndex] = updatedNote;
-        setNotes(newNotes);
-      } else {
-        setNotes([updatedNote, ...notes]);
-      }
-      setCurrentNote(null);
+      return;
     }
-  };
+
+    const updatedAt = new Date().toISOString();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    const baseNote: NotePayload = {
+      ...currentNote,
+      userId: ownerId,
+      updatedAt,
+    };
+
+    const applyLocal = (note: NotePayload) => {
+      setNotes((prev) => {
+        const existingIndex = prev.findIndex((n) => n.id === note.id);
+        if (existingIndex >= 0) {
+          const next = [...prev];
+          next[existingIndex] = note;
+          return next;
+        }
+        return [note, ...prev];
+      });
+    };
+
+    const exists = notes.some((n) => n.id === baseNote.id);
+
+    if (isAuthenticated) {
+      try {
+        const saved = exists
+          ? await updateNoteOnServer(baseNote.id, baseNote)
+          : await createNoteOnServer(baseNote);
+        applyLocal(saved);
+      } catch (error) {
+        console.error("Failed to save note", error);
+        return;
+      }
+    } else {
+      applyLocal(baseNote);
+    }
+
+    setCurrentNote(null);
+  }, [currentNote, isAuthenticated, notes, updateNoteOnServer, createNoteOnServer, userId]);
 
   // Hard delete is no longer used; keep for potential future admin actions
 
-  const addChecklistItem = () => {
+  const addChecklistItem = useCallback(() => {
     if (currentNote) {
       setCurrentNote({
         ...currentNote,
         checklist: [
           ...currentNote.checklist,
-          { id: Date.now(), text: "", checked: false },
+          { id: generateId(), text: "", checked: false },
         ],
       });
     }
-  };
+  }, [currentNote]);
 
-  const markAllChecklist = (checked: boolean) => {
+  const markAllChecklist = useCallback((checked: boolean) => {
     if (currentNote) {
       setCurrentNote({
         ...currentNote,
         checklist: currentNote.checklist.map((item) => ({ ...item, checked })),
       });
     }
-  };
+  }, [currentNote]);
 
-  const clearCompletedChecklist = () => {
+  const clearCompletedChecklist = useCallback(() => {
     if (currentNote) {
       setCurrentNote({
         ...currentNote,
         checklist: currentNote.checklist.filter((i) => !i.checked),
       });
     }
-  };
+  }, [currentNote]);
 
-  const updateChecklistItem = (
-    itemId: number,
+  const updateChecklistItem = useCallback((
+    itemId: string,
     field: "text" | "checked",
     value: string | boolean
   ) => {
@@ -321,34 +385,34 @@ const NoteApp = () => {
         ),
       });
     }
-  };
+  }, [currentNote]);
 
-  const deleteChecklistItem = (itemId: number) => {
+  const deleteChecklistItem = useCallback((itemId: string) => {
     if (currentNote) {
       setCurrentNote({
         ...currentNote,
         checklist: currentNote.checklist.filter((item) => item.id !== itemId),
       });
     }
-  };
+  }, [currentNote]);
 
-  const addTag = (tag: string) => {
+  const addTag = useCallback((tag: string) => {
     if (currentNote && tag && !currentNote.tags.includes(tag)) {
       setCurrentNote({
         ...currentNote,
         tags: [...currentNote.tags, tag],
       });
     }
-  };
+  }, [currentNote]);
 
-  const removeTag = (tag: string) => {
+  const removeTag = useCallback((tag: string) => {
     if (currentNote) {
       setCurrentNote({
         ...currentNote,
         tags: currentNote.tags.filter((t) => t !== tag),
       });
     }
-  };
+  }, [currentNote]);
 
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
@@ -383,72 +447,196 @@ const NoteApp = () => {
     });
   }, [filteredNotes, sortBy, activeSection]);
 
-  const togglePin = (id: number) => {
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, pinned: !n.pinned, updatedAt: new Date().toISOString() }
-          : n
-      )
-    );
-  };
+  const togglePin = useCallback(async (id: string) => {
+    const existing = notes.find((n) => n.id === id);
+    if (!existing) return;
 
-  const archiveNote = (id: number) => {
-    setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, archived: true, pinned: false, updatedAt: new Date().toISOString() }
-          : n
-      )
-    );
-  };
+    const optimistic: NotePayload = {
+      ...existing,
+      pinned: !existing.pinned,
+      updatedAt: new Date().toISOString(),
+    };
 
-  const unarchiveNote = (id: number) => {
     setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? { ...n, archived: false, updatedAt: new Date().toISOString() }
-          : n
-      )
+      prev.map((note) => (note.id === id ? optimistic : note))
     );
-  };
 
-  const trashNote = (id: number) => {
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, {
+          pinned: optimistic.pinned,
+        });
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+      } catch (error) {
+        console.error("Failed to toggle pin", error);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? existing : note))
+        );
+      }
+    }
+  }, [notes, isAuthenticated, updateNoteOnServer]);
+
+  const archiveNote = useCallback(async (id: string) => {
+    const existing = notes.find((n) => n.id === id);
+    if (!existing) return;
+
+    const optimistic: NotePayload = {
+      ...existing,
+      archived: true,
+      pinned: false,
+      updatedAt: new Date().toISOString(),
+    };
+
     setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              trashed: true,
-              archived: false,
-              pinned: false,
-              updatedAt: new Date().toISOString(),
-            }
-          : n
-      )
+      prev.map((note) => (note.id === id ? optimistic : note))
     );
-    if (currentNote?.id === id) setCurrentNote(null);
-  };
 
-  const restoreFromBin = (id: number) => {
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, {
+          archived: true,
+          pinned: false,
+        });
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+      } catch (error) {
+        console.error("Failed to archive note", error);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? existing : note))
+        );
+      }
+    }
+  }, [notes, isAuthenticated, updateNoteOnServer]);
+
+  const unarchiveNote = useCallback(async (id: string) => {
+    const existing = notes.find((n) => n.id === id);
+    if (!existing) return;
+
+    const optimistic: NotePayload = {
+      ...existing,
+      archived: false,
+      updatedAt: new Date().toISOString(),
+    };
+
     setNotes((prev) =>
-      prev.map((n) =>
-        n.id === id
-          ? {
-              ...n,
-              trashed: false,
-              archived: false,
-              updatedAt: new Date().toISOString(),
-            }
-          : n
-      )
+      prev.map((note) => (note.id === id ? optimistic : note))
     );
-  };
 
-  const deleteForever = (id: number) => {
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, {
+          archived: false,
+        });
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+      } catch (error) {
+        console.error("Failed to unarchive note", error);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? existing : note))
+        );
+      }
+    }
+  }, [notes, isAuthenticated, updateNoteOnServer]);
+
+  const trashNote = useCallback(async (id: string) => {
+    const existing = notes.find((n) => n.id === id);
+    if (!existing) return;
+
+    const optimistic: NotePayload = {
+      ...existing,
+      trashed: true,
+      archived: false,
+      pinned: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const wasCurrent = currentNote?.id === id;
+
+    setNotes((prev) =>
+      prev.map((note) => (note.id === id ? optimistic : note))
+    );
+    if (wasCurrent) setCurrentNote(null);
+
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, {
+          trashed: true,
+          archived: false,
+          pinned: false,
+        });
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+      } catch (error) {
+        console.error("Failed to move note to bin", error);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? existing : note))
+        );
+        if (wasCurrent) setCurrentNote(existing);
+      }
+    }
+  }, [notes, currentNote, isAuthenticated, updateNoteOnServer]);
+
+  const restoreFromBin = useCallback(async (id: string) => {
+    const existing = notes.find((n) => n.id === id);
+    if (!existing) return;
+
+    const optimistic: NotePayload = {
+      ...existing,
+      trashed: false,
+      archived: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    setNotes((prev) =>
+      prev.map((note) => (note.id === id ? optimistic : note))
+    );
+
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, {
+          trashed: false,
+          archived: false,
+        });
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+      } catch (error) {
+        console.error("Failed to restore note", error);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? existing : note))
+        );
+      }
+    }
+  }, [notes, isAuthenticated, updateNoteOnServer]);
+
+  const deleteForever = useCallback(async (id: string) => {
+    const index = notes.findIndex((n) => n.id === id);
+    if (index === -1) return;
+    const existing = notes[index];
+    const wasCurrent = currentNote?.id === id;
+
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    if (currentNote?.id === id) setCurrentNote(null);
-  };
+    if (wasCurrent) setCurrentNote(null);
+
+    if (isAuthenticated) {
+      try {
+        await deleteNoteOnServer(id);
+      } catch (error) {
+        console.error("Failed to delete note", error);
+        setNotes((prev) => {
+          const next = [...prev];
+          next.splice(index, 0, existing);
+          return next;
+        });
+        if (wasCurrent) setCurrentNote(existing);
+      }
+    }
+  }, [notes, currentNote, isAuthenticated, deleteNoteOnServer]);
 
   // Restore UI not implemented in this view; function omitted to keep bundle lean
 
@@ -471,8 +659,8 @@ const NoteApp = () => {
         const data = JSON.parse(String(reader.result));
         if (Array.isArray(data)) {
           // naive merge by id; prefer imported
-          const map = new Map<number, Note>(notes.map((n) => [n.id, n]));
-          for (const n of data) map.set(n.id, n);
+          const map = new Map<string, NotePayload>(notes.map((n) => [n.id, n]));
+          for (const n of data) map.set(n.id, n as NotePayload);
           setNotes(Array.from(map.values()));
         }
       } catch (e) {
