@@ -45,7 +45,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const THEME_STORAGE_KEY = "notemaster-theme";
 
 const generateId = () => {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+  if (
+    typeof crypto !== "undefined" &&
+    typeof crypto.randomUUID === "function"
+  ) {
     return crypto.randomUUID();
   }
   return `${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -88,9 +91,9 @@ const NoteApp = () => {
   } | null>(null);
   const [canInstall, setCanInstall] = useState(false);
   const [showIosInstallTip, setShowIosInstallTip] = useState(false);
-  const [activeSection, setActiveSection] = useState<"notes" | "archive" | "bin">(
-    "notes"
-  );
+  const [activeSection, setActiveSection] = useState<
+    "notes" | "archive" | "bin"
+  >("notes");
 
   useEffect(() => {
     if (activeSection !== "notes") {
@@ -124,17 +127,20 @@ const NoteApp = () => {
     return (await response.json()) as NotePayload;
   }, []);
 
-  const updateNoteOnServer = useCallback(async (id: string, updates: Partial<NotePayload>) => {
-    const response = await fetch(`/api/notes/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(updates),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to update note");
-    }
-    return (await response.json()) as NotePayload;
-  }, []);
+  const updateNoteOnServer = useCallback(
+    async (id: string, updates: Partial<NotePayload>) => {
+      const response = await fetch(`/api/notes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update note");
+      }
+      return (await response.json()) as NotePayload;
+    },
+    []
+  );
 
   const deleteNoteOnServer = useCallback(async (id: string) => {
     const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
@@ -373,9 +379,14 @@ const NoteApp = () => {
     }
 
     setCurrentNote(null);
-  }, [currentNote, isAuthenticated, notes, updateNoteOnServer, createNoteOnServer, userId]);
-
-  // Hard delete is no longer used; keep for potential future admin actions
+  }, [
+    currentNote,
+    isAuthenticated,
+    notes,
+    updateNoteOnServer,
+    createNoteOnServer,
+    userId,
+  ]);
 
   const addChecklistItem = useCallback(() => {
     if (currentNote) {
@@ -389,14 +400,20 @@ const NoteApp = () => {
     }
   }, [currentNote]);
 
-  const markAllChecklist = useCallback((checked: boolean) => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        checklist: currentNote.checklist.map((item) => ({ ...item, checked })),
-      });
-    }
-  }, [currentNote]);
+  const markAllChecklist = useCallback(
+    (checked: boolean) => {
+      if (currentNote) {
+        setCurrentNote({
+          ...currentNote,
+          checklist: currentNote.checklist.map((item) => ({
+            ...item,
+            checked,
+          })),
+        });
+      }
+    },
+    [currentNote]
+  );
 
   const clearCompletedChecklist = useCallback(() => {
     if (currentNote) {
@@ -407,47 +424,55 @@ const NoteApp = () => {
     }
   }, [currentNote]);
 
-  const updateChecklistItem = useCallback((
-    itemId: string,
-    field: "text" | "checked",
-    value: string | boolean
-  ) => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        checklist: currentNote.checklist.map((item) =>
-          item.id === itemId ? { ...item, [field]: value as never } : item
-        ),
-      });
-    }
-  }, [currentNote]);
+  const updateChecklistItem = useCallback(
+    (itemId: string, field: "text" | "checked", value: string | boolean) => {
+      if (currentNote) {
+        setCurrentNote({
+          ...currentNote,
+          checklist: currentNote.checklist.map((item) =>
+            item.id === itemId ? { ...item, [field]: value as never } : item
+          ),
+        });
+      }
+    },
+    [currentNote]
+  );
 
-  const deleteChecklistItem = useCallback((itemId: string) => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        checklist: currentNote.checklist.filter((item) => item.id !== itemId),
-      });
-    }
-  }, [currentNote]);
+  const deleteChecklistItem = useCallback(
+    (itemId: string) => {
+      if (currentNote) {
+        setCurrentNote({
+          ...currentNote,
+          checklist: currentNote.checklist.filter((item) => item.id !== itemId),
+        });
+      }
+    },
+    [currentNote]
+  );
 
-  const addTag = useCallback((tag: string) => {
-    if (currentNote && tag && !currentNote.tags.includes(tag)) {
-      setCurrentNote({
-        ...currentNote,
-        tags: [...currentNote.tags, tag],
-      });
-    }
-  }, [currentNote]);
+  const addTag = useCallback(
+    (tag: string) => {
+      if (currentNote && tag && !currentNote.tags.includes(tag)) {
+        setCurrentNote({
+          ...currentNote,
+          tags: [...currentNote.tags, tag],
+        });
+      }
+    },
+    [currentNote]
+  );
 
-  const removeTag = useCallback((tag: string) => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        tags: currentNote.tags.filter((t) => t !== tag),
-      });
-    }
-  }, [currentNote]);
+  const removeTag = useCallback(
+    (tag: string) => {
+      if (currentNote) {
+        setCurrentNote({
+          ...currentNote,
+          tags: currentNote.tags.filter((t) => t !== tag),
+        });
+      }
+    },
+    [currentNote]
+  );
 
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
@@ -475,203 +500,224 @@ const NoteApp = () => {
         if (pinnedDiff !== 0) return pinnedDiff;
       }
 
-      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "title")
+        return (a.title || "").localeCompare(b.title || "");
       if (sortBy === "created")
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        return (
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
   }, [filteredNotes, sortBy, activeSection]);
 
-  const togglePin = useCallback(async (id: string) => {
-    const existing = notes.find((n) => n.id === id);
-    if (!existing) return;
+  const togglePin = useCallback(
+    async (id: string) => {
+      const existing = notes.find((n) => n.id === id);
+      if (!existing) return;
 
-    const optimistic: NotePayload = {
-      ...existing,
-      pinned: !existing.pinned,
-      updatedAt: new Date().toISOString(),
-    };
+      const optimistic: NotePayload = {
+        ...existing,
+        pinned: !existing.pinned,
+        updatedAt: new Date().toISOString(),
+      };
 
-    setNotes((prev) =>
-      prev.map((note) => (note.id === id ? optimistic : note))
-    );
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? optimistic : note))
+      );
 
-    if (isAuthenticated) {
-      try {
-        const saved = await updateNoteOnServer(id, {
-          pinned: optimistic.pinned,
-        });
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
-        );
-      } catch (error) {
-        console.error("Failed to toggle pin", error);
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? existing : note))
-        );
+      if (isAuthenticated) {
+        try {
+          const saved = await updateNoteOnServer(id, {
+            pinned: optimistic.pinned,
+          });
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? saved : note))
+          );
+        } catch (error) {
+          console.error("Failed to toggle pin", error);
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? existing : note))
+          );
+        }
       }
-    }
-  }, [notes, isAuthenticated, updateNoteOnServer]);
+    },
+    [notes, isAuthenticated, updateNoteOnServer]
+  );
 
-  const archiveNote = useCallback(async (id: string) => {
-    const existing = notes.find((n) => n.id === id);
-    if (!existing) return;
+  const archiveNote = useCallback(
+    async (id: string) => {
+      const existing = notes.find((n) => n.id === id);
+      if (!existing) return;
 
-    const optimistic: NotePayload = {
-      ...existing,
-      archived: true,
-      pinned: false,
-      updatedAt: new Date().toISOString(),
-    };
+      const optimistic: NotePayload = {
+        ...existing,
+        archived: true,
+        pinned: false,
+        updatedAt: new Date().toISOString(),
+      };
 
-    setNotes((prev) =>
-      prev.map((note) => (note.id === id ? optimistic : note))
-    );
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? optimistic : note))
+      );
 
-    if (isAuthenticated) {
-      try {
-        const saved = await updateNoteOnServer(id, {
-          archived: true,
-          pinned: false,
-        });
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
-        );
-      } catch (error) {
-        console.error("Failed to archive note", error);
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? existing : note))
-        );
+      if (isAuthenticated) {
+        try {
+          const saved = await updateNoteOnServer(id, {
+            archived: true,
+            pinned: false,
+          });
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? saved : note))
+          );
+        } catch (error) {
+          console.error("Failed to archive note", error);
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? existing : note))
+          );
+        }
       }
-    }
-  }, [notes, isAuthenticated, updateNoteOnServer]);
+    },
+    [notes, isAuthenticated, updateNoteOnServer]
+  );
 
-  const unarchiveNote = useCallback(async (id: string) => {
-    const existing = notes.find((n) => n.id === id);
-    if (!existing) return;
+  const unarchiveNote = useCallback(
+    async (id: string) => {
+      const existing = notes.find((n) => n.id === id);
+      if (!existing) return;
 
-    const optimistic: NotePayload = {
-      ...existing,
-      archived: false,
-      updatedAt: new Date().toISOString(),
-    };
+      const optimistic: NotePayload = {
+        ...existing,
+        archived: false,
+        updatedAt: new Date().toISOString(),
+      };
 
-    setNotes((prev) =>
-      prev.map((note) => (note.id === id ? optimistic : note))
-    );
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? optimistic : note))
+      );
 
-    if (isAuthenticated) {
-      try {
-        const saved = await updateNoteOnServer(id, {
-          archived: false,
-        });
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
-        );
-      } catch (error) {
-        console.error("Failed to unarchive note", error);
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? existing : note))
-        );
+      if (isAuthenticated) {
+        try {
+          const saved = await updateNoteOnServer(id, {
+            archived: false,
+          });
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? saved : note))
+          );
+        } catch (error) {
+          console.error("Failed to unarchive note", error);
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? existing : note))
+          );
+        }
       }
-    }
-  }, [notes, isAuthenticated, updateNoteOnServer]);
+    },
+    [notes, isAuthenticated, updateNoteOnServer]
+  );
 
-  const trashNote = useCallback(async (id: string) => {
-    const existing = notes.find((n) => n.id === id);
-    if (!existing) return;
+  const trashNote = useCallback(
+    async (id: string) => {
+      const existing = notes.find((n) => n.id === id);
+      if (!existing) return;
 
-    const optimistic: NotePayload = {
-      ...existing,
-      trashed: true,
-      archived: false,
-      pinned: false,
-      updatedAt: new Date().toISOString(),
-    };
+      const optimistic: NotePayload = {
+        ...existing,
+        trashed: true,
+        archived: false,
+        pinned: false,
+        updatedAt: new Date().toISOString(),
+      };
 
-    const wasCurrent = currentNote?.id === id;
+      const wasCurrent = currentNote?.id === id;
 
-    setNotes((prev) =>
-      prev.map((note) => (note.id === id ? optimistic : note))
-    );
-    if (wasCurrent) setCurrentNote(null);
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? optimistic : note))
+      );
+      if (wasCurrent) setCurrentNote(null);
 
-    if (isAuthenticated) {
-      try {
-        const saved = await updateNoteOnServer(id, {
-          trashed: true,
-          archived: false,
-          pinned: false,
-        });
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
-        );
-      } catch (error) {
-        console.error("Failed to move note to bin", error);
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? existing : note))
-        );
-        if (wasCurrent) setCurrentNote(existing);
+      if (isAuthenticated) {
+        try {
+          const saved = await updateNoteOnServer(id, {
+            trashed: true,
+            archived: false,
+            pinned: false,
+          });
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? saved : note))
+          );
+        } catch (error) {
+          console.error("Failed to move note to bin", error);
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? existing : note))
+          );
+          if (wasCurrent) setCurrentNote(existing);
+        }
       }
-    }
-  }, [notes, currentNote, isAuthenticated, updateNoteOnServer]);
+    },
+    [notes, currentNote, isAuthenticated, updateNoteOnServer]
+  );
 
-  const restoreFromBin = useCallback(async (id: string) => {
-    const existing = notes.find((n) => n.id === id);
-    if (!existing) return;
+  const restoreFromBin = useCallback(
+    async (id: string) => {
+      const existing = notes.find((n) => n.id === id);
+      if (!existing) return;
 
-    const optimistic: NotePayload = {
-      ...existing,
-      trashed: false,
-      archived: false,
-      updatedAt: new Date().toISOString(),
-    };
+      const optimistic: NotePayload = {
+        ...existing,
+        trashed: false,
+        archived: false,
+        updatedAt: new Date().toISOString(),
+      };
 
-    setNotes((prev) =>
-      prev.map((note) => (note.id === id ? optimistic : note))
-    );
+      setNotes((prev) =>
+        prev.map((note) => (note.id === id ? optimistic : note))
+      );
 
-    if (isAuthenticated) {
-      try {
-        const saved = await updateNoteOnServer(id, {
-          trashed: false,
-          archived: false,
-        });
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
-        );
-      } catch (error) {
-        console.error("Failed to restore note", error);
-        setNotes((prev) =>
-          prev.map((note) => (note.id === id ? existing : note))
-        );
+      if (isAuthenticated) {
+        try {
+          const saved = await updateNoteOnServer(id, {
+            trashed: false,
+            archived: false,
+          });
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? saved : note))
+          );
+        } catch (error) {
+          console.error("Failed to restore note", error);
+          setNotes((prev) =>
+            prev.map((note) => (note.id === id ? existing : note))
+          );
+        }
       }
-    }
-  }, [notes, isAuthenticated, updateNoteOnServer]);
+    },
+    [notes, isAuthenticated, updateNoteOnServer]
+  );
 
-  const deleteForever = useCallback(async (id: string) => {
-    const index = notes.findIndex((n) => n.id === id);
-    if (index === -1) return;
-    const existing = notes[index];
-    const wasCurrent = currentNote?.id === id;
+  const deleteForever = useCallback(
+    async (id: string) => {
+      const index = notes.findIndex((n) => n.id === id);
+      if (index === -1) return;
+      const existing = notes[index];
+      const wasCurrent = currentNote?.id === id;
 
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-    if (wasCurrent) setCurrentNote(null);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      if (wasCurrent) setCurrentNote(null);
 
-    if (isAuthenticated) {
-      try {
-        await deleteNoteOnServer(id);
-      } catch (error) {
-        console.error("Failed to delete note", error);
-        setNotes((prev) => {
-          const next = [...prev];
-          next.splice(index, 0, existing);
-          return next;
-        });
-        if (wasCurrent) setCurrentNote(existing);
+      if (isAuthenticated) {
+        try {
+          await deleteNoteOnServer(id);
+        } catch (error) {
+          console.error("Failed to delete note", error);
+          setNotes((prev) => {
+            const next = [...prev];
+            next.splice(index, 0, existing);
+            return next;
+          });
+          if (wasCurrent) setCurrentNote(existing);
+        }
       }
-    }
-  }, [notes, currentNote, isAuthenticated, deleteNoteOnServer]);
+    },
+    [notes, currentNote, isAuthenticated, deleteNoteOnServer]
+  );
 
   // Restore UI not implemented in this view; function omitted to keep bundle lean
 
@@ -735,7 +781,9 @@ const NoteApp = () => {
               <p className="text-sm font-medium text-muted-foreground">
                 Welcome back{userFirstName ? `, ${userFirstName}` : ""}
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight">NoteMaster</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                NoteMaster
+              </h1>
             </div>
           </div>
 
@@ -751,7 +799,11 @@ const NoteApp = () => {
               size="icon-sm"
               onClick={() => setDarkMode((prev) => !prev)}
             >
-              {darkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              {darkMode ? (
+                <Sun className="size-4" />
+              ) : (
+                <Moon className="size-4" />
+              )}
             </Button>
             <Button size="sm" onClick={createNote}>
               <Plus className="size-4" />
@@ -765,7 +817,9 @@ const NoteApp = () => {
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton appearance={{ elements: { userButtonAvatarBox: "size-8" } }} />
+              <UserButton
+                appearance={{ elements: { userButtonAvatarBox: "size-8" } }}
+              />
             </SignedIn>
           </div>
         </header>
@@ -780,7 +834,8 @@ const NoteApp = () => {
                   <span className="inline-flex items-center gap-1 font-medium">
                     <Share className="size-4" /> Share
                   </span>
-                  button in Safari, then choose <strong>Add to Home Screen</strong>.
+                  button in Safari, then choose{" "}
+                  <strong>Add to Home Screen</strong>.
                 </p>
               </AlertDescription>
             </div>
@@ -798,7 +853,9 @@ const NoteApp = () => {
           <aside
             className={cn(
               "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300 lg:static lg:block",
-              showSidebar ? "block translate-y-0 opacity-100" : "hidden -translate-y-2 opacity-0 lg:block lg:opacity-100 lg:translate-y-0"
+              showSidebar
+                ? "block translate-y-0 opacity-100"
+                : "hidden -translate-y-2 opacity-0 lg:block lg:opacity-100 lg:translate-y-0"
             )}
           >
             <div className="space-y-3">
@@ -913,7 +970,12 @@ const NoteApp = () => {
             </div>
 
             <div className="space-y-2">
-              <Button variant="outline" size="sm" onClick={exportNotes} className="w-full justify-between">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportNotes}
+                className="w-full justify-between"
+              >
                 <span>Export notes</span>
                 <Download className="size-4" />
               </Button>
@@ -943,7 +1005,10 @@ const NoteApp = () => {
                     <Input
                       value={currentNote.title}
                       onChange={(event) =>
-                        setCurrentNote({ ...currentNote, title: event.target.value })
+                        setCurrentNote({
+                          ...currentNote,
+                          title: event.target.value,
+                        })
                       }
                       placeholder="Title"
                       className="border-none px-0 text-xl font-semibold focus-visible:ring-0"
@@ -953,7 +1018,11 @@ const NoteApp = () => {
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setCurrentNote(null)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentNote(null)}
+                    >
                       <X className="size-4" />
                       Cancel
                     </Button>
@@ -967,7 +1036,10 @@ const NoteApp = () => {
                   <Textarea
                     value={currentNote.content}
                     onChange={(event) =>
-                      setCurrentNote({ ...currentNote, content: event.target.value })
+                      setCurrentNote({
+                        ...currentNote,
+                        content: event.target.value,
+                      })
                     }
                     placeholder="Capture your thoughts..."
                     className="min-h-[240px] resize-y border-none bg-transparent px-0 text-base focus-visible:ring-0"
@@ -979,16 +1051,32 @@ const NoteApp = () => {
                         Checklist
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => markAllChecklist(true)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => markAllChecklist(true)}
+                        >
                           Mark all
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => markAllChecklist(false)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => markAllChecklist(false)}
+                        >
                           Unmark all
                         </Button>
-                        <Button variant="outline" size="sm" onClick={clearCompletedChecklist}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={clearCompletedChecklist}
+                        >
                           Clear done
                         </Button>
-                        <Button variant="outline" size="sm" onClick={addChecklistItem}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={addChecklistItem}
+                        >
                           <Plus className="size-4" />
                           Add
                         </Button>
@@ -1006,7 +1094,11 @@ const NoteApp = () => {
                               type="checkbox"
                               checked={item.checked}
                               onChange={(event) =>
-                                updateChecklistItem(item.id, "checked", event.target.checked)
+                                updateChecklistItem(
+                                  item.id,
+                                  "checked",
+                                  event.target.checked
+                                )
                               }
                               className="size-4 rounded border-muted-foreground"
                             />
@@ -1014,12 +1106,17 @@ const NoteApp = () => {
                           <Input
                             value={item.text}
                             onChange={(event) =>
-                              updateChecklistItem(item.id, "text", event.target.value)
+                              updateChecklistItem(
+                                item.id,
+                                "text",
+                                event.target.value
+                              )
                             }
                             placeholder="Checklist item"
                             className={cn(
                               "flex-1 border-none px-0 focus-visible:ring-0",
-                              item.checked && "text-muted-foreground line-through"
+                              item.checked &&
+                                "text-muted-foreground line-through"
                             )}
                           />
                           <Button
@@ -1034,7 +1131,8 @@ const NoteApp = () => {
                       ))}
                       {currentNote.checklist.length === 0 && (
                         <p className="text-sm text-muted-foreground">
-                          No checklist items yet. Add one to keep track of tasks.
+                          No checklist items yet. Add one to keep track of
+                          tasks.
                         </p>
                       )}
                     </div>
@@ -1097,7 +1195,9 @@ const NoteApp = () => {
                       <div className="space-y-2">
                         {activeSection === "notes" && (
                           <>
-                            <h2 className="text-lg font-semibold">Nothing here yet</h2>
+                            <h2 className="text-lg font-semibold">
+                              Nothing here yet
+                            </h2>
                             <p className="text-sm text-muted-foreground">
                               Start capturing your ideas by creating a new note.
                             </p>
@@ -1105,17 +1205,23 @@ const NoteApp = () => {
                         )}
                         {activeSection === "archive" && (
                           <>
-                            <h2 className="text-lg font-semibold">No archived notes</h2>
+                            <h2 className="text-lg font-semibold">
+                              No archived notes
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                              Archive notes to keep them here without deleting them.
+                              Archive notes to keep them here without deleting
+                              them.
                             </p>
                           </>
                         )}
                         {activeSection === "bin" && (
                           <>
-                            <h2 className="text-lg font-semibold">Bin is empty</h2>
+                            <h2 className="text-lg font-semibold">
+                              Bin is empty
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                              Deleted notes will appear here for recovery or removal.
+                              Deleted notes will appear here for recovery or
+                              removal.
                             </p>
                           </>
                         )}
@@ -1254,7 +1360,11 @@ const NoteApp = () => {
                           </p>
                           {note.checklist.length > 0 && (
                             <div className="rounded-md bg-muted px-3 py-2 text-xs">
-                              {note.checklist.filter((item) => item.checked).length} of
+                              {
+                                note.checklist.filter((item) => item.checked)
+                                  .length
+                              }{" "}
+                              of
                               {note.checklist.length} tasks complete
                             </div>
                           )}
