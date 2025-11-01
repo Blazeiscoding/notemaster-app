@@ -74,7 +74,6 @@ const NoteApp = () => {
     } catch (error) {
       console.error("Failed to read theme preference", error);
     }
-
     return false;
   });
   const [showSidebar, setShowSidebar] = useState(false);
