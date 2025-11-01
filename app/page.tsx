@@ -42,6 +42,8 @@ import {
 } from "@clerk/nextjs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+const THEME_STORAGE_KEY = "notemaster-theme";
+
 const generateId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -53,7 +55,28 @@ const NoteApp = () => {
   const [notes, setNotes] = useState<NotePayload[]>([]);
   const [currentNote, setCurrentNote] = useState<NotePayload | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    try {
+      const stored = window.localStorage?.getItem(THEME_STORAGE_KEY);
+      if (stored === "dark") {
+        return true;
+      }
+      if (stored === "light") {
+        return false;
+      }
+      if (typeof window.matchMedia === "function") {
+        return window.matchMedia("(prefers-color-scheme: dark)").matches;
+      }
+    } catch (error) {
+      console.error("Failed to read theme preference", error);
+    }
+
+    return false;
+  });
   const [showSidebar, setShowSidebar] = useState(false);
   const [filterTag, setFilterTag] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
@@ -165,6 +188,19 @@ const NoteApp = () => {
       } else {
         root.classList.remove("dark");
       }
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    try {
+      window.localStorage?.setItem(
+        THEME_STORAGE_KEY,
+        darkMode ? "dark" : "light"
+      );
+    } catch (error) {
+      console.error("Failed to persist theme preference", error);
     }
   }, [darkMode]);
 
