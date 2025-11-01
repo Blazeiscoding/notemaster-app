@@ -1,9 +1,10 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import type { NotePayload, ChecklistItem as ChecklistItemPayload } from "@/types/note";
 import {
   Archive,
+  ArchiveRestore,
   Check,
   Clock,
   Download,
@@ -16,6 +17,7 @@ import {
   Sun,
   Tag,
   Trash2,
+  Undo2,
   Upload,
   X,
 } from "lucide-react";
@@ -72,10 +74,28 @@ const NoteApp = () => {
   } | null>(null);
   const [canInstall, setCanInstall] = useState(false);
   const [showIosInstallTip, setShowIosInstallTip] = useState(false);
+  const [activeSection, setActiveSection] = useState<"notes" | "archive" | "bin">(
+    "notes"
+  );
+
+  useEffect(() => {
+    if (activeSection !== "notes") {
+      setCurrentNote(null);
+    }
+  }, [activeSection]);
 
   const { user } = useUser();
   const userFirstName = (user as { firstName?: string } | null)?.firstName;
   const storageKey = `notemaster-notes-${user?.id ?? "guest"}`;
+
+  const sectionCounts = useMemo(
+    () => ({
+      notes: notes.filter((note) => !note.archived && !note.trashed).length,
+      archive: notes.filter((note) => note.archived && !note.trashed).length,
+      bin: notes.filter((note) => note.trashed).length,
+    }),
+    [notes]
+  );
 
   // Load notes from storage on mount and when user changes
   useEffect(() => {
@@ -214,6 +234,7 @@ const NoteApp = () => {
   };
 
   const createNote = () => {
+    setActiveSection("notes");
     const newNote: Note = {
       id: Date.now(),
       title: "",
@@ -329,22 +350,38 @@ const NoteApp = () => {
     }
   };
 
-  const filteredNotes = notes.filter((note) => {
-    const matchesSearch =
-      note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTag = filterTag === "all" || note.tags.includes(filterTag);
-    return matchesSearch && matchesTag && !note.trashed && !note.archived;
-  });
+  const filteredNotes = useMemo(() => {
+    return notes.filter((note) => {
+      const matchesSearch =
+        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesTag = filterTag === "all" || note.tags.includes(filterTag);
+
+      if (!matchesSearch || !matchesTag) return false;
+
+      if (activeSection === "notes") return !note.archived && !note.trashed;
+      if (activeSection === "archive") return note.archived && !note.trashed;
+      if (activeSection === "bin") return note.trashed;
+
+      return false;
+    });
+  }, [notes, searchQuery, filterTag, activeSection]);
 
   const allTags = [...new Set(notes.flatMap((note) => note.tags))];
 
-  const sortedNotes = [...filteredNotes].sort((a, b) => {
-    if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
-    if (sortBy === "created")
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
+  const sortedNotes = useMemo(() => {
+    return [...filteredNotes].sort((a, b) => {
+      if (activeSection === "notes") {
+        const pinnedDiff = Number(b.pinned) - Number(a.pinned);
+        if (pinnedDiff !== 0) return pinnedDiff;
+      }
+
+      if (sortBy === "title") return (a.title || "").localeCompare(b.title || "");
+      if (sortBy === "created")
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }, [filteredNotes, sortBy, activeSection]);
 
   const togglePin = (id: number) => {
     setNotes((prev) =>
@@ -360,7 +397,17 @@ const NoteApp = () => {
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id
-          ? { ...n, archived: true, updatedAt: new Date().toISOString() }
+          ? { ...n, archived: true, pinned: false, updatedAt: new Date().toISOString() }
+          : n
+      )
+    );
+  };
+
+  const unarchiveNote = (id: number) => {
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === id
+          ? { ...n, archived: false, updatedAt: new Date().toISOString() }
           : n
       )
     );
@@ -370,10 +417,36 @@ const NoteApp = () => {
     setNotes((prev) =>
       prev.map((n) =>
         n.id === id
-          ? { ...n, trashed: true, updatedAt: new Date().toISOString() }
+          ? {
+              ...n,
+              trashed: true,
+              archived: false,
+              pinned: false,
+              updatedAt: new Date().toISOString(),
+            }
           : n
       )
     );
+    if (currentNote?.id === id) setCurrentNote(null);
+  };
+
+  const restoreFromBin = (id: number) => {
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.id === id
+          ? {
+              ...n,
+              trashed: false,
+              archived: false,
+              updatedAt: new Date().toISOString(),
+            }
+          : n
+      )
+    );
+  };
+
+  const deleteForever = (id: number) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
     if (currentNote?.id === id) setCurrentNote(null);
   };
 
@@ -514,6 +587,46 @@ const NoteApp = () => {
                   placeholder="Search notes"
                   className="pl-9"
                 />
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sections
+                </p>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant={activeSection === "notes" ? "default" : "ghost"}
+                    size="sm"
+                    className="justify-between"
+                    onClick={() => setActiveSection("notes")}
+                  >
+                    <span>Notes</span>
+                    <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                      {sectionCounts.notes}
+                    </span>
+                  </Button>
+                  <Button
+                    variant={activeSection === "archive" ? "default" : "ghost"}
+                    size="sm"
+                    className="justify-between"
+                    onClick={() => setActiveSection("archive")}
+                  >
+                    <span>Archive</span>
+                    <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                      {sectionCounts.archive}
+                    </span>
+                  </Button>
+                  <Button
+                    variant={activeSection === "bin" ? "default" : "ghost"}
+                    size="sm"
+                    className="justify-between"
+                    onClick={() => setActiveSection("bin")}
+                  >
+                    <span>Bin</span>
+                    <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                      {sectionCounts.bin}
+                    </span>
+                  </Button>
+                </div>
               </div>
               <div className="flex gap-2">
                 <Button
@@ -759,25 +872,54 @@ const NoteApp = () => {
                         />
                       </div>
                       <div className="space-y-2">
-                        <h2 className="text-lg font-semibold">Nothing here yet</h2>
-                        <p className="text-sm text-muted-foreground">
-                          Start capturing your ideas by creating a new note.
-                        </p>
+                        {activeSection === "notes" && (
+                          <>
+                            <h2 className="text-lg font-semibold">Nothing here yet</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Start capturing your ideas by creating a new note.
+                            </p>
+                          </>
+                        )}
+                        {activeSection === "archive" && (
+                          <>
+                            <h2 className="text-lg font-semibold">No archived notes</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Archive notes to keep them here without deleting them.
+                            </p>
+                          </>
+                        )}
+                        {activeSection === "bin" && (
+                          <>
+                            <h2 className="text-lg font-semibold">Bin is empty</h2>
+                            <p className="text-sm text-muted-foreground">
+                              Deleted notes will appear here for recovery or removal.
+                            </p>
+                          </>
+                        )}
                       </div>
-                      <Button onClick={createNote} className="gap-2">
-                        <Plus className="size-4" />
-                        Create your first note
-                      </Button>
+                      {activeSection === "notes" && (
+                        <Button onClick={createNote} className="gap-2">
+                          <Plus className="size-4" />
+                          Create your first note
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (
-                  sortedNotes
-                    .sort((a, b) => Number(b.pinned) - Number(a.pinned))
-                    .map((note) => (
+                  sortedNotes.map((note) => {
+                    const noteCard = (
                       <Card
                         key={note.id}
-                        className="group relative border bg-card/80 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg animate-in fade-in slide-in-from-bottom-2"
-                        onClick={() => setCurrentNote(note)}
+                        className={cn(
+                          "group relative border bg-card/80 transition animate-in fade-in slide-in-from-bottom-2",
+                          activeSection === "notes" &&
+                            "hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg cursor-pointer"
+                        )}
+                        onClick={
+                          activeSection === "notes"
+                            ? () => setCurrentNote(note)
+                            : undefined
+                        }
                       >
                         <CardHeader className="space-y-2">
                           <div className="flex items-start justify-between gap-2">
@@ -785,41 +927,97 @@ const NoteApp = () => {
                               {note.title || "Untitled note"}
                             </CardTitle>
                             <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  togglePin(note.id);
-                                }}
-                                className={cn(
-                                  "text-muted-foreground transition hover:text-primary",
-                                  note.pinned && "text-primary"
-                                )}
-                              >
-                                <Pin className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  archiveNote(note.id);
-                                }}
-                              >
-                                <Archive className="size-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  trashNote(note.id);
-                                }}
-                                className="text-muted-foreground hover:text-destructive"
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
+                              {activeSection === "notes" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      togglePin(note.id);
+                                    }}
+                                    className={cn(
+                                      "text-muted-foreground transition hover:text-primary",
+                                      note.pinned && "text-primary"
+                                    )}
+                                  >
+                                    <Pin className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      archiveNote(note.id);
+                                    }}
+                                  >
+                                    <Archive className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      trashNote(note.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {activeSection === "archive" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      unarchiveNote(note.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-primary"
+                                  >
+                                    <ArchiveRestore className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      trashNote(note.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </>
+                              )}
+                              {activeSection === "bin" && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      restoreFromBin(note.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-primary"
+                                  >
+                                    <Undo2 className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon-sm"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      deleteForever(note.id);
+                                    }}
+                                    className="text-muted-foreground hover:text-destructive"
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </>
+                              )}
                             </div>
                           </div>
                           <CardDescription className="flex items-center gap-2 text-xs">
@@ -848,7 +1046,10 @@ const NoteApp = () => {
                           )}
                         </CardContent>
                       </Card>
-                    ))
+                    );
+
+                    return noteCard;
+                  })
                 )}
               </div>
             )}
