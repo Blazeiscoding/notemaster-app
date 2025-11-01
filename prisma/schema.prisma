@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Note {
+  id         String   @id @default(uuid())
+  userId     String
+  title      String   @default("")
+  content    String   @default("")
+  tags       String[] @default([])
+  checklist  Json
+  type       String   @default("note")
+  pinned     Boolean  @default(false)
+  archived   Boolean  @default(false)
+  trashed    Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@index([trashed])
+  @@index([archived])
+}

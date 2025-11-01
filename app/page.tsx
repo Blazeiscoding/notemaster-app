@@ -1,21 +1,35 @@
 "use client";
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
+import type { NotePayload, ChecklistItem as ChecklistItemPayload } from "@/types/note";
 import {
-  Search,
-  Plus,
-  Trash2,
+  Archive,
   Check,
-  X,
-  Menu,
-  Sun,
-  Moon,
-  Tag,
   Clock,
+  Download,
+  Menu,
+  Moon,
+  Pin,
+  Plus,
+  Search,
+  Sun,
+  Tag,
+  Trash2,
+  Upload,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import {
   SignedIn,
   SignedOut,
@@ -44,7 +58,7 @@ const NoteApp = () => {
   const [currentNote, setCurrentNote] = useState<Note | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const [filterTag, setFilterTag] = useState("all");
   const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"updated" | "created" | "title">(
@@ -57,6 +71,7 @@ const NoteApp = () => {
   const [canInstall, setCanInstall] = useState(false);
 
   const { user } = useUser();
+  const userFirstName = (user as { firstName?: string } | null)?.firstName;
   const storageKey = `notemaster-notes-${user?.id ?? "guest"}`;
 
   // Load notes from storage on mount and when user changes
@@ -154,7 +169,7 @@ const NoteApp = () => {
       trashed: false,
     };
     setCurrentNote(newNote);
-    setShowMenu(false);
+    setShowSidebar(false);
   };
 
   const saveCurrentNote = () => {
@@ -349,339 +364,325 @@ const NoteApp = () => {
   }
 
   return (
-    <div
-      className={`min-h-screen ${
-        darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"
-      }`}
-    >
-      {/* Header */}
-      <header
-        className={`sticky top-0 z-50 ${
-          darkMode ? "bg-gray-800" : "bg-white"
-        } shadow-md`}
-      >
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 lg:px-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="lg:hidden"
+            <Button
+              variant="outline"
+              size="icon-sm"
+              className="sm:hidden"
+              onClick={() => setShowSidebar((prev) => !prev)}
             >
-              <Menu className="w-6 h-6" />
-            </button>
-            <h1 className="text-xl font-bold text-blue-600">NoteMaster</h1>
+              <Menu className="size-4" />
+            </Button>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">
+                Welcome back{userFirstName ? `, ${userFirstName}` : ""}
+              </p>
+              <h1 className="text-2xl font-semibold tracking-tight">NoteMaster</h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {canInstall && (
+              <Button variant="outline" size="sm" onClick={installApp}>
+                <Download className="size-4" />
+                Install
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setDarkMode((prev) => !prev)}
+            >
+              {darkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
+            <Button size="sm" onClick={createNote}>
+              <Plus className="size-4" />
+              <span className="hidden sm:inline">New note</span>
+            </Button>
             <SignedOut>
               <SignInButton mode="modal">
-                <Button size="sm" variant="outline">
+                <Button size="sm" variant="ghost">
                   Sign in
                 </Button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <UserButton
-                appearance={{ elements: { userButtonAvatarBox: "w-8 h-8" } }}
-              />
+              <UserButton appearance={{ elements: { userButtonAvatarBox: "size-8" } }} />
             </SignedIn>
-            {canInstall && (
-              <button
-                onClick={installApp}
-                className="px-3 py-2 rounded-lg bg-blue-600 text-white text-sm"
-                title="Install App"
-              >
-                Install
-              </button>
+          </div>
+        </header>
+
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          <aside
+            className={cn(
+              "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300 lg:static lg:block",
+              showSidebar ? "block translate-y-0 opacity-100" : "hidden -translate-y-2 opacity-0 lg:block lg:opacity-100 lg:translate-y-0"
             )}
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
-            >
-              {darkMode ? (
-                <Sun className="w-5 h-5" />
-              ) : (
-                <Moon className="w-5 h-5" />
-              )}
-            </button>
-            <Button onClick={createNote} size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New Note</span>
-            </Button>
-          </div>
-        </div>
-      </header>
+          >
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search notes"
+                  className="pl-9"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={filterTag === "all" ? "default" : "outline"}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setFilterTag("all")}
+                >
+                  All
+                  <span className="ml-2 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    {notes.length}
+                  </span>
+                </Button>
+                <select
+                  value={sortBy}
+                  onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
+                    setSortBy(event.target.value as typeof sortBy)
+                  }
+                  className="w-36 rounded-md border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="updated">Last updated</option>
+                  <option value="created">Date created</option>
+                  <option value="title">Title</option>
+                </select>
+              </div>
+            </div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sidebar */}
-          <div className={`${showMenu ? "block" : "hidden"} lg:block`}>
-            <Card className={darkMode ? "bg-gray-800 border-gray-700" : ""}>
-              <CardHeader>
-                <CardTitle className="text-lg">Search & Filter</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search notes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Tag className="size-4" />
+                  Tags
                 </div>
-
-                <div>
-                  <h3 className="font-semibold mb-2 flex items-center gap-2">
-                    <Tag className="w-4 h-4" />
-                    Tags
-                  </h3>
-                  <div className="space-y-1">
-                    <button
-                      onClick={() => setFilterTag("all")}
-                      className={`w-full text-left px-3 py-2 rounded ${
-                        filterTag === "all"
-                          ? "bg-blue-600 text-white"
-                          : darkMode
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-100"
-                      }`}
-                    >
-                      All Notes ({notes.length})
-                    </button>
-                    {allTags.map((tag) => (
-                      <button
-                        key={tag}
-                        onClick={() => setFilterTag(tag)}
-                        className={`w-full text-left px-3 py-2 rounded ${
-                          filterTag === tag
-                            ? "bg-blue-600 text-white"
-                            : darkMode
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-100"
-                        }`}
-                      >
-                        #{tag} (
-                        {notes.filter((n) => n.tags.includes(tag)).length})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="font-semibold mb-2">Sort</h3>
-                  <select
-                    value={sortBy}
-                    onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                      setSortBy(
-                        e.target.value as "updated" | "created" | "title"
-                      )
-                    }
-                    className={`w-full px-3 py-2 rounded border ${
-                      darkMode ? "bg-gray-900 border-gray-700" : ""
-                    }`}
+                {allTags.length > 0 && (
+                  <button
+                    className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                    onClick={() => setFilterTag("all")}
                   >
-                    <option value="updated">Last updated</option>
-                    <option value="created">Date created</option>
-                    <option value="title">Title</option>
-                  </select>
-                </div>
-
-                <div className="flex gap-2 pt-2">
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {allTags.map((tag) => (
                   <Button
-                    variant="outline"
+                    key={tag}
+                    variant={filterTag === tag ? "default" : "outline"}
                     size="sm"
-                    onClick={exportNotes}
-                    className="flex-1"
+                    onClick={() => setFilterTag(tag)}
                   >
-                    Export
-                  </Button>
-                  <label className="flex-1">
-                    <input
-                      type="file"
-                      accept="application/json"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) importNotes(f);
-                      }}
-                    />
-                    <span className="inline-flex w-full justify-center items-center px-3 py-2 rounded-md border cursor-pointer text-sm">
-                      Import
+                    #{tag}
+                    <span className="ml-2 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                      {notes.filter((note) => note.tags.includes(tag)).length}
                     </span>
-                  </label>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+                  </Button>
+                ))}
+                {allTags.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No tags yet</p>
+                )}
+              </div>
+            </div>
 
-          {/* Notes List or Editor */}
-          <div className="lg:col-span-2">
+            <div className="space-y-2">
+              <Button variant="outline" size="sm" onClick={exportNotes} className="w-full justify-between">
+                <span>Export notes</span>
+                <Download className="size-4" />
+              </Button>
+              <label className="w-full">
+                <input
+                  type="file"
+                  accept="application/json"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) importNotes(file);
+                  }}
+                  className="hidden"
+                />
+                <span className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground">
+                  Import notes
+                  <Upload className="size-4" />
+                </span>
+              </label>
+            </div>
+          </aside>
+
+          <main className="space-y-6">
             {currentNote ? (
-              // Editor View
-              <Card className={darkMode ? "bg-gray-800 border-gray-700" : ""}>
-                <CardHeader>
-                  <div className="flex justify-between items-start gap-4">
+              <Card className="border bg-card/60 backdrop-blur animate-in fade-in slide-in-from-bottom-4">
+                <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-2">
                     <Input
-                      placeholder="Note title..."
                       value={currentNote.title}
-                      onChange={(e) =>
-                        setCurrentNote({
-                          ...currentNote,
-                          title: e.target.value,
-                        })
+                      onChange={(event) =>
+                        setCurrentNote({ ...currentNote, title: event.target.value })
                       }
-                      className="text-xl font-bold border-none p-0 focus-visible:ring-0"
+                      placeholder="Title"
+                      className="border-none px-0 text-xl font-semibold focus-visible:ring-0"
                     />
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={saveCurrentNote}
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <Check className="w-4 h-4" />
-                        Save
-                      </Button>
-                      <Button
-                        onClick={() => setCurrentNote(null)}
-                        size="sm"
-                        variant="outline"
-                      >
-                        <X className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <CardDescription>
+                      Edited {new Date(currentNote.updatedAt).toLocaleString()}
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setCurrentNote(null)}>
+                      <X className="size-4" />
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={saveCurrentNote}>
+                      <Check className="size-4" />
+                      Save
+                    </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-6">
                   <Textarea
-                    placeholder="Write your note here..."
                     value={currentNote.content}
-                    onChange={(e) =>
-                      setCurrentNote({
-                        ...currentNote,
-                        content: e.target.value,
-                      })
+                    onChange={(event) =>
+                      setCurrentNote({ ...currentNote, content: event.target.value })
                     }
-                    className="min-h-[200px] resize-y"
+                    placeholder="Capture your thoughts..."
+                    className="min-h-[240px] resize-y border-none bg-transparent px-0 text-base focus-visible:ring-0"
                   />
 
-                  {/* Checklist Section */}
-                  <div>
-                    <div className="flex flex-wrap gap-2 items-center justify-between mb-2">
-                      <h3 className="font-semibold">Checklist</h3>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => markAllChecklist(true)}
-                          size="sm"
-                          variant="outline"
-                        >
+                  <section className="space-y-4">
+                    <header className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Checklist
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => markAllChecklist(true)}>
                           Mark all
                         </Button>
-                        <Button
-                          onClick={() => markAllChecklist(false)}
-                          size="sm"
-                          variant="outline"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => markAllChecklist(false)}>
                           Unmark all
                         </Button>
-                        <Button
-                          onClick={clearCompletedChecklist}
-                          size="sm"
-                          variant="outline"
-                        >
+                        <Button variant="outline" size="sm" onClick={clearCompletedChecklist}>
                           Clear done
                         </Button>
-                        <Button
-                          onClick={addChecklistItem}
-                          size="sm"
-                          variant="outline"
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Item
+                        <Button variant="outline" size="sm" onClick={addChecklistItem}>
+                          <Plus className="size-4" />
+                          Add
                         </Button>
                       </div>
-                    </div>
-                    <div className="space-y-2">
+                    </header>
+
+                    <div className="space-y-3">
                       {currentNote.checklist.map((item) => (
-                        <div key={item.id} className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={item.checked}
-                            onChange={(e) =>
-                              updateChecklistItem(
-                                item.id,
-                                "checked",
-                                e.target.checked
-                              )
-                            }
-                            className="w-5 h-5 rounded"
-                          />
+                        <div
+                          key={item.id}
+                          className="flex flex-col gap-2 rounded-lg border border-dashed px-3 py-2 sm:flex-row sm:items-center"
+                        >
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={item.checked}
+                              onChange={(event) =>
+                                updateChecklistItem(item.id, "checked", event.target.checked)
+                              }
+                              className="size-4 rounded border-muted-foreground"
+                            />
+                          </label>
                           <Input
                             value={item.text}
-                            onChange={(e) =>
-                              updateChecklistItem(
-                                item.id,
-                                "text",
-                                e.target.value
-                              )
+                            onChange={(event) =>
+                              updateChecklistItem(item.id, "text", event.target.value)
                             }
-                            placeholder="Checklist item..."
-                            className={
-                              item.checked ? "line-through opacity-60" : ""
-                            }
+                            placeholder="Checklist item"
+                            className={cn(
+                              "flex-1 border-none px-0 focus-visible:ring-0",
+                              item.checked && "text-muted-foreground line-through"
+                            )}
                           />
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
                             onClick={() => deleteChecklistItem(item.id)}
-                            className="p-2 hover:bg-red-100 dark:hover:bg-red-900 rounded"
+                            className="ml-auto text-muted-foreground hover:text-destructive"
                           >
-                            <Trash2 className="w-4 h-4 text-red-600" />
-                          </button>
+                            <Trash2 className="size-4" />
+                          </Button>
                         </div>
                       ))}
+                      {currentNote.checklist.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No checklist items yet. Add one to keep track of tasks.
+                        </p>
+                      )}
                     </div>
-                  </div>
+                  </section>
 
-                  {/* Tags Section */}
-                  <div>
-                    <h3 className="font-semibold mb-2">Tags</h3>
-                    <div className="flex flex-wrap gap-2 mb-2">
+                  <section className="space-y-4">
+                    <header className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Tags
+                      </h3>
+                    </header>
+                    <div className="flex flex-wrap gap-2">
                       {currentNote.tags.map((tag) => (
-                        <span
+                        <Badge
                           key={tag}
-                          className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-sm flex items-center gap-1"
+                          variant="outline"
+                          className="flex items-center gap-1 bg-background"
                         >
                           #{tag}
                           <button onClick={() => removeTag(tag)}>
-                            <X className="w-3 h-3" />
+                            <X className="size-3" />
                           </button>
-                        </span>
+                        </Badge>
                       ))}
+                      {currentNote.tags.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No tags yet. Add one below to organize this note.
+                        </p>
+                      )}
                     </div>
                     <Input
-                      placeholder="Add tag and press Enter..."
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          const target = e.target as HTMLInputElement;
-                          addTag(target.value.trim());
-                          target.value = "";
+                      placeholder="Add a tag and press Enter"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          const value = event.currentTarget.value.trim();
+                          if (value) {
+                            addTag(value);
+                            event.currentTarget.value = "";
+                          }
                         }
                       }}
                     />
-                  </div>
+                  </section>
                 </CardContent>
               </Card>
             ) : (
-              // Notes List View
-              <div className="space-y-4">
-                {filteredNotes.length === 0 ? (
-                  <Card
-                    className={`${
-                      darkMode ? "bg-gray-800 border-gray-700" : ""
-                    } text-center py-12`}
-                  >
-                    <CardContent>
-                      <p className="text-gray-500 mb-4">No notes found</p>
-                      <Button onClick={createNote}>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {sortedNotes.length === 0 ? (
+                  <Card className="col-span-full overflow-hidden rounded-2xl border-dashed py-12 text-center animate-in fade-in">
+                    <CardContent className="flex flex-col items-center gap-6">
+                      <div className="relative h-40 w-60">
+                        <Image
+                          src="/note-empty.svg"
+                          alt="Empty notebook illustration"
+                          fill
+                          className="object-contain"
+                          priority
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <h2 className="text-lg font-semibold">Nothing here yet</h2>
+                        <p className="text-sm text-muted-foreground">
+                          Start capturing your ideas by creating a new note.
+                        </p>
+                      </div>
+                      <Button onClick={createNote} className="gap-2">
+                        <Plus className="size-4" />
                         Create your first note
                       </Button>
                     </CardContent>
@@ -692,82 +693,73 @@ const NoteApp = () => {
                     .map((note) => (
                       <Card
                         key={note.id}
-                        className={`${
-                          darkMode
-                            ? "bg-gray-800 border-gray-700 hover:bg-gray-700"
-                            : "hover:shadow-lg"
-                        } cursor-pointer transition-all`}
+                        className="group relative border bg-card/80 transition hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg animate-in fade-in slide-in-from-bottom-2"
                         onClick={() => setCurrentNote(note)}
                       >
-                        <CardHeader>
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <CardTitle className="text-lg mb-1">
-                                {note.title || "Untitled Note"}
-                              </CardTitle>
-                              <p className="text-sm text-gray-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {new Date(note.updatedAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                        <CardHeader className="space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <CardTitle className="text-base font-semibold">
+                              {note.title || "Untitled note"}
+                            </CardTitle>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={(event) => {
+                                  event.stopPropagation();
                                   togglePin(note.id);
                                 }}
-                                className="px-2 py-1 rounded text-xs border"
-                                title={note.pinned ? "Unpin" : "Pin"}
+                                className={cn(
+                                  "text-muted-foreground transition hover:text-primary",
+                                  note.pinned && "text-primary"
+                                )}
                               >
-                                {note.pinned ? "Unpin" : "Pin"}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                <Pin className="size-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={(event) => {
+                                  event.stopPropagation();
                                   archiveNote(note.id);
                                 }}
-                                className="px-2 py-1 rounded text-xs border"
-                                title="Archive"
                               >
-                                Archive
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
+                                <Archive className="size-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                onClick={(event) => {
+                                  event.stopPropagation();
                                   trashNote(note.id);
                                 }}
-                                className="p-2 hover:bg-red-100 dark:hover:bg-red-900 rounded"
-                                title="Move to Trash"
+                                className="text-muted-foreground hover:text-destructive"
                               >
-                                <Trash2 className="w-4 h-4 text-red-600" />
-                              </button>
+                                <Trash2 className="size-4" />
+                              </Button>
                             </div>
                           </div>
+                          <CardDescription className="flex items-center gap-2 text-xs">
+                            <Clock className="size-3" />
+                            {new Date(note.updatedAt).toLocaleDateString()}
+                          </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3 mb-3">
-                            {note.content || "No content"}
+                        <CardContent className="space-y-3">
+                          <p className="line-clamp-3 text-sm text-muted-foreground">
+                            {note.content || "No content yet"}
                           </p>
-
                           {note.checklist.length > 0 && (
-                            <div className="mb-3">
-                              <p className="text-xs font-semibold mb-1">
-                                Checklist:{" "}
-                                {note.checklist.filter((i) => i.checked).length}
-                                /{note.checklist.length} completed
-                              </p>
+                            <div className="rounded-md bg-muted px-3 py-2 text-xs">
+                              {note.checklist.filter((item) => item.checked).length} of
+                              {note.checklist.length} tasks complete
                             </div>
                           )}
-
                           {note.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {note.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded-full text-xs"
-                                >
+                                <Badge key={tag} variant="outline">
                                   #{tag}
-                                </span>
+                                </Badge>
                               ))}
                             </div>
                           )}
@@ -777,7 +769,7 @@ const NoteApp = () => {
                 )}
               </div>
             )}
-          </div>
+          </main>
         </div>
       </div>
     </div>
