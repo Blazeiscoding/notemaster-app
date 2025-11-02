@@ -719,8 +719,7 @@ const NoteApp = () => {
     [notes, currentNote, isAuthenticated, deleteNoteOnServer]
   );
 
-  // Restore UI not implemented in this view; function omitted to keep bundle lean
-
+ 
   const exportNotes = () => {
     const blob = new Blob([JSON.stringify(notes, null, 2)], {
       type: "application/json",
@@ -751,7 +750,6 @@ const NoteApp = () => {
     reader.readAsText(file);
   };
 
-  // Legacy manual install helper removed; using native install prompt instead
 
   if (isLoading) {
     return (
