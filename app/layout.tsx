@@ -1,4 +1,4 @@
-import { type Metadata } from "next"
+import { type Metadata, type Viewport } from "next"
 import { ClerkProvider } from "@clerk/nextjs"
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
@@ -17,7 +17,6 @@ export const metadata: Metadata = {
   title: "NoteMaster",
   description: "Capture and organize your notes anywhere.",
   manifest: "/manifest.json",
-  themeColor: "#2563EB",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
@@ -34,6 +33,10 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon.ico",
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: "#2563EB",
 }
 
 export default function RootLayout({
