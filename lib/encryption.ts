@@ -7,9 +7,16 @@ const IV_LENGTH = 12
 const AUTH_TAG_LENGTH = 16
 
 const rawKey = process.env.NOTES_ENCRYPTION_KEY
+const hasEncryptionKey = typeof rawKey === "string" && rawKey.trim().length > 0
 
-if (!rawKey) {
-  throw new Error("NOTES_ENCRYPTION_KEY environment variable is not set")
+if (!hasEncryptionKey) {
+  const message =
+    "NOTES_ENCRYPTION_KEY is not set. Falling back to plaintext storage for notes."
+  if (process.env.NODE_ENV === "production") {
+    console.error(message)
+  } else {
+    console.warn(message)
+  }
 }
 
 export const encryptAttachments = (attachments: Attachment[] = []): Attachment[] =>
@@ -48,12 +55,16 @@ export const decryptAttachments = (value: unknown): Attachment[] => {
     .filter((item): item is Attachment => item !== null)
 }
 
-const KEY = createHash("sha256").update(rawKey).digest()
+const KEY = hasEncryptionKey ? createHash("sha256").update(rawKey!).digest() : null
 
 const encode = (buffer: Buffer) => buffer.toString("base64")
 const decode = (value: string) => Buffer.from(value, "base64")
 
 export const encryptString = (plainText: string): string => {
+  if (!KEY) {
+    return plainText
+  }
+
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, KEY, iv)
   const encrypted = Buffer.concat([cipher.update(plainText, "utf8"), cipher.final()])
@@ -65,6 +76,10 @@ export const encryptString = (plainText: string): string => {
 export const decryptString = (encrypted: string): string => {
   if (!encrypted) {
     return ""
+  }
+
+  if (!KEY) {
+    return encrypted
   }
 
   try {
