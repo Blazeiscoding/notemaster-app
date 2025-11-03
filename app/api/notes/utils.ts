@@ -1,18 +1,78 @@
-import type { Note } from "@prisma/client"
-import type { NotePayload } from "@/types/note"
-import { decryptChecklist, decryptString, decryptStringArray } from "@/lib/encryption"
+import type { Prisma } from "@prisma/client"
+import type { NotePayload, NoteRevisionPayload } from "@/types/note"
+import {
+  decryptAttachments,
+  decryptChecklist,
+  decryptString,
+  decryptStringArray,
+} from "@/lib/encryption"
 
-export const serializeNote = (note: Note): NotePayload => ({
+type SerializableNote = {
+  id: string
+  userId: string
+  title: string
+  content: string
+  tags: string[]
+  checklist: Prisma.JsonValue
+  type: string
+  pinned: boolean
+  archived: boolean
+  trashed: boolean
+  createdAt: Date
+  updatedAt: Date
+  notebookId: string | null
+  attachments: Prisma.JsonValue
+  dueAt: Date | null
+}
+
+type SerializableRevision = {
+  id: string
+  noteId: string
+  title: string
+  content: string
+  tags: string[]
+  checklist: Prisma.JsonValue
+  attachments: Prisma.JsonValue
+  pinned: boolean
+  archived: boolean
+  trashed: boolean
+  createdAt: Date
+  notebookId: string | null
+  dueAt: Date | null
+}
+
+export const serializeNote = (note: SerializableNote): NotePayload => ({
   id: note.id,
   userId: note.userId,
+  notebookId: note.notebookId,
   title: decryptString(note.title),
   content: decryptString(note.content),
   tags: decryptStringArray(note.tags),
   checklist: decryptChecklist(note.checklist),
+  attachments: decryptAttachments(note.attachments),
   type: note.type as NotePayload["type"],
   pinned: note.pinned,
   archived: note.archived,
   trashed: note.trashed,
+  dueAt: note.dueAt ? note.dueAt.toISOString() : null,
   createdAt: note.createdAt.toISOString(),
   updatedAt: note.updatedAt.toISOString(),
+})
+
+export const serializeRevision = (
+  revision: SerializableRevision
+): NoteRevisionPayload => ({
+  id: revision.id,
+  noteId: revision.noteId,
+  notebookId: revision.notebookId ?? null,
+  title: decryptString(revision.title),
+  content: decryptString(revision.content),
+  tags: decryptStringArray(revision.tags),
+  checklist: decryptChecklist(revision.checklist),
+  attachments: decryptAttachments(revision.attachments ?? []),
+  pinned: revision.pinned,
+  archived: revision.archived,
+  trashed: revision.trashed,
+  dueAt: revision.dueAt ? revision.dueAt.toISOString() : null,
+  createdAt: revision.createdAt.toISOString(),
 })

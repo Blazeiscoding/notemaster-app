@@ -3,7 +3,12 @@ import { auth } from "@clerk/nextjs/server"
 import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { serializeNote } from "../utils"
-import { encryptChecklist, encryptString, encryptStringArray } from "@/lib/encryption"
+import {
+  encryptAttachments,
+  encryptChecklist,
+  encryptString,
+  encryptStringArray,
+} from "@/lib/encryption"
 import type { NotePayload } from "@/types/note"
 
 type ParamsPromise = Promise<{ id: string }>
@@ -32,6 +37,23 @@ export async function PATCH(request: NextRequest, { params }: { params: ParamsPr
 
   const data: Prisma.NoteUpdateInput = {}
 
+  if (typeof payload.notebookId === "string") {
+    if (payload.notebookId === "") {
+      data.notebook = { disconnect: true }
+    } else {
+      const notebook = await prisma.notebook.findUnique({
+        where: { id: payload.notebookId },
+        select: { id: true, userId: true },
+      })
+
+      if (!notebook || notebook.userId !== userId) {
+        return NextResponse.json({ error: "Notebook not found" }, { status: 400 })
+      }
+
+      data.notebook = { connect: { id: notebook.id } }
+    }
+  }
+
   if (typeof payload.title === "string") {
     data.title = encryptString(payload.title)
   }
@@ -46,6 +68,10 @@ export async function PATCH(request: NextRequest, { params }: { params: ParamsPr
 
   if (Array.isArray(payload.checklist)) {
     data.checklist = encryptChecklist(payload.checklist) as Prisma.InputJsonValue
+  }
+
+  if (Array.isArray(payload.attachments)) {
+    data.attachments = encryptAttachments(payload.attachments) as Prisma.InputJsonValue
   }
 
   if (typeof payload.type === "string") {
@@ -63,6 +89,32 @@ export async function PATCH(request: NextRequest, { params }: { params: ParamsPr
   if (typeof payload.trashed === "boolean") {
     data.trashed = payload.trashed
   }
+
+  if (typeof payload.dueAt === "string") {
+    data.dueAt = payload.dueAt ? new Date(payload.dueAt) : null
+  }
+
+  if (Object.keys(data).length === 0) {
+    return NextResponse.json(serializeNote(existing))
+  }
+
+  const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
+    noteId: existing.id,
+    notebookId: existing.notebookId,
+    title: existing.title,
+    content: existing.content,
+    tags: existing.tags,
+    checklist: existing.checklist as Prisma.InputJsonValue,
+    attachments: existing.attachments as Prisma.InputJsonValue,
+    pinned: existing.pinned,
+    archived: existing.archived,
+    trashed: existing.trashed,
+    dueAt: existing.dueAt ?? undefined,
+  }
+
+  await prisma.noteRevision.create({
+    data: revisionData,
+  })
 
   const updated = await prisma.note.update({
     where: { id },

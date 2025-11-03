@@ -1,15 +1,40 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from "react";
 import Image from "next/image";
-import type { NotePayload } from "@/types/note";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type {
+  NotePayload,
+  Attachment,
+  NotebookPayload,
+  NoteRevisionPayload,
+  NotebookTreeNode,
+  AccentPalette,
+} from "@/types/note";
 import {
   Archive,
   ArchiveRestore,
+  CalendarClock,
   Check,
   Clock,
   Download,
+  Eye,
+  EyeOff,
+  Folder,
+  FolderPlus,
+  History,
+  Loader2,
   Menu,
   Moon,
+  Palette as PaletteIcon,
+  Paperclip,
   Pin,
   Plus,
   Search,
@@ -43,6 +68,147 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const THEME_STORAGE_KEY = "notemaster-theme";
+const ACCENT_STORAGE_KEY = "notemaster-accent";
+
+const DEFAULT_ACCENT: AccentPalette = {
+  id: "azure",
+  name: "Azure",
+  primary: "#2563EB",
+  accent: "#1D4ED8",
+};
+
+const ACCENT_PALETTES: AccentPalette[] = [
+  DEFAULT_ACCENT,
+  { id: "violet", name: "Violet", primary: "#7C3AED", accent: "#5B21B6" },
+  { id: "rose", name: "Rose", primary: "#E11D48", accent: "#BE123C" },
+  { id: "pink", name: "Pink", primary: "#EC4899", accent: "#DB2777" },
+  { id: "emerald", name: "Emerald", primary: "#10B981", accent: "#047857" },
+  { id: "amber", name: "Amber", primary: "#F59E0B", accent: "#B45309" },
+  { id: "olive", name: "Olive", primary: "#708238", accent: "#556B2F" },
+];
+
+const buildNotebookTree = (items: NotebookPayload[]): NotebookTreeNode[] => {
+  const map = new Map<string, NotebookTreeNode>();
+  const roots: NotebookTreeNode[] = [];
+
+  items.forEach((notebook) => {
+    map.set(notebook.id, { ...notebook, children: [] });
+  });
+
+  items.forEach((notebook) => {
+    if (notebook.parentId && map.has(notebook.parentId)) {
+      map.get(notebook.parentId)!.children.push(map.get(notebook.id)!);
+    } else {
+      roots.push(map.get(notebook.id)!);
+    }
+  });
+
+  return roots.sort((a, b) => a.name.localeCompare(b.name));
+};
+
+const formatDateTimeForInput = (value: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offset = date.getTimezoneOffset();
+  const local = new Date(date.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 16);
+};
+
+const parseInputToIso = (value: string): string | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+};
+
+const toBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+const formatBytes = (size: number) => {
+  if (!size) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const exponent = Math.min(
+    Math.floor(Math.log(size) / Math.log(1024)),
+    units.length - 1
+  );
+  const value = size / Math.pow(1024, exponent);
+  const precision = value >= 10 || exponent === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[exponent]}`;
+};
+
+type NotebookNodeProps = {
+  node: NotebookTreeNode;
+  activeId: string;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+  depth?: number;
+};
+
+const NotebookNode = ({
+  node,
+  activeId,
+  onSelect,
+  onDelete,
+  depth = 0,
+}: NotebookNodeProps) => {
+  const isActive = node.id === activeId;
+  const hasChildren = node.children.length > 0;
+
+  return (
+    <div className="space-y-1">
+      <div
+        className={cn(
+          "flex items-center justify-between rounded-md px-2 py-1 text-sm transition hover:bg-muted",
+          isActive && "bg-muted"
+        )}
+        style={{ marginLeft: depth * 12 }}
+      >
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-2 text-left"
+          onClick={() => onSelect(node.id)}
+        >
+          <Folder className="size-4 text-muted-foreground" />
+          <span className="truncate">{node.name}</span>
+          {hasChildren && (
+            <span className="text-xs text-muted-foreground">({node.children.length})</span>
+          )}
+        </button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={() => onDelete(node.id)}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+      {hasChildren && (
+        <div className="space-y-1">
+          {node.children
+            .slice()
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((child) => (
+              <NotebookNode
+                key={child.id}
+                node={child}
+                activeId={activeId}
+                onSelect={onSelect}
+                onDelete={onDelete}
+                depth={depth + 1}
+              />
+            ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const generateId = () => {
   if (
@@ -94,6 +260,55 @@ const NoteApp = () => {
   const [activeSection, setActiveSection] = useState<
     "notes" | "archive" | "bin"
   >("notes");
+  const [accent, setAccent] = useState<AccentPalette>(() => {
+    if (typeof window === "undefined") return DEFAULT_ACCENT;
+    try {
+      const raw = window.localStorage?.getItem(ACCENT_STORAGE_KEY);
+      if (!raw) return DEFAULT_ACCENT;
+      const parsed = JSON.parse(raw) as AccentPalette;
+      if (parsed?.id && parsed?.primary && parsed?.accent) {
+        return parsed;
+      }
+    } catch (error) {
+      console.error("Failed to read accent palette", error);
+    }
+    return DEFAULT_ACCENT;
+  });
+  const [notebooks, setNotebooks] = useState<NotebookPayload[]>([]);
+  const notebookTree = useMemo(() => buildNotebookTree(notebooks), [notebooks]);
+  const notebooksById = useMemo(() => {
+    const map = new Map<string, NotebookPayload>();
+    notebooks.forEach((notebook) => map.set(notebook.id, notebook));
+    return map;
+  }, [notebooks]);
+  const notebookOptions = useMemo(() => {
+    const options: { id: string; label: string }[] = [];
+
+    const walk = (nodes: NotebookTreeNode[], depth = 0) => {
+      nodes
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .forEach((node) => {
+          const indent = depth === 0 ? "" : `${"\u00A0".repeat(depth * 2)}↳ `;
+          options.push({ id: node.id, label: `${indent}${node.name}` });
+          walk(node.children, depth + 1);
+        });
+    };
+
+    walk(notebookTree);
+    return options;
+  }, [notebookTree]);
+  const [activeNotebookId, setActiveNotebookId] = useState<string>("all");
+  const [revisions, setRevisions] = useState<NoteRevisionPayload[]>([]);
+  const [isRevisionOpen, setIsRevisionOpen] = useState(false);
+  const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
+  const [revisionTargetId, setRevisionTargetId] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [newNotebookName, setNewNotebookName] = useState("");
+  const [newNotebookParent, setNewNotebookParent] = useState<string | null>(null);
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [isCreatingNotebook, setIsCreatingNotebook] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (activeSection !== "notes") {
@@ -113,6 +328,65 @@ const NoteApp = () => {
       throw new Error("Failed to fetch notes");
     }
     return (await response.json()) as NotePayload[];
+  }, []);
+
+  const fetchNotebooksFromServer = useCallback(async () => {
+    const response = await fetch("/api/notebooks", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Failed to fetch notebooks");
+    }
+    return (await response.json()) as NotebookPayload[];
+  }, []);
+
+  const createNotebookOnServer = useCallback(
+    async (payload: { name: string; parentId?: string | null; color?: string }) => {
+      const response = await fetch("/api/notebooks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to create notebook");
+      }
+      return (await response.json()) as NotebookPayload;
+    },
+    []
+  );
+
+  const updateNotebookOnServer = useCallback(
+    async (
+      id: string,
+      payload: { name?: string; color?: string; parentId?: string | null }
+    ) => {
+      const response = await fetch(`/api/notebooks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update notebook");
+      }
+      return (await response.json()) as NotebookPayload;
+    },
+    []
+  );
+
+  const deleteNotebookOnServer = useCallback(async (id: string) => {
+    const response = await fetch(`/api/notebooks/${id}`, { method: "DELETE" });
+    if (!response.ok) {
+      throw new Error("Failed to delete notebook");
+    }
+    return (await response.json()) as { success: boolean; releasedNotes: number };
+  }, []);
+
+  const fetchRevisionsFromServer = useCallback(async (id: string) => {
+    const response = await fetch(`/api/notes/${id}/revisions`, {
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch revisions");
+    }
+    return (await response.json()) as NoteRevisionPayload[];
   }, []);
 
   const createNoteOnServer = useCallback(async (note: NotePayload) => {
@@ -149,31 +423,235 @@ const NoteApp = () => {
     }
   }, []);
 
-  const loadNotes = useCallback(async () => {
+  const handleSelectAccent = useCallback((palette: AccentPalette) => {
+    setAccent(palette);
+  }, []);
+
+  const handleSelectNotebookFilter = useCallback((notebookId: string) => {
+    setActiveNotebookId(notebookId);
+  }, []);
+
+  const handleCreateNotebook = useCallback(async () => {
+    const name = newNotebookName.trim();
+    if (!name) return;
+
+    setIsCreatingNotebook(true);
+
+    const resetForm = () => {
+      setNewNotebookName("");
+      setNewNotebookParent(null);
+      setIsCreatingNotebook(false);
+    };
+
+    try {
+      if (isAuthenticated) {
+        const created = await createNotebookOnServer({
+          name,
+          parentId: newNotebookParent,
+        });
+        setNotebooks((prev) => [created, ...prev]);
+      } else {
+        const now = new Date().toISOString();
+        const created: NotebookPayload = {
+          id: generateId(),
+          userId: "guest",
+          name,
+          parentId: newNotebookParent ?? null,
+          color: DEFAULT_ACCENT.primary,
+          createdAt: now,
+          updatedAt: now,
+        };
+        setNotebooks((prev) => [created, ...prev]);
+      }
+    } catch (error) {
+      console.error("Failed to create notebook", error);
+    } finally {
+      resetForm();
+    }
+  }, [
+    newNotebookName,
+    newNotebookParent,
+    isAuthenticated,
+    createNotebookOnServer,
+  ]);
+
+  const handleDeleteNotebook = useCallback(
+    async (id: string) => {
+      try {
+        if (isAuthenticated) {
+          await deleteNotebookOnServer(id);
+        }
+
+        setNotebooks((prev) => prev.filter((notebook) => notebook.id !== id));
+        setNotes((prev) =>
+          prev.map((note) =>
+            note.notebookId === id ? { ...note, notebookId: null } : note
+          )
+        );
+
+        if (activeNotebookId === id) {
+          setActiveNotebookId("all");
+        }
+      } catch (error) {
+        console.error("Failed to delete notebook", error);
+      }
+    },
+    [activeNotebookId, deleteNotebookOnServer, isAuthenticated]
+  );
+
+  const handleOpenRevisions = useCallback(
+    async (noteId: string) => {
+      setIsRevisionOpen(true);
+      setRevisionTargetId(noteId);
+      if (!isAuthenticated) {
+        setRevisions([]);
+        return;
+      }
+      setIsLoadingRevisions(true);
+      try {
+        const history = await fetchRevisionsFromServer(noteId);
+        setRevisions(history);
+      } catch (error) {
+        console.error("Failed to load revisions", error);
+        setRevisions([]);
+      } finally {
+        setIsLoadingRevisions(false);
+      }
+    },
+    [fetchRevisionsFromServer, isAuthenticated]
+  );
+
+  const handleCloseRevisions = useCallback(() => {
+    setIsRevisionOpen(false);
+    setRevisionTargetId(null);
+    setRevisions([]);
+  }, []);
+
+  const handleRestoreRevision = useCallback(
+    async (noteId: string, revisionId: string) => {
+      if (!isAuthenticated) return;
+
+      try {
+        const response = await fetch(`/api/notes/${noteId}/revisions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revisionId }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to restore revision");
+        }
+
+        const restored = (await response.json()) as NotePayload;
+        setNotes((prev) =>
+          prev.map((note) => (note.id === restored.id ? restored : note))
+        );
+        setCurrentNote(restored);
+        handleCloseRevisions();
+      } catch (error) {
+        console.error("Failed to restore revision", error);
+      }
+    },
+    [handleCloseRevisions, isAuthenticated]
+  );
+
+  const triggerAttachmentPicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleAttachmentsSelected = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (!files || !currentNote) return;
+
+      try {
+        const attachments: Attachment[] = [];
+        for (const file of Array.from(files)) {
+          const data = await toBase64(file);
+          attachments.push({
+            id: generateId(),
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            data,
+          });
+        }
+
+        setCurrentNote({
+          ...currentNote,
+          attachments: [...currentNote.attachments, ...attachments],
+        });
+      } catch (error) {
+        console.error("Failed to attach files", error);
+      } finally {
+        event.target.value = "";
+      }
+    },
+    [currentNote]
+  );
+
+  const handleRemoveAttachment = useCallback(
+    (attachmentId: string) => {
+      if (!currentNote) return;
+      setCurrentNote({
+        ...currentNote,
+        attachments: currentNote.attachments.filter((item) => item.id !== attachmentId),
+      });
+    },
+    [currentNote]
+  );
+
+  const handleDownloadAttachment = useCallback((attachment: Attachment) => {
+    try {
+      const link = document.createElement("a");
+      link.href = attachment.data;
+      link.download = attachment.name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Failed to download attachment", error);
+    }
+  }, []);
+
+  const loadNotesAndNotebooks = useCallback(async () => {
     setIsLoading(true);
     try {
       if (isAuthenticated) {
-        const remoteNotes = await fetchNotesFromServer();
+        const [remoteNotes, remoteNotebooks] = await Promise.all([
+          fetchNotesFromServer(),
+          fetchNotebooksFromServer(),
+        ]);
         setNotes(remoteNotes);
+        setNotebooks(remoteNotebooks);
       } else if (typeof window !== "undefined" && window.localStorage) {
-        const raw = window.localStorage.getItem(storageKey);
-        setNotes(raw ? JSON.parse(raw) : []);
+        const rawNotes = window.localStorage.getItem(storageKey);
+        const rawNotebooks = window.localStorage.getItem(`${storageKey}-notebooks`);
+        setNotes(rawNotes ? JSON.parse(rawNotes) : []);
+        setNotebooks(rawNotebooks ? JSON.parse(rawNotebooks) : []);
       } else {
         setNotes([]);
+        setNotebooks([]);
       }
     } catch (error) {
-      console.error("Failed to load notes", error);
+      console.error("Failed to load workspace", error);
       if (!isAuthenticated) {
         setNotes([]);
+        setNotebooks([]);
       }
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, storageKey, fetchNotesFromServer]);
+  }, [
+    isAuthenticated,
+    storageKey,
+    fetchNotesFromServer,
+    fetchNotebooksFromServer,
+  ]);
 
   useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
+    loadNotesAndNotebooks();
+  }, [loadNotesAndNotebooks]);
 
   const sectionCounts = useMemo(
     () => ({
@@ -295,6 +773,33 @@ const NoteApp = () => {
     }
   }, [notes, isLoading, isAuthenticated, storageKey]);
 
+  useEffect(() => {
+    if (!isAuthenticated && typeof window !== "undefined") {
+      try {
+        window.localStorage?.setItem(
+          `${storageKey}-notebooks`,
+          JSON.stringify(notebooks)
+        );
+      } catch (error) {
+        console.error("Failed to save notebooks", error);
+      }
+    }
+  }, [notebooks, isAuthenticated, storageKey]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    root.style.setProperty("--accent-primary", accent.primary);
+    root.style.setProperty("--accent-secondary", accent.accent);
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage?.setItem(ACCENT_STORAGE_KEY, JSON.stringify(accent));
+      } catch (error) {
+        console.error("Failed to persist accent", error);
+      }
+    }
+  }, [accent]);
+
   const installApp = async () => {
     if (deferredPrompt) {
       await deferredPrompt.prompt();
@@ -317,30 +822,40 @@ const NoteApp = () => {
     const newNote: NotePayload = {
       id: generateId(),
       userId: ownerId,
+      notebookId: activeNotebookId === "all" ? null : activeNotebookId,
       title: "",
       content: "",
       tags: [],
       checklist: [],
+      attachments: [],
       type: "note",
       createdAt: now,
       updatedAt: now,
       pinned: false,
       archived: false,
       trashed: false,
+      dueAt: null,
     };
     setCurrentNote(newNote);
     setShowSidebar(false);
-  }, [isAuthenticated, userId]);
+  }, [isAuthenticated, userId, activeNotebookId]);
 
   const saveCurrentNote = useCallback(async () => {
-    if (
-      !currentNote ||
-      (!currentNote.title &&
-        !currentNote.content &&
-        currentNote.checklist.length === 0)
-    ) {
+    if (!currentNote) {
       return;
     }
+
+    const hasContent =
+      Boolean(currentNote.title?.trim()) ||
+      Boolean(currentNote.content?.trim()) ||
+      currentNote.checklist.length > 0 ||
+      currentNote.attachments.length > 0;
+
+    if (!hasContent) {
+      return;
+    }
+
+    setIsSavingNote(true);
 
     const updatedAt = new Date().toISOString();
     const ownerId = isAuthenticated && userId ? userId : null;
@@ -348,6 +863,11 @@ const NoteApp = () => {
       ...currentNote,
       userId: ownerId,
       updatedAt,
+      dueAt: currentNote.dueAt ?? null,
+      notebookId:
+        currentNote.notebookId && currentNote.notebookId.trim().length > 0
+          ? currentNote.notebookId
+          : null,
     };
 
     const applyLocal = (note: NotePayload) => {
@@ -366,19 +886,36 @@ const NoteApp = () => {
 
     if (isAuthenticated) {
       try {
+        const payload: Partial<NotePayload> = {
+          notebookId: baseNote.notebookId,
+          title: baseNote.title,
+          content: baseNote.content,
+          tags: baseNote.tags,
+          checklist: baseNote.checklist,
+          attachments: baseNote.attachments,
+          pinned: baseNote.pinned,
+          archived: baseNote.archived,
+          trashed: baseNote.trashed,
+          dueAt: baseNote.dueAt,
+          updatedAt: baseNote.updatedAt,
+        };
+
         const saved = exists
-          ? await updateNoteOnServer(baseNote.id, baseNote)
+          ? await updateNoteOnServer(baseNote.id, payload)
           : await createNoteOnServer(baseNote);
         applyLocal(saved);
+        setCurrentNote(saved);
       } catch (error) {
         console.error("Failed to save note", error);
+        setIsSavingNote(false);
         return;
       }
     } else {
       applyLocal(baseNote);
+      setCurrentNote(baseNote);
     }
 
-    setCurrentNote(null);
+    setIsSavingNote(false);
   }, [
     currentNote,
     isAuthenticated,
@@ -480,8 +1017,10 @@ const NoteApp = () => {
         note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         note.content.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTag = filterTag === "all" || note.tags.includes(filterTag);
+      const matchesNotebook =
+        activeNotebookId === "all" || note.notebookId === activeNotebookId;
 
-      if (!matchesSearch || !matchesTag) return false;
+      if (!matchesSearch || !matchesTag || !matchesNotebook) return false;
 
       if (activeSection === "notes") return !note.archived && !note.trashed;
       if (activeSection === "archive") return note.archived && !note.trashed;
@@ -489,7 +1028,7 @@ const NoteApp = () => {
 
       return false;
     });
-  }, [notes, searchQuery, filterTag, activeSection]);
+  }, [notes, searchQuery, filterTag, activeSection, activeNotebookId]);
 
   const allTags = [...new Set(notes.flatMap((note) => note.tags))];
 
@@ -989,6 +1528,116 @@ const NoteApp = () => {
               </div>
             </div>
 
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <Folder className="size-4" />
+                  Notebooks
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowSidebar(false)}
+                  className="lg:hidden text-muted-foreground"
+                >
+                  <X className="size-4" />
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={newNotebookName}
+                    onChange={(event) => setNewNotebookName(event.target.value)}
+                    placeholder="New notebook"
+                    className="flex-1"
+                    disabled={isCreatingNotebook}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    onClick={handleCreateNotebook}
+                    disabled={isCreatingNotebook || !newNotebookName.trim()}
+                  >
+                    <FolderPlus className="size-4" />
+                  </Button>
+                </div>
+                {notebooks.length > 0 && (
+                  <select
+                    value={newNotebookParent ?? ""}
+                    onChange={(event) =>
+                      setNewNotebookParent(event.target.value || null)
+                    }
+                    className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Parent notebook</option>
+                    {notebooks.map((notebook) => (
+                      <option key={notebook.id} value={notebook.id}>
+                        {notebook.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Button
+                  variant={activeNotebookId === "all" ? "default" : "outline"}
+                  size="sm"
+                  className="w-full justify-between"
+                  onClick={() => handleSelectNotebookFilter("all")}
+                >
+                  All notebooks
+                  <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+                    {notes.length}
+                  </span>
+                </Button>
+                <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-dashed p-3">
+                  {notebookTree.length === 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Create notebooks to organize notes by project or theme.
+                    </p>
+                  )}
+                  {notebookTree.map((node) => (
+                    <NotebookNode
+                      key={node.id}
+                      node={node}
+                      activeId={activeNotebookId}
+                      onSelect={handleSelectNotebookFilter}
+                      onDelete={handleDeleteNotebook}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <PaletteIcon className="size-4" />
+                  Accent color
+                </div>
+              </div>
+              <div className="grid grid-cols-5 gap-2">
+                {ACCENT_PALETTES.map((palette) => (
+                  <button
+                    key={palette.id}
+                    className={cn(
+                      "h-10 rounded-full border transition",
+                      palette.id === accent.id
+                        ? "ring-2 ring-offset-2 ring-(--accent-primary)"
+                        : "hover:ring-1"
+                    )}
+                    style={{
+                      background: `linear-gradient(135deg, ${palette.primary}, ${palette.accent})`,
+                    }}
+                    aria-label={`Switch to ${palette.name}`}
+                    onClick={() => handleSelectAccent(palette)}
+                  />
+                ))}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Button
                 variant="outline"
@@ -1021,49 +1670,171 @@ const NoteApp = () => {
             {currentNote ? (
               <Card className="border bg-card/60 backdrop-blur animate-in fade-in slide-in-from-bottom-4">
                 <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="space-y-2">
+                  <div className="flex-1 space-y-3">
                     <Input
                       value={currentNote.title}
                       onChange={(event) =>
-                        setCurrentNote({
-                          ...currentNote,
-                          title: event.target.value,
-                        })
+                        setCurrentNote((prev) =>
+                          prev ? { ...prev, title: event.target.value } : prev
+                        )
                       }
                       placeholder="Title"
                       className="border-none px-0 text-xl font-semibold focus-visible:ring-0"
                     />
-                    <CardDescription>
-                      Edited {new Date(currentNote.updatedAt).toLocaleString()}
+                    <CardDescription className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Clock className="size-3.5" />
+                        Edited {new Date(currentNote.updatedAt).toLocaleString()}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <Folder className="size-3.5" />
+                        {currentNote.notebookId
+                          ? notebooksById.get(currentNote.notebookId)?.name ?? "Notebook"
+                          : "Inbox"}
+                      </span>
+                      {currentNote.dueAt && (
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <CalendarClock className="size-3.5" />
+                          Due {new Date(currentNote.dueAt).toLocaleString()}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setCurrentNote(null)}
-                    >
-                      <X className="size-4" />
-                      Cancel
-                    </Button>
-                    <Button size="sm" onClick={saveCurrentNote}>
-                      <Check className="size-4" />
-                      Save
-                    </Button>
+                  <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPreview((prev) => !prev)}
+                      >
+                        {showPreview ? (
+                          <>
+                            <EyeOff className="size-4" />
+                            Editor
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="size-4" />
+                            Preview
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenRevisions(currentNote.id)}
+                        disabled={!isAuthenticated || !notes.some((n) => n.id === currentNote.id)}
+                        title={isAuthenticated ? "View revision history" : "Sign in to see revision history"}
+                      >
+                        <History className="size-4" />
+                        History
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setCurrentNote(null)}
+                      >
+                        <X className="size-4" />
+                        Close
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={saveCurrentNote}
+                        disabled={isSavingNote}
+                        className="bg-(--accent-primary) text-white hover:bg-(--accent-secondary)"
+                      >
+                        {isSavingNote ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Check className="size-4" />
+                        )}
+                        {isSavingNote ? "Saving" : "Save"}
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <Textarea
-                    value={currentNote.content}
-                    onChange={(event) =>
-                      setCurrentNote({
-                        ...currentNote,
-                        content: event.target.value,
-                      })
-                    }
-                    placeholder="Capture your thoughts..."
-                    className="min-h-[240px] resize-y border-none bg-transparent px-0 text-base focus-visible:ring-0"
-                  />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Notebook
+                      </label>
+                      <select
+                        value={currentNote.notebookId ?? ""}
+                        onChange={(event) => {
+                          const value = event.target.value;
+                          setCurrentNote((prev) =>
+                            prev ? { ...prev, notebookId: value || null } : prev
+                          );
+                        }}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm focus:border-(--accent-primary) focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/50"
+                      >
+                        <option value="">Inbox</option>
+                        {notebookOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Reminder
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="datetime-local"
+                          value={formatDateTimeForInput(currentNote.dueAt)}
+                          onChange={(event) => {
+                            const iso = parseInputToIso(event.target.value);
+                            setCurrentNote((prev) =>
+                              prev ? { ...prev, dueAt: iso } : prev
+                            );
+                          }}
+                          className="flex-1 rounded-md border bg-background px-3 py-2 text-sm shadow-sm focus:border-(--accent-primary) focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/50"
+                        />
+                        {currentNote.dueAt && (
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              setCurrentNote((prev) =>
+                                prev ? { ...prev, dueAt: null } : prev
+                              )
+                            }
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {showPreview ? (
+                    <div className="rounded-2xl border bg-muted/40 p-4">
+                      <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {currentNote.content.trim().length > 0
+                            ? currentNote.content
+                            : "_Nothing to preview yet. Start writing in the editor._"}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  ) : (
+                    <Textarea
+                      value={currentNote.content}
+                      onChange={(event) =>
+                        setCurrentNote((prev) =>
+                          prev ? { ...prev, content: event.target.value } : prev
+                        )
+                      }
+                      placeholder="Capture your thoughts..."
+                      className="min-h-[240px] resize-y border-none bg-transparent px-0 text-base focus-visible:ring-0"
+                    />
+                  )}
 
                   <section className="space-y-4">
                     <header className="flex flex-wrap items-center justify-between gap-2">
@@ -1195,6 +1966,85 @@ const NoteApp = () => {
                         }
                       }}
                     />
+                  </section>
+
+                  <section className="space-y-4">
+                    <header className="flex flex-wrap items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                        Attachments
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={triggerAttachmentPicker}
+                        >
+                          <Paperclip className="size-4" />
+                          Add files
+                        </Button>
+                        {currentNote.attachments.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              setCurrentNote((prev) =>
+                                prev ? { ...prev, attachments: [] } : prev
+                              )
+                            }
+                          >
+                            <X className="size-4" />
+                            Clear all
+                          </Button>
+                        )}
+                      </div>
+                    </header>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={handleAttachmentsSelected}
+                    />
+                    <div className="space-y-2">
+                      {currentNote.attachments.map((attachment) => (
+                        <div
+                          key={attachment.id}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-dashed bg-muted/30 px-3 py-2"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">
+                              {attachment.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatBytes(attachment.size)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon-sm"
+                              onClick={() => handleDownloadAttachment(attachment)}
+                            >
+                              <Download className="size-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="text-muted-foreground hover:text-destructive"
+                              onClick={() => handleRemoveAttachment(attachment.id)}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      {currentNote.attachments.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          No attachments yet. Add images, documents, or audio clips to enrich your note.
+                        </p>
+                      )}
+                    </div>
                   </section>
                 </CardContent>
               </Card>

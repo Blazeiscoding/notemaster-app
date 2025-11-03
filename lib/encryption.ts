@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto"
 
-import type { ChecklistItem } from "@/types/note"
+import type { Attachment, ChecklistItem } from "@/types/note"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
@@ -10,6 +10,42 @@ const rawKey = process.env.NOTES_ENCRYPTION_KEY
 
 if (!rawKey) {
   throw new Error("NOTES_ENCRYPTION_KEY environment variable is not set")
+}
+
+export const encryptAttachments = (attachments: Attachment[] = []): Attachment[] =>
+  attachments.map((attachment) => ({
+    ...attachment,
+    name: encryptString(attachment.name ?? ""),
+    type: encryptString(attachment.type ?? ""),
+    data: encryptString(attachment.data ?? ""),
+  }))
+
+export const decryptAttachments = (value: unknown): Attachment[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null
+      }
+
+      const { id, name, type, size, data } = item as Partial<Attachment>
+
+      if (typeof id !== "string" || typeof size !== "number") {
+        return null
+      }
+
+      return {
+        id,
+        size,
+        name: decryptString(typeof name === "string" ? name : ""),
+        type: decryptString(typeof type === "string" ? type : ""),
+        data: decryptString(typeof data === "string" ? data : ""),
+      }
+    })
+    .filter((item): item is Attachment => item !== null)
 }
 
 const KEY = createHash("sha256").update(rawKey).digest()

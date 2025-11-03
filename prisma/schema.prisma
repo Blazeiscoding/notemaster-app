@@ -8,20 +8,66 @@ datasource db {
 }
 
 model Note {
-  id         String   @id @default(uuid())
-  userId     String
-  title      String   @default("")
-  content    String   @default("")
-  tags       String[] @default([])
-  checklist  Json
-  type       String   @default("note")
-  pinned     Boolean  @default(false)
-  archived   Boolean  @default(false)
-  trashed    Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  notebookId  String?
+  title       String   @default("")
+  content     String   @default("")
+  tags        String[] @default([])
+  checklist   Json
+  attachments Json
+  type        String   @default("note")
+  pinned      Boolean  @default(false)
+  archived    Boolean  @default(false)
+  trashed     Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  notebook  Notebook?     @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+  revisions NoteRevision[]
 
   @@index([userId])
   @@index([trashed])
   @@index([archived])
+  @@index([notebookId])
+  @@index([dueAt])
+}
+
+model Notebook {
+  id        String    @id @default(uuid())
+  userId    String
+  parentId  String?
+  name      String
+  color     String    @default("#2563EB")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  parent   Notebook?  @relation("NotebookHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Notebook[] @relation("NotebookHierarchy")
+  notes    Note[]
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+model NoteRevision {
+  id          String   @id @default(uuid())
+  noteId      String
+  notebookId  String?
+  title       String
+  content     String
+  tags        String[] @default([])
+  checklist   Json
+  attachments Json
+  pinned      Boolean  @default(false)
+  archived    Boolean  @default(false)
+  trashed     Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+  @@index([createdAt])
 }
