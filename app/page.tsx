@@ -904,9 +904,10 @@ const NoteApp = () => {
           ? await updateNoteOnServer(baseNote.id, payload)
           : await createNoteOnServer(baseNote);
         applyLocal(saved);
-        setCurrentNote(saved);
+        setCurrentNote(null); // Close the editor after save
       } catch (error) {
         console.error("Failed to save note", error);
+        // Keep the editor open if there was an error
         setIsSavingNote(false);
         return;
       }
