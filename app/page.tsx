@@ -848,14 +848,36 @@ const NoteApp = () => {
         )}
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          {/* Mobile backdrop overlay */}
+          {showSidebar && (
+            <div
+              className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+              onClick={() => setShowSidebar(false)}
+            />
+          )}
+
+          {/* Sidebar */}
           <aside
             className={cn(
-              "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300 lg:static lg:block",
+              "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300",
+              // Mobile: fixed overlay that slides in from left
+              "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
+              "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
+              // Mobile show/hide
               showSidebar
-                ? "block translate-y-0 opacity-100"
-                : "hidden -translate-y-2 opacity-0 lg:block lg:opacity-100 lg:translate-y-0"
+                ? "translate-x-0"
+                : "-translate-x-full lg:translate-x-0"
             )}
           >
+            {/* Mobile close button */}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-2 top-2 lg:hidden"
+              onClick={() => setShowSidebar(false)}
+            >
+              <X className="size-4" />
+            </Button>
             <div className="space-y-3">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
