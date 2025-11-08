@@ -10,7 +10,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 
-type AppHeaderProps = {
+export type AppHeaderProps = {
   userFirstName?: string | null;
   onToggleSidebar: () => void;
   canInstall: boolean;
