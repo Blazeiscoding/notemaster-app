@@ -3,6 +3,7 @@
 import React from "react";
 import AppHeader from "@/components/layout/AppHeader";
 import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import NoteEditor from "@/components/notes/NoteEditor";
 import NotesGrid from "@/components/notes/NotesGrid";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
@@ -104,7 +105,7 @@ const NoteApp = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-32 sm:pb-16 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
         <AppHeader
           userFirstName={userFirstName}
           onToggleSidebar={() => setShowSidebar((prev) => !prev)}
@@ -160,7 +161,7 @@ const NoteApp = () => {
             onDeleteNotebook={handleDeleteNotebook}
           />
 
-          <main className="space-y-6 pb-10 sm:pb-0">
+          <main className="space-y-6 pb-14 sm:pb-0">
             {currentNote ? (
               <NoteEditor
                 note={currentNote}
@@ -218,14 +219,26 @@ const NoteApp = () => {
           </main>
         </div>
       </div>
-      <div className="sm:hidden">
+      {currentNote === null && (
+        <div className="sm:hidden">
+          <MobileBottomNav
+            activeSection={activeSection}
+            sectionCounts={sectionCounts}
+            onSelectSection={setActiveSection}
+            onOpenSidebar={() => setShowSidebar(true)}
+          />
+        </div>
+      )}
+      <div className="pointer-events-none sm:hidden">
         <Button
           aria-label="Create a new note"
           variant="accent"
           size="lg"
-          className="fixed right-4 z-50 h-14 rounded-full px-6 font-semibold shadow-xl shadow-(--interactive-accent)/25 transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-(--accent-primary)"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 1rem)" }}
-          onClick={createNote}
+          className="pointer-events-auto fixed right-4 z-50 h-14 rounded-full px-6 font-semibold shadow-xl shadow-(--interactive-accent)/25 transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-(--accent-primary)"
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 5.5rem)" }}
+          onClick={() => {
+            createNote();
+          }}
         >
           <Plus className="mr-2 h-5 w-5" />
           New note

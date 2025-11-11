@@ -31,6 +31,12 @@ import {
   DEFAULT_ACCENT,
   THEME_STORAGE_KEY,
 } from "@/components/note-app/constants";
+import {
+  hapticError,
+  hapticLight,
+  hapticMedium,
+  hapticSuccess,
+} from "@/lib/haptics";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -766,6 +772,7 @@ export const useNoteApp = () => {
 
   const createNote = useCallback(() => {
     setActiveSection("notes");
+    hapticLight();
     const now = new Date().toISOString();
     const ownerId = isAuthenticated && userId ? userId : null;
     const newNote: NotePayload = {
@@ -879,6 +886,8 @@ export const useNoteApp = () => {
       const existing = notes.find((n) => n.id === id);
       if (!existing) return;
 
+      hapticLight();
+
       const optimistic: NotePayload = {
         ...existing,
         pinned: !existing.pinned,
@@ -912,6 +921,8 @@ export const useNoteApp = () => {
     async (id: string) => {
       const existing = notes.find((n) => n.id === id);
       if (!existing) return;
+
+      hapticMedium();
 
       const optimistic: NotePayload = {
         ...existing,
@@ -949,6 +960,8 @@ export const useNoteApp = () => {
       const existing = notes.find((n) => n.id === id);
       if (!existing) return;
 
+      hapticMedium();
+
       const optimistic: NotePayload = {
         ...existing,
         archived: false,
@@ -982,6 +995,8 @@ export const useNoteApp = () => {
     async (id: string) => {
       const existing = notes.find((n) => n.id === id);
       if (!existing) return;
+
+      hapticMedium();
 
       const optimistic: NotePayload = {
         ...existing,
@@ -1025,6 +1040,8 @@ export const useNoteApp = () => {
       const existing = notes.find((n) => n.id === id);
       if (!existing) return;
 
+      hapticSuccess();
+
       const optimistic: NotePayload = {
         ...existing,
         trashed: false,
@@ -1062,6 +1079,8 @@ export const useNoteApp = () => {
       if (index === -1) return;
       const existing = notes[index];
       const wasCurrent = currentNote?.id === id;
+
+      hapticError();
 
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (wasCurrent) setCurrentNote(null);
