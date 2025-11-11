@@ -29,8 +29,14 @@ import {
   ACCENT_PALETTES,
   ACCENT_STORAGE_KEY,
   DEFAULT_ACCENT,
+  NOTE_ORDER_STORAGE_KEY,
+  SMART_FILTERS_STORAGE_KEY,
   THEME_STORAGE_KEY,
 } from "@/components/note-app/constants";
+import {
+  type SmartFilter,
+  type SmartFilterCriteria,
+} from "@/components/note-app/types";
 import {
   hapticError,
   hapticLight,
@@ -87,14 +93,59 @@ export const useNoteApp = () => {
     try {
       const raw = window.localStorage?.getItem(ACCENT_STORAGE_KEY);
       if (!raw) return DEFAULT_ACCENT;
-      const parsed = JSON.parse(raw) as AccentPalette;
-      if (parsed?.id && parsed?.primary && parsed?.accent) {
-        return parsed;
+      const parsed = JSON.parse(raw) as Partial<AccentPalette> | null;
+      if (!parsed?.id) return DEFAULT_ACCENT;
+
+      const base = ACCENT_PALETTES.find((palette) => palette.id === parsed.id);
+      if (base) {
+        return {
+          ...base,
+          ...parsed,
+          fontScale: parsed.fontScale ?? base.fontScale ?? 1,
+          background: parsed.background ?? base.background,
+          texture: parsed.texture ?? base.texture ?? null,
+        } as AccentPalette;
+      }
+
+      if (parsed.primary && parsed.accent) {
+        return {
+          ...DEFAULT_ACCENT,
+          ...parsed,
+          fontScale: parsed.fontScale ?? 1,
+          background: parsed.background ?? DEFAULT_ACCENT.background,
+          texture: parsed.texture ?? DEFAULT_ACCENT.texture ?? null,
+        } as AccentPalette;
       }
     } catch (error) {
       console.error("Failed to read accent palette", error);
     }
     return DEFAULT_ACCENT;
+  });
+  const [accentPreview, setAccentPreview] = useState<AccentPalette | null>(null);
+  const [smartFilters, setSmartFilters] = useState<SmartFilter[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = window.localStorage?.getItem(SMART_FILTERS_STORAGE_KEY);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored) as SmartFilter[];
+      if (Array.isArray(parsed)) return parsed;
+    } catch (error) {
+      console.error("Failed to read smart filters", error);
+    }
+    return [];
+  });
+  const [activeSmartFilterId, setActiveSmartFilterId] = useState<string | null>(null);
+  const [customOrder, setCustomOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = window.localStorage?.getItem(NOTE_ORDER_STORAGE_KEY);
+      if (!stored) return [];
+      const parsed = JSON.parse(stored) as string[];
+      if (Array.isArray(parsed)) return parsed;
+    } catch (error) {
+      console.error("Failed to read note order", error);
+    }
+    return [];
   });
   const [notebooks, setNotebooks] = useState<NotebookPayload[]>([]);
   const [activeNotebookId, setActiveNotebookId] = useState<string>("all");
@@ -204,9 +255,20 @@ export const useNoteApp = () => {
     }
   }, []);
 
-  const handleSelectAccent = useCallback((palette: AccentPalette) => {
-    setAccent(palette);
+  const handlePreviewAccent = useCallback((palette: AccentPalette) => {
+    setAccentPreview(palette);
   }, []);
+
+  const handleCancelAccentPreview = useCallback(() => {
+    setAccentPreview(null);
+  }, []);
+
+  const handleSelectAccent = useCallback((palette?: AccentPalette) => {
+    const next = palette ?? accentPreview;
+    if (!next) return;
+    setAccent(next);
+    setAccentPreview(null);
+  }, [accentPreview]);
 
   const handleSelectNotebookFilter = useCallback((notebookId: string) => {
     setActiveNotebookId(notebookId);
@@ -514,24 +576,94 @@ export const useNoteApp = () => {
     [currentNote]
   );
 
+  const appliedFilter = useMemo(() => {
+    if (!activeSmartFilterId) return null;
+    return smartFilters.find((filter) => filter.id === activeSmartFilterId) ?? null;
+  }, [activeSmartFilterId, smartFilters]);
+
+  const resolvedCriteria: SmartFilterCriteria = useMemo(() => {
+    if (!appliedFilter) {
+      return {
+        search: searchQuery,
+        tag: filterTag === "all" ? undefined : filterTag,
+        notebookId: activeNotebookId === "all" ? undefined : activeNotebookId,
+        section: activeSection,
+        sortBy,
+      };
+    }
+
+    return {
+      search: appliedFilter.criteria.search ?? searchQuery,
+      tag:
+        appliedFilter.criteria.tag ??
+        (filterTag === "all" ? undefined : filterTag),
+      notebookId:
+        appliedFilter.criteria.notebookId ??
+        (activeNotebookId === "all" ? undefined : activeNotebookId),
+      section: appliedFilter.criteria.section ?? activeSection,
+      sortBy: appliedFilter.criteria.sortBy ?? sortBy,
+      pinned: appliedFilter.criteria.pinned,
+      tags: appliedFilter.criteria.tags,
+      dueWithinDays: appliedFilter.criteria.dueWithinDays,
+    };
+  }, [
+    appliedFilter,
+    activeNotebookId,
+    activeSection,
+    filterTag,
+    searchQuery,
+    sortBy,
+  ]);
+
   const filteredNotes = useMemo(() => {
     return notes.filter((note) => {
-      const matchesSearch =
-        note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesTag = filterTag === "all" || note.tags.includes(filterTag);
-      const matchesNotebook =
-        activeNotebookId === "all" || note.notebookId === activeNotebookId;
+      const matchesSearch = resolvedCriteria.search
+        ? note.title.toLowerCase().includes(resolvedCriteria.search.toLowerCase()) ||
+          note.content.toLowerCase().includes(resolvedCriteria.search.toLowerCase())
+        : true;
 
-      if (!matchesSearch || !matchesTag || !matchesNotebook) return false;
+      const matchesPrimaryTag = resolvedCriteria.tag
+        ? note.tags.includes(resolvedCriteria.tag)
+        : true;
+      const matchesExtraTags = resolvedCriteria.tags
+        ? resolvedCriteria.tags.every((tag) => note.tags.includes(tag))
+        : true;
 
-      if (activeSection === "notes") return !note.archived && !note.trashed;
-      if (activeSection === "archive") return note.archived && !note.trashed;
-      if (activeSection === "bin") return note.trashed;
+      const matchesPinned =
+        typeof resolvedCriteria.pinned === "boolean"
+          ? note.pinned === resolvedCriteria.pinned
+          : true;
 
-      return false;
+      const matchesDue = resolvedCriteria.dueWithinDays
+        ? note.dueAt
+          ? (Date.parse(note.dueAt) - Date.now()) / (1000 * 60 * 60 * 24) <=
+            resolvedCriteria.dueWithinDays
+          : false
+        : true;
+
+      const matchesNotebook = resolvedCriteria.notebookId
+        ? note.notebookId === resolvedCriteria.notebookId
+        : true;
+
+      const section = resolvedCriteria.section ?? "notes";
+      const matchesSection =
+        section === "notes"
+          ? !note.archived && !note.trashed
+          : section === "archive"
+            ? note.archived && !note.trashed
+            : note.trashed;
+
+      return (
+        matchesSearch &&
+        matchesPrimaryTag &&
+        matchesExtraTags &&
+        matchesPinned &&
+        matchesDue &&
+        matchesNotebook &&
+        matchesSection
+      );
     });
-  }, [notes, searchQuery, filterTag, activeSection, activeNotebookId]);
+  }, [notes, resolvedCriteria]);
 
   const allTags = useMemo(
     () => [...new Set(notes.flatMap((note) => note.tags))],
@@ -539,19 +671,42 @@ export const useNoteApp = () => {
   );
 
   const sortedNotes = useMemo(() => {
-    return [...filteredNotes].sort((a, b) => {
-      if (activeSection === "notes") {
+    const ordered = [...filteredNotes].sort((a, b) => {
+      const section = resolvedCriteria.section ?? activeSection;
+      const sortPreference = resolvedCriteria.sortBy ?? sortBy;
+
+      if (section === "notes") {
         const pinnedDiff = Number(b.pinned) - Number(a.pinned);
         if (pinnedDiff !== 0) return pinnedDiff;
       }
 
-      if (sortBy === "title")
+      if (sortPreference === "title")
         return (a.title || "").localeCompare(b.title || "");
-      if (sortBy === "created")
+      if (sortPreference === "created")
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
-  }, [filteredNotes, sortBy, activeSection]);
+
+    if (!customOrder.length) {
+      return ordered;
+    }
+
+    const orderMap = new Map(customOrder.map((id, index) => [id, index] as const));
+    const withWeights = ordered.map((note) => ({
+      note,
+      weight: orderMap.get(note.id) ?? Number.MAX_SAFE_INTEGER,
+    }));
+
+    withWeights.sort((a, b) => a.weight - b.weight);
+    return withWeights.map((entry) => entry.note);
+  }, [
+    activeSection,
+    customOrder,
+    filteredNotes,
+    resolvedCriteria.section,
+    resolvedCriteria.sortBy,
+    sortBy,
+  ]);
 
   const notebookTree = useMemo(
     () => buildNotebookTree(notebooks),
@@ -712,6 +867,41 @@ export const useNoteApp = () => {
   }, [loadNotesAndNotebooks]);
 
   useEffect(() => {
+    if (isAuthenticated) return;
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage?.getItem(`${storageKey}-active-notebook`);
+      if (!stored) return;
+      const nextId = stored.trim().length > 0 ? stored : "all";
+      setActiveNotebookId((prev) => (prev === nextId ? prev : nextId));
+    } catch (error) {
+      console.error("Failed to read active notebook", error);
+    }
+  }, [isAuthenticated, storageKey]);
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(
+        `${storageKey}-active-notebook`,
+        activeNotebookId,
+      );
+    } catch (error) {
+      console.error("Failed to persist active notebook", error);
+    }
+  }, [activeNotebookId, isAuthenticated, storageKey]);
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+    if (activeNotebookId === "all") return;
+    const exists = notebooks.some((notebook) => notebook.id === activeNotebookId);
+    if (!exists) {
+      setActiveNotebookId("all");
+    }
+  }, [activeNotebookId, notebooks, isAuthenticated]);
+
+  useEffect(() => {
     if (!isAuthenticated && !isLoading) {
       try {
         if (typeof window !== "undefined" && window.localStorage) {
@@ -736,28 +926,43 @@ export const useNoteApp = () => {
     }
   }, [notebooks, isAuthenticated, storageKey]);
 
+  const appliedAccent = accentPreview ?? accent;
+
   useEffect(() => {
     if (typeof document === "undefined") return;
     const root = document.documentElement;
-    const accentForeground = pickAccessibleTextColor(accent.primary);
-    const accentRing = hexToRgba(accent.primary, 0.45);
-    const accentSoft = hexToRgba(accent.primary, 0.12);
+    const accentForeground = pickAccessibleTextColor(appliedAccent.primary);
+    const accentRing = hexToRgba(appliedAccent.primary, 0.45);
+    const accentSoft = hexToRgba(appliedAccent.primary, 0.12);
+
     root.style.setProperty("--accent-foreground", accentForeground);
-    root.style.setProperty("--accent-primary", accent.primary);
-    root.style.setProperty("--accent-secondary", accent.accent);
-    root.style.setProperty("--interactive-accent", accent.primary);
-    root.style.setProperty("--interactive-accent-strong", accent.accent);
+    root.style.setProperty("--accent-primary", appliedAccent.primary);
+    root.style.setProperty("--accent-secondary", appliedAccent.accent);
+    root.style.setProperty("--interactive-accent", appliedAccent.primary);
+    root.style.setProperty("--interactive-accent-strong", appliedAccent.accent);
     root.style.setProperty("--interactive-accent-contrast", accentForeground);
     root.style.setProperty("--interactive-accent-soft", accentSoft);
     root.style.setProperty("--interactive-accent-ring", accentRing);
-    if (typeof window !== "undefined") {
-      try {
-        window.localStorage?.setItem(ACCENT_STORAGE_KEY, JSON.stringify(accent));
-      } catch (error) {
-        console.error("Failed to persist accent", error);
-      }
+    root.style.setProperty("--app-font-scale", appliedAccent.fontScale.toString());
+    root.style.setProperty(
+      "--app-background-gradient",
+      appliedAccent.background ?? "none",
+    );
+    root.style.setProperty(
+      "--app-background-texture",
+      appliedAccent.texture ?? "none",
+    );
+  }, [appliedAccent]);
+
+  useEffect(() => {
+    if (accentPreview) return;
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(ACCENT_STORAGE_KEY, JSON.stringify(accent));
+    } catch (error) {
+      console.error("Failed to persist accent", error);
     }
-  }, [accent]);
+  }, [accent, accentPreview]);
 
   const installApp = useCallback(async () => {
     if (!deferredPrompt) return;
@@ -1157,8 +1362,17 @@ export const useNoteApp = () => {
     setFilterTag,
     allTags,
     accent,
+    accentPreview,
+    handlePreviewAccent,
+    handleCancelAccentPreview,
     accentPalettes: ACCENT_PALETTES,
     handleSelectAccent,
+    smartFilters,
+    setSmartFilters,
+    activeSmartFilterId,
+    setActiveSmartFilterId,
+    customOrder,
+    setCustomOrder,
     canInstall,
     installApp,
     showIosInstallTip,

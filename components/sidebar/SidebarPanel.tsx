@@ -34,7 +34,10 @@ type SidebarPanelProps = {
   onTagSelect: (tag: string) => void;
   onClearTags: () => void;
   accent: AccentPalette;
-  onAccentSelect: (palette: AccentPalette) => void;
+  accentPreview: AccentPalette | null;
+  onAccentPreview: (palette: AccentPalette) => void;
+  onAccentPreviewEnd: () => void;
+  onAccentApply: (palette: AccentPalette) => void;
   accentPalettes: AccentPalette[];
   onExport: () => void;
   onImport: (file: File) => void;
@@ -67,7 +70,10 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onTagSelect,
   onClearTags,
   accent,
-  onAccentSelect,
+  accentPreview,
+  onAccentPreview,
+  onAccentPreviewEnd,
+  onAccentApply,
   accentPalettes,
   onExport,
   onImport,
@@ -177,7 +183,10 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         <AccentPicker
           palettes={accentPalettes}
           activePaletteId={accent.id}
-          onSelect={onAccentSelect}
+          previewPaletteId={accentPreview?.id ?? null}
+          onPreview={onAccentPreview}
+          onCancelPreview={onAccentPreviewEnd}
+          onApply={onAccentApply}
         />
       </div>
 

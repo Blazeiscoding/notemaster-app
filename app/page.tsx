@@ -38,6 +38,9 @@ const NoteApp = () => {
     setFilterTag,
     allTags,
     accent,
+    accentPreview,
+    handlePreviewAccent,
+    handleCancelAccentPreview,
     accentPalettes,
     handleSelectAccent,
     canInstall,
@@ -144,7 +147,10 @@ const NoteApp = () => {
             onTagSelect={setFilterTag}
             onClearTags={() => setFilterTag("all")}
             accent={accent}
-            onAccentSelect={handleSelectAccent}
+            accentPreview={accentPreview}
+            onAccentPreview={handlePreviewAccent}
+            onAccentPreviewEnd={handleCancelAccentPreview}
+            onAccentApply={handleSelectAccent}
             accentPalettes={accentPalettes}
             onExport={exportNotes}
             onImport={importNotes}
@@ -235,7 +241,7 @@ const NoteApp = () => {
           variant="accent"
           size="lg"
           className="pointer-events-auto fixed right-4 z-50 h-14 rounded-full px-6 font-semibold shadow-xl shadow-(--interactive-accent)/25 transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-(--accent-primary)"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 5.5rem)" }}
+          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 7.5rem)" }}
           onClick={() => {
             createNote();
           }}

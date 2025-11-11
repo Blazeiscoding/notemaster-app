@@ -65,4 +65,7 @@ export type AccentPalette = {
   name: string
   primary: string
   accent: string
+  fontScale: number
+  background: string
+  texture?: string | null
 }
