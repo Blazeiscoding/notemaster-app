@@ -2,15 +2,18 @@
 
 import React from "react";
 import AppHeader from "@/components/layout/AppHeader";
+import AccentPicker from "@/components/layout/AccentPicker";
 import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import NoteEditor from "@/components/notes/NoteEditor";
 import NotesGrid from "@/components/notes/NotesGrid";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeForInput } from "@/components/note-app/util";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 
 const NoteApp = () => {
   const state = useNoteApp();
@@ -43,6 +46,13 @@ const NoteApp = () => {
     handleCancelAccentPreview,
     accentPalettes,
     handleSelectAccent,
+    smartFilters,
+    activeSmartFilterId,
+    currentSmartFilterCriteria,
+    canSaveSmartFilter,
+    addSmartFilter,
+    applySmartFilter,
+    removeSmartFilter,
     canInstall,
     installApp,
     showIosInstallTip,
@@ -95,6 +105,65 @@ const NoteApp = () => {
     handleOpenRevisions,
   } = state;
 
+  const [showThemePanel, setShowThemePanel] = React.useState(false);
+  const [showSaveFilterDialog, setShowSaveFilterDialog] = React.useState(false);
+  const [quickFilterName, setQuickFilterName] = React.useState("");
+  const [quickFilterDescription, setQuickFilterDescription] = React.useState("");
+  const [quickFilterError, setQuickFilterError] = React.useState<string | null>(null);
+
+  const computeDefaultFilterName = React.useCallback(() => {
+    const base = "Smart filter";
+    const existing = new Set(smartFilters.map((filter) => filter.name.toLowerCase()));
+    if (!existing.has(base.toLowerCase())) return base;
+    let suffix = 2;
+    let candidate = `${base} ${suffix}`;
+    while (existing.has(candidate.toLowerCase())) {
+      suffix += 1;
+      candidate = `${base} ${suffix}`;
+    }
+    return candidate;
+  }, [smartFilters]);
+
+  const handleOpenSaveFilter = React.useCallback(() => {
+    setQuickFilterError(null);
+    setQuickFilterDescription("");
+    setQuickFilterName((prev) => (prev.trim() ? prev : computeDefaultFilterName()));
+    setShowSaveFilterDialog(true);
+  }, [computeDefaultFilterName]);
+
+  const handleCloseSaveFilter = React.useCallback(() => {
+    setShowSaveFilterDialog(false);
+    setQuickFilterError(null);
+    setQuickFilterDescription("");
+    setQuickFilterName("");
+  }, []);
+
+  const handleSubmitQuickFilter = React.useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmed = quickFilterName.trim();
+      if (!trimmed) {
+        setQuickFilterError("Give your filter a name.");
+        return;
+      }
+      const success = addSmartFilter({
+        name: trimmed,
+        description: quickFilterDescription.trim() || undefined,
+      });
+      if (!success) {
+        setQuickFilterError("Unable to save filter. Try a different name.");
+        return;
+      }
+      handleCloseSaveFilter();
+    },
+    [addSmartFilter, handleCloseSaveFilter, quickFilterDescription, quickFilterName],
+  );
+
+  const handleCloseThemePanel = React.useCallback(() => {
+    handleCancelAccentPreview();
+    setShowThemePanel(false);
+  }, [handleCancelAccentPreview]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -116,6 +185,10 @@ const NoteApp = () => {
           onInstall={installApp}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode((prev) => !prev)}
+          accentName={accent.name}
+          onOpenAccentModal={() => setShowThemePanel(true)}
+          canSaveSmartFilter={canSaveSmartFilter}
+          onSaveSmartFilter={handleOpenSaveFilter}
           onCreateNote={createNote}
         />
 
@@ -152,6 +225,15 @@ const NoteApp = () => {
             onAccentPreviewEnd={handleCancelAccentPreview}
             onAccentApply={handleSelectAccent}
             accentPalettes={accentPalettes}
+            smartFilters={smartFilters}
+            activeSmartFilterId={activeSmartFilterId}
+            canSaveSmartFilter={canSaveSmartFilter}
+            currentSmartFilterCriteria={currentSmartFilterCriteria}
+            onAddSmartFilter={({ name, description }) =>
+              addSmartFilter({ name, description })
+            }
+            onApplySmartFilter={applySmartFilter}
+            onRemoveSmartFilter={removeSmartFilter}
             onExport={exportNotes}
             onImport={importNotes}
             notebooks={notebooks}
@@ -233,6 +315,111 @@ const NoteApp = () => {
             onSelectSection={setActiveSection}
             onOpenSidebar={() => setShowSidebar(true)}
           />
+        </div>
+      )}
+      {showThemePanel && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">Choose theme</h2>
+                <p className="text-sm text-muted-foreground">
+                  Preview palettes and click one to apply instantly.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleCloseThemePanel}
+                aria-label="Close theme picker"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="mt-4">
+              <AccentPicker
+                palettes={accentPalettes}
+                activePaletteId={accent.id}
+                previewPaletteId={accentPreview?.id ?? null}
+                onPreview={handlePreviewAccent}
+                onCancelPreview={handleCancelAccentPreview}
+                onApply={(palette) => {
+                  handleSelectAccent(palette);
+                  setShowThemePanel(false);
+                }}
+              />
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleCloseThemePanel}>
+                Done
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSaveFilterDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <form
+            className="w-full max-w-md space-y-4 rounded-2xl border bg-card p-6 shadow-xl"
+            onSubmit={handleSubmitQuickFilter}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold">Save current filter</h2>
+                <p className="text-sm text-muted-foreground">
+                  Name your saved search so you can reuse it later.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleCloseSaveFilter}
+                aria-label="Close save filter dialog"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
+            <div className="space-y-2">
+              <Input
+                value={quickFilterName}
+                onChange={(event) => setQuickFilterName(event.target.value)}
+                placeholder="Filter name"
+                aria-label="Smart filter name"
+              />
+              <Textarea
+                value={quickFilterDescription}
+                onChange={(event) => setQuickFilterDescription(event.target.value)}
+                placeholder="Description (optional)"
+                aria-label="Smart filter description"
+                className="min-h-[96px]"
+              />
+              {quickFilterError && (
+                <p className="text-sm text-destructive">{quickFilterError}</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleCloseSaveFilter}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" size="sm" disabled={!canSaveSmartFilter}>
+                Save filter
+              </Button>
+            </div>
+          </form>
         </div>
       )}
       <div className="pointer-events-none sm:hidden">

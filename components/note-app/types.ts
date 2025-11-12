@@ -43,10 +43,28 @@ export type AppState = {
   accentPreview: AccentPalette | null;
   smartFilters: SmartFilter[];
   activeSmartFilterId: string | null;
+  resolvedCriteria: SmartFilterCriteria;
+  currentSmartFilterCriteria: SmartFilterCriteria;
+  canSaveSmartFilter: boolean;
   isLoading: boolean;
   isSavingNote: boolean;
   isRevisionOpen: boolean;
   revisions: NoteRevisionPayload[];
   isLoadingRevisions: boolean;
   revisionTargetId: string | null;
+  addSmartFilter: (input: {
+    name: string;
+    description?: string;
+    criteria?: SmartFilterCriteria;
+  }) => boolean;
+  updateSmartFilter: (
+    id: string,
+    updates: {
+      name?: string;
+      description?: string;
+      criteria?: SmartFilterCriteria;
+    }
+  ) => void;
+  removeSmartFilter: (id: string) => void;
+  applySmartFilter: (id: string | null) => void;
 };

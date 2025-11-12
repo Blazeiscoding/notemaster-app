@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Download, Menu, Moon, Plus, Sun } from "lucide-react";
+import { Download, Filter, Menu, Moon, Palette, Plus, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   SignedIn,
@@ -17,6 +17,10 @@ export type AppHeaderProps = {
   onInstall: () => void;
   darkMode: boolean;
   onToggleDarkMode: () => void;
+  accentName?: string;
+  onOpenAccentModal: () => void;
+  canSaveSmartFilter: boolean;
+  onSaveSmartFilter: () => void;
   onCreateNote: () => void;
 };
 
@@ -27,6 +31,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onInstall,
   darkMode,
   onToggleDarkMode,
+  accentName,
+  onOpenAccentModal,
+  canSaveSmartFilter,
+  onSaveSmartFilter,
   onCreateNote,
 }) => {
   return (
@@ -67,6 +75,26 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           className="hover:border-(--accent-primary) hover:text-(--accent-primary)"
         >
           {darkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onOpenAccentModal}
+          className="gap-2"
+        >
+          <Palette className="size-4" />
+          <span className="hidden sm:inline">Theme</span>
+          {accentName && <span className="text-xs text-muted-foreground">{accentName}</span>}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSaveSmartFilter}
+          disabled={!canSaveSmartFilter}
+          className="gap-2 disabled:opacity-50"
+        >
+          <Filter className="size-4" />
+          <span className="hidden sm:inline">Save filter</span>
         </Button>
         <Button
           size="sm"

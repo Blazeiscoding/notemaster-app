@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Palette as PaletteIcon, Upload, X } from "lucide-react";
+import { ChevronDown, Download, Palette as PaletteIcon, Upload, X } from "lucide-react";
 import AccentPicker from "@/components/layout/AccentPicker";
 import type {
   AccentPalette,
@@ -15,6 +15,10 @@ import SectionFilters from "./SectionFilters";
 import TagFilters from "./TagFilters";
 import NotebookList from "@/components/notebooks/NotebookList";
 import { cn } from "@/lib/utils";
+import SmartFiltersSection, {
+  type SmartFiltersSectionProps,
+} from "./SmartFiltersSection";
+import type { SmartFilter, SmartFilterCriteria } from "@/components/note-app/types";
 
 type SortKey = "updated" | "created" | "title";
 
@@ -39,6 +43,13 @@ type SidebarPanelProps = {
   onAccentPreviewEnd: () => void;
   onAccentApply: (palette: AccentPalette) => void;
   accentPalettes: AccentPalette[];
+  smartFilters: SmartFilter[];
+  activeSmartFilterId: string | null;
+  canSaveSmartFilter: boolean;
+  currentSmartFilterCriteria: SmartFilterCriteria;
+  onAddSmartFilter: (input: { name: string; description?: string }) => boolean;
+  onApplySmartFilter: (id: string | null) => void;
+  onRemoveSmartFilter: (id: string) => void;
   onExport: () => void;
   onImport: (file: File) => void;
   notebooks: NotebookPayload[];
@@ -75,6 +86,13 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onAccentPreviewEnd,
   onAccentApply,
   accentPalettes,
+  smartFilters,
+  activeSmartFilterId,
+  canSaveSmartFilter,
+  currentSmartFilterCriteria,
+  onAddSmartFilter,
+  onApplySmartFilter,
+  onRemoveSmartFilter,
   onExport,
   onImport,
   notebooks,
@@ -98,6 +116,9 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
     });
     return counts;
   }, [notes]);
+
+  const [smartFiltersOpen, setSmartFiltersOpen] = React.useState(true);
+  const [notebooksOpen, setNotebooksOpen] = React.useState(true);
 
   return (
     <aside
@@ -159,21 +180,69 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         onClear={onClearTags}
       />
 
-      <NotebookList
-        notebooks={notebooks}
-        notebookTree={notebookTree}
-        activeNotebookId={activeNotebookId}
-        newNotebookName={newNotebookName}
-        newNotebookParent={newNotebookParent}
-        isCreatingNotebook={isCreatingNotebook}
-        totalNotesCount={notes.length}
-        onNotebookNameChange={onNotebookNameChange}
-        onNotebookParentChange={onNotebookParentChange}
-        onCreateNotebook={onCreateNotebook}
-        onSelectNotebookFilter={onSelectNotebookFilter}
-        onDeleteNotebook={onDeleteNotebook}
-        onCloseSidebar={onClose}
-      />
+      <div className="rounded-xl border p-3">
+        <button
+          type="button"
+          onClick={() => setSmartFiltersOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between text-sm font-semibold"
+        >
+          <span>Smart filters</span>
+          <ChevronDown
+            className={cn(
+              "size-4 transition-transform",
+              smartFiltersOpen ? "rotate-0" : "-rotate-90",
+            )}
+          />
+        </button>
+        {smartFiltersOpen && (
+          <div className="pt-3">
+            <SmartFiltersSection
+              smartFilters={smartFilters}
+              activeSmartFilterId={activeSmartFilterId}
+              canSaveSmartFilter={canSaveSmartFilter}
+              currentCriteria={currentSmartFilterCriteria}
+              onAdd={onAddSmartFilter}
+              onApply={onApplySmartFilter}
+              onRemove={onRemoveSmartFilter}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border p-3">
+        <button
+          type="button"
+          onClick={() => setNotebooksOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between text-sm font-semibold"
+        >
+          <span>Notebooks</span>
+          <ChevronDown
+            className={cn(
+              "size-4 transition-transform",
+              notebooksOpen ? "rotate-0" : "-rotate-90",
+            )}
+          />
+        </button>
+        {notebooksOpen && (
+          <div className="pt-3">
+            <NotebookList
+              notebooks={notebooks}
+              notebookTree={notebookTree}
+              activeNotebookId={activeNotebookId}
+              newNotebookName={newNotebookName}
+              newNotebookParent={newNotebookParent}
+              isCreatingNotebook={isCreatingNotebook}
+              totalNotesCount={notes.length}
+              onNotebookNameChange={onNotebookNameChange}
+              onNotebookParentChange={onNotebookParentChange}
+              onCreateNotebook={onCreateNotebook}
+              onSelectNotebookFilter={onSelectNotebookFilter}
+              onDeleteNotebook={onDeleteNotebook}
+              onCloseSidebar={onClose}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
