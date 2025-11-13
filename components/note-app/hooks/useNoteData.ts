@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import type { NotePayload, NotebookPayload } from "@/types/note";
 
 type ServerActions = {
@@ -15,9 +16,11 @@ export function useNoteData(
   const [notes, setNotes] = useState<NotePayload[]>([]);
   const [notebooks, setNotebooks] = useState<NotebookPayload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadNotesAndNotebooks = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       if (isAuthenticated) {
         const [remoteNotes, remoteNotebooks] = await Promise.all([
@@ -39,7 +42,14 @@ export function useNoteData(
       }
     } catch (error) {
       console.error("Failed to load workspace", error);
-      if (!isAuthenticated) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to load your notes. Please refresh the page.";
+      setError(errorMessage);
+      if (isAuthenticated) {
+        toast.error("Failed to load your notes. Please refresh the page.");
+      } else {
         setNotes([]);
         setNotebooks([]);
       }
@@ -66,6 +76,7 @@ export function useNoteData(
         }
       } catch (err) {
         console.error("Failed to save notes:", err);
+        toast.error("Failed to save notes locally");
       }
     }
   }, [notes, isLoading, isAuthenticated, storageKey]);
@@ -80,6 +91,7 @@ export function useNoteData(
         );
       } catch (error) {
         console.error("Failed to save notebooks", error);
+        toast.error("Failed to save notebooks locally");
       }
     }
   }, [notebooks, isAuthenticated, storageKey]);
@@ -90,6 +102,8 @@ export function useNoteData(
     notebooks,
     setNotebooks,
     isLoading,
+    error,
+    retry: loadNotesAndNotebooks,
   };
 }
 

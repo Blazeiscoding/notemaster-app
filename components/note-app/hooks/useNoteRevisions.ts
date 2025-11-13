@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { toast } from "sonner";
 import type { NotePayload, NoteRevisionPayload } from "@/types/note";
 
 type RevisionsState = {
@@ -38,6 +39,7 @@ export function useNoteRevisions(
       } catch (error) {
         console.error("Failed to load revisions", error);
         setRevisions([]);
+        toast.error("Failed to load revision history");
       } finally {
         setIsLoadingRevisions(false);
       }
@@ -72,8 +74,10 @@ export function useNoteRevisions(
         );
         setCurrentNote(restored);
         handleCloseRevisions();
+        toast.success("Revision restored");
       } catch (error) {
         console.error("Failed to restore revision", error);
+        toast.error("Failed to restore revision. Please try again.");
       }
     },
     [handleCloseRevisions, isAuthenticated, setNotes, setCurrentNote]

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { toast } from "sonner";
 import type { NotePayload } from "@/types/note";
 import {
   hapticError,
@@ -56,6 +57,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? existing : note))
           );
+          toast.error("Failed to update note. Please try again.");
         }
       }
     },
@@ -94,6 +96,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? existing : note))
           );
+          toast.error("Failed to archive note. Please try again.");
         }
       }
     },
@@ -130,6 +133,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? existing : note))
           );
+          toast.error("Failed to unarchive note. Please try again.");
         }
       }
     },
@@ -174,6 +178,7 @@ export function useNotes(
             prev.map((note) => (note.id === id ? existing : note))
           );
           if (wasCurrent) setCurrentNote(existing);
+          toast.error("Failed to move note to bin. Please try again.");
         }
       }
     },
@@ -212,6 +217,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? existing : note))
           );
+          toast.error("Failed to restore note. Please try again.");
         }
       }
     },
@@ -241,6 +247,7 @@ export function useNotes(
             return next;
           });
           if (wasCurrent) setCurrentNote(existing);
+          toast.error("Failed to delete note. Please try again.");
         }
       }
     },
@@ -248,15 +255,21 @@ export function useNotes(
   );
 
   const exportNotes = useCallback(() => {
-    const blob = new Blob([JSON.stringify(notes, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `notemaster-notes-${new Date().toISOString()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const blob = new Blob([JSON.stringify(notes, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `notemaster-notes-${new Date().toISOString()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Notes exported successfully");
+    } catch (error) {
+      console.error("Failed to export notes", error);
+      toast.error("Failed to export notes. Please try again.");
+    }
   }, [notes]);
 
   const importNotes = useCallback(
@@ -271,10 +284,17 @@ export function useNotes(
             );
             for (const n of data) map.set(n.id, n as NotePayload);
             setNotes(Array.from(map.values()));
+            toast.success(`Imported ${data.length} note(s)`);
+          } else {
+            toast.error("Invalid file format. Expected an array of notes.");
           }
         } catch (error) {
           console.error("Failed to import notes", error);
+          toast.error("Failed to import notes. Invalid file format.");
         }
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read file. Please try again.");
       };
       reader.readAsText(file);
     },

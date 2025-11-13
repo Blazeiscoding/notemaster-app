@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { useTheme } from "./useTheme";
 import { usePWA } from "./usePWA";
@@ -72,7 +73,10 @@ export const useNoteApp = () => {
   const fetchNotesFromServer = useCallback(async () => {
     const response = await fetch("/api/notes", { cache: "no-store" });
     if (!response.ok) {
-      throw new Error("Failed to fetch notes");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to fetch notes (${response.status})`;
+      throw new Error(errorMessage);
     }
     return (await response.json()) as NotePayload[];
   }, []);
@@ -80,7 +84,10 @@ export const useNoteApp = () => {
   const fetchNotebooksFromServer = useCallback(async () => {
     const response = await fetch("/api/notebooks", { cache: "no-store" });
     if (!response.ok) {
-      throw new Error("Failed to fetch notebooks");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to fetch notebooks (${response.status})`;
+      throw new Error(errorMessage);
     }
     return (await response.json()) as NotebookPayload[];
   }, []);
@@ -97,7 +104,10 @@ export const useNoteApp = () => {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        throw new Error("Failed to create notebook");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.error || `Failed to create notebook (${response.status})`;
+        throw new Error(errorMessage);
       }
       return (await response.json()) as NotebookPayload;
     },
@@ -107,7 +117,10 @@ export const useNoteApp = () => {
   const deleteNotebookOnServer = useCallback(async (id: string) => {
     const response = await fetch(`/api/notebooks/${id}`, { method: "DELETE" });
     if (!response.ok) {
-      throw new Error("Failed to delete notebook");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to delete notebook (${response.status})`;
+      throw new Error(errorMessage);
     }
     return (await response.json()) as {
       success: boolean;
@@ -120,7 +133,10 @@ export const useNoteApp = () => {
       cache: "no-store",
     });
     if (!response.ok) {
-      throw new Error("Failed to fetch revisions");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to fetch revisions (${response.status})`;
+      throw new Error(errorMessage);
     }
     return (await response.json()) as NoteRevisionPayload[];
   }, []);
@@ -132,7 +148,10 @@ export const useNoteApp = () => {
       body: JSON.stringify(note),
     });
     if (!response.ok) {
-      throw new Error("Failed to create note");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to create note (${response.status})`;
+      throw new Error(errorMessage);
     }
     return (await response.json()) as NotePayload;
   }, []);
@@ -145,7 +164,10 @@ export const useNoteApp = () => {
         body: JSON.stringify(updates),
       });
       if (!response.ok) {
-        throw new Error("Failed to update note");
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.error || `Failed to update note (${response.status})`;
+        throw new Error(errorMessage);
       }
       return (await response.json()) as NotePayload;
     },
@@ -155,19 +177,28 @@ export const useNoteApp = () => {
   const deleteNoteOnServer = useCallback(async (id: string) => {
     const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
     if (!response.ok) {
-      throw new Error("Failed to delete note");
+      const errorData = await response.json().catch(() => ({}));
+      const errorMessage =
+        errorData.error || `Failed to delete note (${response.status})`;
+      throw new Error(errorMessage);
     }
   }, []);
 
   // Data loading
-  const { notes, setNotes, notebooks, setNotebooks, isLoading } = useNoteData(
-    isAuthenticated,
-    storageKey,
-    {
-      fetchNotesFromServer,
-      fetchNotebooksFromServer,
-    }
-  );
+  const {
+    notes,
+    setNotes,
+    notebooks,
+    setNotebooks,
+    isLoading,
+    error: dataError,
+    retry: retryLoadData,
+  } = useNoteData(isAuthenticated, storageKey, {
+    fetchNotesFromServer,
+    fetchNotebooksFromServer: fetchNotebooksFromServer as () => Promise<
+      NotebookPayload[]
+    >,
+  });
 
   // Notebooks management
   const notebooksHook = useNotebooks(
@@ -341,8 +372,16 @@ export const useNoteApp = () => {
           : await createNoteOnServer(baseNote);
         applyLocal(saved);
         setCurrentNote(null);
+        toast.success(exists ? "Note updated" : "Note created");
       } catch (error) {
         console.error("Failed to save note", error);
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to save note";
+        if (errorMessage.includes("Too many requests")) {
+          toast.error("Too many requests. Please wait a moment and try again.");
+        } else {
+          toast.error("Failed to save note. Please try again.");
+        }
         setIsSavingNote(false);
         return;
       }
@@ -369,6 +408,8 @@ export const useNoteApp = () => {
 
   return {
     isLoading,
+    dataError,
+    retryLoadData,
     userFirstName,
     isAuthenticated,
     darkMode,

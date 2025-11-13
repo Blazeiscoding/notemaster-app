@@ -2,6 +2,8 @@ import { type Metadata, type Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Toaster } from "sonner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -52,7 +54,10 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          {children}
+          <ErrorBoundary>
+            {children}
+            <Toaster position="top-right" richColors />
+          </ErrorBoundary>
         </body>
       </html>
     </ClerkProvider>

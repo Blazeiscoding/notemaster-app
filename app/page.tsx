@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeForInput } from "@/components/note-app/util";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
+import { ErrorState } from "@/components/ErrorState";
 import { Plus, X } from "lucide-react";
 
 const NoteApp = () => {
@@ -20,6 +21,8 @@ const NoteApp = () => {
 
   const {
     isLoading,
+    dataError,
+    retryLoadData,
     userFirstName,
     isAuthenticated,
     darkMode,
@@ -166,11 +169,24 @@ const NoteApp = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
-          <p className="mt-4 text-gray-600">Loading your notes...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading your notes...</p>
         </div>
+      </div>
+    );
+  }
+
+  if (dataError && isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <ErrorState
+          title="Failed to load your notes"
+          message={dataError}
+          onRetry={retryLoadData}
+          retryLabel="Retry"
+        />
       </div>
     );
   }

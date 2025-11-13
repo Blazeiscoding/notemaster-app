@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { toast } from "sonner";
 import type { NotebookPayload } from "@/types/note";
 import { generateId } from "@/components/note-app/util";
 import {
@@ -92,8 +93,10 @@ export function useNotebooks(
         };
         setNotebooks((prev) => [created, ...prev]);
       }
+      toast.success("Notebook created");
     } catch (error) {
       console.error("Failed to create notebook", error);
+      toast.error("Failed to create notebook. Please try again.");
     } finally {
       resetForm();
     }
@@ -122,8 +125,10 @@ export function useNotebooks(
         if (activeNotebookId === id) {
           setActiveNotebookId("all");
         }
+        toast.success("Notebook deleted");
       } catch (error) {
         console.error("Failed to delete notebook", error);
+        toast.error("Failed to delete notebook. Please try again.");
       }
     },
     [
