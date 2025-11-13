@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import NoteCard from "./NoteCard";
+import { useVirtualizedGrid } from "./useVirtualizedGrid";
 import type { NotePayload } from "@/types/note";
 
 type SectionKey = "notes" | "archive" | "bin";
@@ -23,7 +24,10 @@ type NotesGridProps = {
   onDeleteForever: (id: string) => void;
 };
 
-const emptyStateCopy: Record<SectionKey, { title: string; description: string }> = {
+const emptyStateCopy: Record<
+  SectionKey,
+  { title: string; description: string }
+> = {
   notes: {
     title: "Nothing here yet",
     description: "Start capturing your ideas by creating a new note.",
@@ -38,6 +42,9 @@ const emptyStateCopy: Record<SectionKey, { title: string; description: string }>
   },
 };
 
+// Note: Not using React.memo here because TanStack Virtual's useVirtualizer
+// is incompatible with React Compiler memoization. Virtual scrolling already
+// provides performance benefits for large lists.
 const NotesGrid: React.FC<NotesGridProps> = ({
   notes,
   activeSection,
@@ -50,6 +57,9 @@ const NotesGrid: React.FC<NotesGridProps> = ({
   onRestoreFromBin,
   onDeleteForever,
 }) => {
+  const { parentRef, columnsCount, shouldVirtualize, rows, rowVirtualizer } =
+    useVirtualizedGrid(notes);
+
   if (notes.length === 0) {
     const copy = emptyStateCopy[activeSection];
     return (
@@ -67,7 +77,9 @@ const NotesGrid: React.FC<NotesGridProps> = ({
             </div>
             <div className="space-y-2">
               <h2 className="text-lg font-semibold">{copy.title}</h2>
-              <p className="text-sm text-muted-foreground">{copy.description}</p>
+              <p className="text-sm text-muted-foreground">
+                {copy.description}
+              </p>
             </div>
             {activeSection === "notes" && (
               <Button onClick={onCreateNote} className="gap-2">
@@ -81,6 +93,73 @@ const NotesGrid: React.FC<NotesGridProps> = ({
     );
   }
 
+  // Use virtual scrolling for large lists
+  if (shouldVirtualize) {
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const totalSize = rowVirtualizer.getTotalSize();
+
+    return (
+      <div
+        ref={parentRef}
+        className="h-[600px] overflow-auto"
+        style={{ contain: "strict" }}
+      >
+        <div
+          style={{
+            height: `${totalSize}px`,
+            width: "100%",
+            position: "relative",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
+            }}
+          >
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
+
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4"
+                >
+                  {row.map((note) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      activeSection={activeSection}
+                      onOpen={onOpenNote}
+                      onPin={onPin}
+                      onArchive={onArchive}
+                      onTrash={onTrash}
+                      onUnarchive={onUnarchive}
+                      onRestoreFromBin={onRestoreFromBin}
+                      onDeleteForever={onDeleteForever}
+                    />
+                  ))}
+                  {/* Fill remaining columns in the last row */}
+                  {row.length < columnsCount &&
+                    Array.from({ length: columnsCount - row.length }).map(
+                      (_, i) => <div key={`spacer-${i}`} />
+                    )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular grid for smaller lists
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       {notes.map((note) => (
@@ -100,5 +179,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
     </div>
   );
 };
+
+NotesGrid.displayName = "NotesGrid";
 
 export default NotesGrid;
