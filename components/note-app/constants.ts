@@ -31,17 +31,6 @@ export const ACCENT_PALETTES: AccentPalette[] = [
       "radial-gradient(circle at 80% 30%, rgba(255,255,255,0.1) 0%, transparent 60%)",
   },
   {
-    id: "rose",
-    name: "Rose",
-    primary: "#E11D48",
-    accent: "#BE123C",
-    fontScale: 1.04,
-    background:
-      "linear-gradient(145deg, rgba(225,29,72,0.18) 0%, rgba(190,18,60,0.1) 60%, rgba(244,63,94,0.2) 100%)",
-    texture:
-      "radial-gradient(circle at 25% 75%, rgba(255,255,255,0.12) 0%, transparent 62%)",
-  },
-  {
     id: "pink",
     name: "Pink",
     primary: "#EC4899",
@@ -62,17 +51,6 @@ export const ACCENT_PALETTES: AccentPalette[] = [
       "linear-gradient(135deg, rgba(16,185,129,0.18) 0%, rgba(4,120,87,0.09) 55%, rgba(34,197,94,0.18) 100%)",
     texture:
       "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.1) 0%, transparent 60%)",
-  },
-  {
-    id: "amber",
-    name: "Amber",
-    primary: "#F59E0B",
-    accent: "#B45309",
-    fontScale: 1.06,
-    background:
-      "linear-gradient(130deg, rgba(245,158,11,0.18) 0%, rgba(180,83,9,0.08) 55%, rgba(252,211,77,0.22) 100%)",
-    texture:
-      "radial-gradient(circle at 15% 40%, rgba(255,255,255,0.14) 0%, transparent 58%)",
   },
   {
     id: "olive",

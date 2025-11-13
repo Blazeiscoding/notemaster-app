@@ -87,10 +87,10 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
           <button
             type="button"
-            className="flex flex-1 flex-col items-center gap-1 rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition hover:text-foreground"
+            className="flex flex-1 flex-col items-center gap-1 rounded-full px-3 py-2 text-xs font-medium text-muted-foreground transition hover:text-(--interactive-accent)"
             onClick={handleOpenSidebar}
           >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-transparent transition-colors hover:bg-(--interactive-accent-soft)">
               <Filter className="size-5" />
             </span>
             <span className="leading-none">Filters</span>

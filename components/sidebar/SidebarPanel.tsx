@@ -1,8 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Download, Palette as PaletteIcon, Upload, X } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  Palette as PaletteIcon,
+  Upload,
+  X,
+} from "lucide-react";
 import AccentPicker from "@/components/layout/AccentPicker";
 import type {
   AccentPalette,
@@ -18,7 +25,10 @@ import { cn } from "@/lib/utils";
 import SmartFiltersSection, {
   type SmartFiltersSectionProps,
 } from "./SmartFiltersSection";
-import type { SmartFilter, SmartFilterCriteria } from "@/components/note-app/types";
+import type {
+  SmartFilter,
+  SmartFilterCriteria,
+} from "@/components/note-app/types";
 
 type SortKey = "updated" | "created" | "title";
 
@@ -117,8 +127,8 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
     return counts;
   }, [notes]);
 
-  const [smartFiltersOpen, setSmartFiltersOpen] = React.useState(true);
-  const [notebooksOpen, setNotebooksOpen] = React.useState(true);
+  const [smartFiltersOpen, setSmartFiltersOpen] = React.useState(false);
+  const [notebooksOpen, setNotebooksOpen] = React.useState(false);
 
   return (
     <aside
@@ -126,7 +136,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300",
         "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
         "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
-        show ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
       <Button
@@ -142,13 +152,23 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
 
       <div className="flex gap-2">
         <Button
-          variant={filterTag === "all" ? "default" : "outline"}
+          variant={filterTag === "all" ? "accent" : "outline"}
           size="sm"
-          className="flex-1"
+          className={cn(
+            "flex-1",
+            filterTag === "all" && "shadow-sm shadow-(--interactive-accent)/20"
+          )}
           onClick={() => onTagSelect("all")}
         >
           All
-          <span className="ml-2 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              "ml-2 rounded-full px-2 py-0.5 text-xs",
+              filterTag === "all"
+                ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
+                : "bg-background text-muted-foreground"
+            )}
+          >
             {notes.length}
           </span>
         </Button>
@@ -180,17 +200,17 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         onClear={onClearTags}
       />
 
-      <div className="rounded-xl border p-3">
+      <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
         <button
           type="button"
           onClick={() => setSmartFiltersOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between text-sm font-semibold"
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
         >
           <span>Smart filters</span>
           <ChevronDown
             className={cn(
-              "size-4 transition-transform",
-              smartFiltersOpen ? "rotate-0" : "-rotate-90",
+              "size-4 text-muted-foreground transition-transform",
+              smartFiltersOpen ? "rotate-0" : "-rotate-90"
             )}
           />
         </button>
@@ -209,17 +229,17 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         )}
       </div>
 
-      <div className="rounded-xl border p-3">
+      <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
         <button
           type="button"
           onClick={() => setNotebooksOpen((prev) => !prev)}
-          className="flex w-full items-center justify-between text-sm font-semibold"
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
         >
           <span>Notebooks</span>
           <ChevronDown
             className={cn(
-              "size-4 transition-transform",
-              notebooksOpen ? "rotate-0" : "-rotate-90",
+              "size-4 text-muted-foreground transition-transform",
+              notebooksOpen ? "rotate-0" : "-rotate-90"
             )}
           />
         </button>
@@ -238,7 +258,6 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
               onCreateNotebook={onCreateNotebook}
               onSelectNotebookFilter={onSelectNotebookFilter}
               onDeleteNotebook={onDeleteNotebook}
-              onCloseSidebar={onClose}
             />
           </div>
         )}

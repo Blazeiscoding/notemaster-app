@@ -6,6 +6,7 @@ import type { SmartFilter, SmartFilterCriteria } from "@/components/note-app/typ
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export type SmartFiltersSectionProps = {
   smartFilters: SmartFilter[];
@@ -75,6 +76,7 @@ const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = ({
           size="sm"
           onClick={() => onApply(null)}
           disabled={!activeSmartFilterId}
+          className="text-(--interactive-accent) hover:text-(--interactive-accent-strong)"
         >
           Clear
         </Button>
@@ -83,7 +85,11 @@ const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = ({
       {criteriaChips.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {criteriaChips.map((chip) => (
-            <Badge key={chip} variant="outline" className="text-xs">
+            <Badge 
+              key={chip} 
+              variant="outline" 
+              className="text-xs border-(--interactive-accent)/30 text-(--interactive-accent)"
+            >
               {chip}
             </Badge>
           ))}
@@ -96,15 +102,23 @@ const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = ({
           return (
             <div
               key={filter.id}
-              className="flex items-center gap-2 rounded-lg border px-3 py-2 transition hover:border-primary/40"
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-3 py-2 transition",
+                isActive
+                  ? "border-(--interactive-accent) bg-(--interactive-accent-soft)"
+                  : "hover:border-(--interactive-accent)/40"
+              )}
               data-active={isActive}
             >
               <button
                 type="button"
                 onClick={() => onApply(filter.id)}
-                className="flex flex-1 flex-col items-start text-left focus-visible:outline-none"
+                className="flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--interactive-accent) rounded"
               >
-                <span className={`text-sm font-semibold ${isActive ? "text-primary" : ""}`}>
+                <span className={cn(
+                  "text-sm font-semibold",
+                  isActive ? "text-(--interactive-accent)" : ""
+                )}>
                   {filter.name}
                 </span>
                 {filter.description ? (
@@ -148,8 +162,10 @@ const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = ({
         />
         <Button
           size="sm"
+          variant="accent"
           onClick={handleSave}
           disabled={!canSaveSmartFilter || !name.trim()}
+          className="shadow-sm shadow-(--interactive-accent)/20"
         >
           Save smart filter
         </Button>

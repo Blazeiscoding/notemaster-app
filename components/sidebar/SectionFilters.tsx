@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type SectionKey = "notes" | "archive" | "bin";
 
@@ -25,13 +26,21 @@ const SectionFilters: React.FC<SectionFiltersProps> = ({
         {(Object.keys(counts) as SectionKey[]).map((section) => (
           <Button
             key={section}
-            variant={activeSection === section ? "default" : "ghost"}
+            variant={activeSection === section ? "accent" : "ghost"}
             size="sm"
-            className="justify-between capitalize"
+            className={cn(
+              "justify-between capitalize transition-colors",
+              activeSection === section && "shadow-sm shadow-(--interactive-accent)/20"
+            )}
             onClick={() => onSelect(section)}
           >
             <span>{section}</span>
-            <span className="rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-xs",
+              activeSection === section
+                ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
+                : "bg-background text-muted-foreground"
+            )}>
               {counts[section] ?? 0}
             </span>
           </Button>

@@ -302,7 +302,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
           className={cn(
             "group relative border bg-card/80 transition animate-in fade-in slide-in-from-bottom-2",
             isNotesSection &&
-              "hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg cursor-pointer",
+              "hover:-translate-y-1 hover:border-(--interactive-accent)/40 hover:shadow-lg hover:shadow-(--interactive-accent)/10 cursor-pointer",
             isDragging && "cursor-grabbing"
           )}
           style={{
@@ -321,7 +321,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
             {(note.pinned || dueDateMetadata) && (
               <div className="flex flex-wrap gap-2">
                 {note.pinned && (
-                  <Badge className="flex items-center gap-1 bg-violet-500/15 text-violet-600">
+                  <Badge className="flex items-center gap-1 bg-(--interactive-accent-soft) text-(--interactive-accent) border border-(--interactive-accent)/20">
                     <Pin className="size-3" />
                     <span>Pinned</span>
                   </Badge>
@@ -354,8 +354,8 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                         onPin(note.id);
                       }}
                       className={cn(
-                        "text-muted-foreground transition hover:text-primary",
-                        note.pinned && "text-primary"
+                        "text-muted-foreground transition hover:text-(--interactive-accent)",
+                        note.pinned && "text-(--interactive-accent)"
                       )}
                     >
                       <Pin className="size-4" />
@@ -392,7 +392,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                         event.stopPropagation();
                         onUnarchive(note.id);
                       }}
-                      className="text-muted-foreground hover:text-primary"
+                      className="text-muted-foreground hover:text-(--interactive-accent)"
                     >
                       <ArchiveRestore className="size-4" />
                     </Button>
@@ -418,7 +418,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                         event.stopPropagation();
                         onRestoreFromBin(note.id);
                       }}
-                      className="text-muted-foreground hover:text-primary"
+                      className="text-muted-foreground hover:text-(--interactive-accent)"
                     >
                       <Undo2 className="size-4" />
                     </Button>
@@ -455,7 +455,11 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
             {note.tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
                 {note.tags.map((tag) => (
-                  <Badge key={tag} variant="outline">
+                  <Badge
+                    key={tag}
+                    variant="outline"
+                    className="border-(--interactive-accent)/30 text-(--interactive-accent) hover:bg-(--interactive-accent-soft) transition-colors"
+                  >
                     #{tag}
                   </Badge>
                 ))}

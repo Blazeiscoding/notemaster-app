@@ -3,7 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Folder, FolderPlus, X } from "lucide-react";
+import { Folder, FolderPlus } from "lucide-react";
 import NotebookNode from "@/components/notebooks/NotebookNode";
 import type { NotebookPayload, NotebookTreeNode } from "@/types/note";
 
@@ -20,7 +20,6 @@ type NotebookListProps = {
   onCreateNotebook: () => void;
   onSelectNotebookFilter: (id: string) => void;
   onDeleteNotebook: (id: string) => void;
-  onCloseSidebar?: () => void;
 };
 
 const NotebookList: React.FC<NotebookListProps> = ({
@@ -36,25 +35,12 @@ const NotebookList: React.FC<NotebookListProps> = ({
   onCreateNotebook,
   onSelectNotebookFilter,
   onDeleteNotebook,
-  onCloseSidebar,
 }) => {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Folder className="size-4" />
-          Notebooks
-        </div>
-        {onCloseSidebar && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={onCloseSidebar}
-            className="lg:hidden text-muted-foreground"
-          >
-            <X className="size-4" />
-          </Button>
-        )}
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+        <Folder className="size-4" />
+        Notebooks
       </div>
 
       <div className="space-y-2">
