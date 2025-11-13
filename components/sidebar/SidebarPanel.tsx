@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import React from "react";
@@ -22,9 +21,7 @@ import SectionFilters from "./SectionFilters";
 import TagFilters from "./TagFilters";
 import NotebookList from "@/components/notebooks/NotebookList";
 import { cn } from "@/lib/utils";
-import SmartFiltersSection, {
-  type SmartFiltersSectionProps,
-} from "./SmartFiltersSection";
+import SmartFiltersSection from "./SmartFiltersSection";
 import type {
   SmartFilter,
   SmartFilterCriteria,
