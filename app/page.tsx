@@ -114,12 +114,17 @@ const NoteApp = () => {
   const [showThemePanel, setShowThemePanel] = React.useState(false);
   const [showSaveFilterDialog, setShowSaveFilterDialog] = React.useState(false);
   const [quickFilterName, setQuickFilterName] = React.useState("");
-  const [quickFilterDescription, setQuickFilterDescription] = React.useState("");
-  const [quickFilterError, setQuickFilterError] = React.useState<string | null>(null);
+  const [quickFilterDescription, setQuickFilterDescription] =
+    React.useState("");
+  const [quickFilterError, setQuickFilterError] = React.useState<string | null>(
+    null
+  );
 
   const computeDefaultFilterName = React.useCallback(() => {
     const base = "Smart filter";
-    const existing = new Set(smartFilters.map((filter) => filter.name.toLowerCase()));
+    const existing = new Set(
+      smartFilters.map((filter) => filter.name.toLowerCase())
+    );
     if (!existing.has(base.toLowerCase())) return base;
     let suffix = 2;
     let candidate = `${base} ${suffix}`;
@@ -133,7 +138,9 @@ const NoteApp = () => {
   const handleOpenSaveFilter = React.useCallback(() => {
     setQuickFilterError(null);
     setQuickFilterDescription("");
-    setQuickFilterName((prev) => (prev.trim() ? prev : computeDefaultFilterName()));
+    setQuickFilterName((prev) =>
+      prev.trim() ? prev : computeDefaultFilterName()
+    );
     setShowSaveFilterDialog(true);
   }, [computeDefaultFilterName]);
 
@@ -162,7 +169,12 @@ const NoteApp = () => {
       }
       handleCloseSaveFilter();
     },
-    [addSmartFilter, handleCloseSaveFilter, quickFilterDescription, quickFilterName],
+    [
+      addSmartFilter,
+      handleCloseSaveFilter,
+      quickFilterDescription,
+      quickFilterName,
+    ]
   );
 
   const handleCloseThemePanel = React.useCallback(() => {
@@ -175,7 +187,9 @@ const NoteApp = () => {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-(--interactive-accent)" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading your notes...</p>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">
+            Loading your notes...
+          </p>
         </div>
       </div>
     );
@@ -375,7 +389,11 @@ const NoteApp = () => {
               />
             </div>
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={handleCloseThemePanel}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCloseThemePanel}
+              >
                 Done
               </Button>
             </div>
@@ -418,7 +436,9 @@ const NoteApp = () => {
               />
               <Textarea
                 value={quickFilterDescription}
-                onChange={(event) => setQuickFilterDescription(event.target.value)}
+                onChange={(event) =>
+                  setQuickFilterDescription(event.target.value)
+                }
                 placeholder="Description (optional)"
                 aria-label="Smart filter description"
                 className="min-h-[96px]"
