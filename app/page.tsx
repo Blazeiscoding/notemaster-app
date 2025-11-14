@@ -102,6 +102,9 @@ const NoteApp = () => {
     setNewNotebookParent,
     isCreatingNotebook,
     handleCreateNotebook,
+    handleCreateNotebookChild,
+    handleRenameNotebook,
+    handleMoveNotebook,
     activeNotebookId,
     handleSelectNotebookFilter,
     handleDeleteNotebook,
@@ -222,7 +225,6 @@ const NoteApp = () => {
 
           <SidebarPanel
             show={showSidebar}
-            onClose={() => setShowSidebar(false)}
             sortBy={sortBy}
             onSortChange={setSortBy}
             searchQuery={searchQuery}
@@ -260,6 +262,9 @@ const NoteApp = () => {
             onNotebookNameChange={setNewNotebookName}
             onNotebookParentChange={setNewNotebookParent}
             onCreateNotebook={handleCreateNotebook}
+            onQuickAddNotebook={handleCreateNotebookChild}
+            onRenameNotebook={handleRenameNotebook}
+            onMoveNotebook={handleMoveNotebook}
             activeNotebookId={activeNotebookId}
             onSelectNotebookFilter={handleSelectNotebookFilter}
             onDeleteNotebook={handleDeleteNotebook}

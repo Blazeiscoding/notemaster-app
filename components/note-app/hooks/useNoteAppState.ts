@@ -128,6 +128,27 @@ export const useNoteApp = () => {
     };
   }, []);
 
+  const updateNotebookOnServer = useCallback(
+    async (
+      id: string,
+      updates: Partial<Pick<NotebookPayload, "name" | "parentId" | "color">>
+    ) => {
+      const response = await fetch(`/api/notebooks/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates),
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage =
+          errorData.error || `Failed to update notebook (${response.status})`;
+        throw new Error(errorMessage);
+      }
+      return (await response.json()) as NotebookPayload;
+    },
+    []
+  );
+
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
     const response = await fetch(`/api/notes/${id}/revisions`, {
       cache: "no-store",
@@ -216,6 +237,7 @@ export const useNoteApp = () => {
     {
       createNotebookOnServer,
       deleteNotebookOnServer,
+      updateNotebookOnServer,
     }
   );
 
@@ -492,6 +514,9 @@ export const useNoteApp = () => {
     setNewNotebookParent: notebooksHook.setNewNotebookParent,
     isCreatingNotebook: notebooksHook.isCreatingNotebook,
     handleCreateNotebook: notebooksHook.handleCreateNotebook,
+    handleCreateNotebookChild: notebooksHook.handleCreateNotebookChild,
+    handleRenameNotebook: notebooksHook.handleRenameNotebook,
+    handleMoveNotebook: notebooksHook.handleMoveNotebook,
     activeNotebookId: notebooksHook.activeNotebookId,
     handleSelectNotebookFilter: notebooksHook.handleSelectNotebookFilter,
     handleDeleteNotebook: notebooksHook.handleDeleteNotebook,

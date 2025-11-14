@@ -7,7 +7,6 @@ import {
   Download,
   Palette as PaletteIcon,
   Upload,
-  X,
 } from "lucide-react";
 import AccentPicker from "@/components/layout/AccentPicker";
 import type {
@@ -27,11 +26,48 @@ import type {
   SmartFilterCriteria,
 } from "@/components/note-app/types";
 
+const SIDEBAR_PANEL_STATE_KEY = "notemaster:sidebar-panel-state";
+
+type CollapsibleState = {
+  smartFiltersOpen: boolean;
+  notebooksOpen: boolean;
+};
+
+const DEFAULT_PANEL_STATE: CollapsibleState = {
+  smartFiltersOpen: true,
+  notebooksOpen: true,
+};
+
+const readPanelStateFromStorage = (): CollapsibleState => {
+  if (typeof window === "undefined") {
+    return DEFAULT_PANEL_STATE;
+  }
+  try {
+    const raw = window.localStorage?.getItem(SIDEBAR_PANEL_STATE_KEY);
+    if (!raw) {
+      return DEFAULT_PANEL_STATE;
+    }
+    const parsed = JSON.parse(raw) as Partial<CollapsibleState>;
+    return {
+      smartFiltersOpen:
+        typeof parsed.smartFiltersOpen === "boolean"
+          ? parsed.smartFiltersOpen
+          : DEFAULT_PANEL_STATE.smartFiltersOpen,
+      notebooksOpen:
+        typeof parsed.notebooksOpen === "boolean"
+          ? parsed.notebooksOpen
+          : DEFAULT_PANEL_STATE.notebooksOpen,
+    };
+  } catch (error) {
+    console.error("Failed to read sidebar state", error);
+    return DEFAULT_PANEL_STATE;
+  }
+};
+
 type SortKey = "updated" | "created" | "title";
 
 type SidebarPanelProps = {
   show: boolean;
-  onClose: () => void;
   sortBy: SortKey;
   onSortChange: (value: SortKey) => void;
   searchQuery: string;
@@ -67,6 +103,16 @@ type SidebarPanelProps = {
   onNotebookNameChange: (value: string) => void;
   onNotebookParentChange: (value: string | null) => void;
   onCreateNotebook: () => void;
+  onQuickAddNotebook: (
+    parentId: string | null,
+    name: string
+  ) => Promise<boolean> | boolean;
+  onRenameNotebook: (id: string, name: string) => Promise<boolean> | boolean;
+  onMoveNotebook: (
+    id: string,
+    targetParentId: string | null,
+    targetIndex: number
+  ) => Promise<boolean> | boolean;
   activeNotebookId: string;
   onSelectNotebookFilter: (id: string) => void;
   onDeleteNotebook: (id: string) => void;
@@ -74,7 +120,6 @@ type SidebarPanelProps = {
 
 const SidebarPanel: React.FC<SidebarPanelProps> = ({
   show,
-  onClose,
   sortBy,
   onSortChange,
   searchQuery,
@@ -110,6 +155,9 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onNotebookNameChange,
   onNotebookParentChange,
   onCreateNotebook,
+  onQuickAddNotebook,
+  onRenameNotebook,
+  onMoveNotebook,
   activeNotebookId,
   onSelectNotebookFilter,
   onDeleteNotebook,
@@ -124,8 +172,27 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
     return counts;
   }, [notes]);
 
-  const [smartFiltersOpen, setSmartFiltersOpen] = React.useState(false);
-  const [notebooksOpen, setNotebooksOpen] = React.useState(false);
+  const [panelState, setPanelState] = React.useState<CollapsibleState>(
+    readPanelStateFromStorage
+  );
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(
+        SIDEBAR_PANEL_STATE_KEY,
+        JSON.stringify(panelState)
+      );
+    } catch (error) {
+      console.error("Failed to persist sidebar state", error);
+    }
+  }, [panelState]);
+
+  const toggleSection = (section: keyof CollapsibleState) => {
+    setPanelState((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const { smartFiltersOpen, notebooksOpen } = panelState;
 
   return (
     <aside
@@ -136,15 +203,6 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="absolute right-2 top-2 lg:hidden"
-        onClick={onClose}
-      >
-        <X className="size-4" />
-      </Button>
-
       <SearchBar value={searchQuery} onChange={onSearchChange} />
 
       <div className="flex gap-2">
@@ -200,7 +258,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
       <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
         <button
           type="button"
-          onClick={() => setSmartFiltersOpen((prev) => !prev)}
+          onClick={() => toggleSection("smartFiltersOpen")}
           className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
         >
           <span>Smart filters</span>
@@ -229,7 +287,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
       <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
         <button
           type="button"
-          onClick={() => setNotebooksOpen((prev) => !prev)}
+          onClick={() => toggleSection("notebooksOpen")}
           className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
         >
           <span>Notebooks</span>
@@ -255,6 +313,9 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
               onCreateNotebook={onCreateNotebook}
               onSelectNotebookFilter={onSelectNotebookFilter}
               onDeleteNotebook={onDeleteNotebook}
+              onQuickAddNotebook={onQuickAddNotebook}
+              onRenameNotebook={onRenameNotebook}
+              onMoveNotebook={onMoveNotebook}
             />
           </div>
         )}

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Folder, FolderPlus } from "lucide-react";
 import NotebookNode from "@/components/notebooks/NotebookNode";
 import type { NotebookPayload, NotebookTreeNode } from "@/types/note";
+import { cn } from "@/lib/utils";
 
 type NotebookListProps = {
   notebooks: NotebookPayload[];
@@ -18,9 +19,18 @@ type NotebookListProps = {
   onNotebookNameChange: (value: string) => void;
   onNotebookParentChange: (value: string | null) => void;
   onCreateNotebook: () => void;
+  onQuickAddNotebook: (parentId: string | null, name: string) => Promise<boolean> | boolean;
+  onRenameNotebook: (id: string, name: string) => Promise<boolean> | boolean;
+  onMoveNotebook: (
+    id: string,
+    targetParentId: string | null,
+    targetIndex: number
+  ) => Promise<boolean> | boolean;
   onSelectNotebookFilter: (id: string) => void;
   onDeleteNotebook: (id: string) => void;
 };
+
+const NOTEBOOK_DRAG_DATA = "application/x-notebook-id";
 
 const NotebookList: React.FC<NotebookListProps> = ({
   notebooks,
@@ -33,9 +43,32 @@ const NotebookList: React.FC<NotebookListProps> = ({
   onNotebookNameChange,
   onNotebookParentChange,
   onCreateNotebook,
+  onQuickAddNotebook,
+  onRenameNotebook,
+  onMoveNotebook,
   onSelectNotebookFilter,
   onDeleteNotebook,
 }) => {
+  const [isRootDragOver, setIsRootDragOver] = React.useState(false);
+
+  const handleRootDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsRootDragOver(true);
+    event.dataTransfer.dropEffect = "move";
+  };
+
+  const handleRootDragLeave = () => {
+    setIsRootDragOver(false);
+  };
+
+  const handleRootDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsRootDragOver(false);
+    const sourceId = event.dataTransfer.getData(NOTEBOOK_DRAG_DATA);
+    if (!sourceId) return;
+    onMoveNotebook(sourceId, null, notebookTree.length);
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
@@ -91,21 +124,35 @@ const NotebookList: React.FC<NotebookListProps> = ({
             {totalNotesCount}
           </span>
         </Button>
-        <div className="max-h-64 space-y-1 overflow-y-auto rounded-lg border border-dashed p-3">
-          {notebookTree.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Create notebooks to organize notes by project or theme.
-            </p>
+        <div
+          className={cn(
+            "max-h-64 space-y-1 overflow-y-auto rounded-lg border border-dashed p-3 transition-colors",
+            isRootDragOver && "border-(--interactive-accent)"
           )}
-          {notebookTree.map((node) => (
-            <NotebookNode
-              key={node.id}
-              node={node}
-              activeId={activeNotebookId}
-              onSelect={onSelectNotebookFilter}
-              onDelete={onDeleteNotebook}
-            />
-          ))}
+          onDragOver={handleRootDragOver}
+          onDragLeave={handleRootDragLeave}
+          onDrop={handleRootDrop}
+        >
+          {notebookTree.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Drag notebooks here or create a new one to get started.
+            </p>
+          ) : (
+            notebookTree.map((node, index) => (
+              <NotebookNode
+                key={node.id}
+                node={node}
+                index={index}
+                dragDataType={NOTEBOOK_DRAG_DATA}
+                activeId={activeNotebookId}
+                onSelect={onSelectNotebookFilter}
+                onDelete={onDeleteNotebook}
+                onAddChild={onQuickAddNotebook}
+                onRename={onRenameNotebook}
+                onMove={onMoveNotebook}
+              />
+            ))
+          )}
         </div>
       </div>
     </div>
