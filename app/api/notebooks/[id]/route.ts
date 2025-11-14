@@ -1,146 +1,104 @@
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/prisma";
-import { serializeNotebook } from "../utils";
-import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
+import { prisma } from "@/lib/prisma"
+import { serializeNotebook } from "../utils"
 import {
   sanitizeString,
   sanitizeColor,
   sanitizeOptionalId,
-} from "@/lib/validation";
+} from "@/lib/validation"
+import {
+  withAuthJsonAndParams,
+  withAuthAndParams,
+  successResponse,
+  errorResponse,
+} from "@/lib/api-middleware"
 
-interface Params {
-  id: string;
-}
+type ParamsPromise = Promise<{ id: string }>
 
-type ParamsPromise = Promise<Params>;
-
-export async function PATCH(
-  request: Request,
-  { params }: { params: ParamsPromise }
-) {
-  try {
-    const { userId } = await auth();
-    const { id } = await params;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    // Rate limiting
-    const rateLimitResult = rateLimit(`notebooks-patch-${userId}`);
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: getRateLimitHeaders(rateLimitResult),
-        }
-      );
-    }
-
-    const existing = await prisma.notebook.findUnique({ where: { id } });
+export const PATCH = withAuthJsonAndParams<ParamsPromise>(
+  async ({ userId, body, rateLimitHeaders }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } })
 
     if (!existing || existing.userId !== userId) {
-      return NextResponse.json(
-        { error: "Notebook not found" },
-        { status: 404 }
-      );
+      return errorResponse("Notebook not found", 404, rateLimitHeaders)
     }
 
-    let payload: unknown;
-
-    try {
-      payload = await request.json();
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid request format" },
-        { status: 400 }
-      );
+    if (typeof body !== "object" || body === null) {
+      return errorResponse("Invalid payload format", 400, rateLimitHeaders)
     }
 
-    if (typeof payload !== "object" || payload === null) {
-      return NextResponse.json(
-        { error: "Invalid payload format" },
-        { status: 400 }
-      );
-    }
-
-    const p = payload as Record<string, unknown>;
+    const p = body as Record<string, unknown>
 
     const updates: {
-      name?: string;
-      color?: string;
-      parent?: { connect: { id: string } } | { disconnect: true };
-    } = {};
+      name?: string
+      color?: string
+      parent?: { connect: { id: string } } | { disconnect: true }
+    } = {}
 
     if (p.name !== undefined) {
       try {
-        updates.name = sanitizeString(p.name, 200);
+        updates.name = sanitizeString(p.name, 200)
       } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Invalid name" },
-          { status: 400 }
-        );
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid name",
+          400,
+          rateLimitHeaders
+        )
       }
     }
 
     if (p.color !== undefined) {
       try {
-        updates.color = sanitizeColor(p.color);
+        updates.color = sanitizeColor(p.color)
       } catch (error) {
-        return NextResponse.json(
-          { error: error instanceof Error ? error.message : "Invalid color" },
-          { status: 400 }
-        );
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid color",
+          400,
+          rateLimitHeaders
+        )
       }
     }
 
-    if (Object.prototype.hasOwnProperty.call(payload, "parentId")) {
+    if (Object.prototype.hasOwnProperty.call(body, "parentId")) {
       try {
-        const parentId = sanitizeOptionalId(p.parentId);
+        const parentId = sanitizeOptionalId(p.parentId)
 
         if (!parentId) {
-          updates.parent = { disconnect: true };
+          updates.parent = { disconnect: true }
         } else {
           if (parentId === id) {
-            return NextResponse.json(
-              { error: "Notebook cannot reference itself" },
-              { status: 400 }
-            );
+            return errorResponse(
+              "Notebook cannot reference itself",
+              400,
+              rateLimitHeaders
+            )
           }
 
           const parent = await prisma.notebook.findUnique({
             where: { id: parentId },
             select: { id: true, userId: true },
-          });
+          })
 
           if (!parent || parent.userId !== userId) {
-            return NextResponse.json(
-              { error: "Parent notebook not found" },
-              { status: 404 }
-            );
+            return errorResponse(
+              "Parent notebook not found",
+              404,
+              rateLimitHeaders
+            )
           }
 
-          updates.parent = { connect: { id: parent.id } };
+          updates.parent = { connect: { id: parent.id } }
         }
       } catch (error) {
-        return NextResponse.json(
-          {
-            error: error instanceof Error ? error.message : "Invalid parent ID",
-          },
-          { status: 400 }
-        );
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid parent ID",
+          400,
+          rateLimitHeaders
+        )
       }
     }
 
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json(serializeNotebook(existing), {
-        headers: getRateLimitHeaders(rateLimitResult),
-      });
+      return successResponse(serializeNotebook(existing), 200, rateLimitHeaders)
     }
 
     const updated = await prisma.notebook.update({
@@ -150,74 +108,33 @@ export async function PATCH(
         color: updates.color,
         parent: updates.parent,
       },
-    });
+    })
 
-    return NextResponse.json(serializeNotebook(updated), {
-      headers: getRateLimitHeaders(rateLimitResult),
-    });
-  } catch (error) {
-    console.error("Error updating notebook:", error);
-    return NextResponse.json(
-      { error: "Failed to update notebook" },
-      { status: 500 }
-    );
-  }
-}
+    return successResponse(serializeNotebook(updated), 200, rateLimitHeaders)
+  },
+  { rateLimitSuffix: "notebooks-patch" }
+)
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: ParamsPromise }
-) {
-  try {
-    const { userId } = await auth();
-    const { id } = await params;
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    // Rate limiting
-    const rateLimitResult = rateLimit(`notebooks-delete-${userId}`);
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: getRateLimitHeaders(rateLimitResult),
-        }
-      );
-    }
-
-    const existing = await prisma.notebook.findUnique({ where: { id } });
+export const DELETE = withAuthAndParams<ParamsPromise>(
+  async ({ userId, rateLimitHeaders }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } })
 
     if (!existing || existing.userId !== userId) {
-      return NextResponse.json(
-        { error: "Notebook not found" },
-        { status: 404 }
-      );
+      return errorResponse("Notebook not found", 404, rateLimitHeaders)
     }
 
     const reassigned = await prisma.note.updateMany({
       where: { notebookId: existing.id },
       data: { notebookId: null },
-    });
+    })
 
-    await prisma.notebook.delete({ where: { id } });
+    await prisma.notebook.delete({ where: { id } })
 
-    return NextResponse.json(
+    return successResponse(
       { success: true, releasedNotes: reassigned.count },
-      {
-        headers: getRateLimitHeaders(rateLimitResult),
-      }
-    );
-  } catch (error) {
-    console.error("Error deleting notebook:", error);
-    return NextResponse.json(
-      { error: "Failed to delete notebook" },
-      { status: 500 }
-    );
-  }
-}
+      200,
+      rateLimitHeaders
+    )
+  },
+  { rateLimitSuffix: "notebooks-delete" }
+)

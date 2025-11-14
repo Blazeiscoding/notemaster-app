@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { NotePayload } from "@/types/note"
@@ -10,114 +8,47 @@ import {
   encryptString,
   encryptStringArray,
 } from "@/lib/encryption"
-import { rateLimit, getRateLimitHeaders } from "@/lib/rate-limit"
+import {
+  withAuth,
+  withAuthAndJson,
+  successResponse,
+  errorResponse,
+} from "@/lib/api-middleware"
 
-export async function GET() {
-  try {
-    const { userId } = await auth()
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      )
-    }
-
-    // Rate limiting
-    const rateLimitResult = rateLimit(`notes-get-${userId}`)
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: getRateLimitHeaders(rateLimitResult),
-        },
-      )
-    }
-
+export const GET = withAuth(
+  async ({ userId, rateLimitHeaders }) => {
     const notes = await prisma.note.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
     })
 
-    return NextResponse.json(notes.map(serializeNote), {
-      headers: getRateLimitHeaders(rateLimitResult),
-    })
-  } catch (error) {
-    console.error("Error fetching notes:", error)
-    return NextResponse.json(
-      { error: "Failed to fetch notes" },
-      { status: 500 }
-    )
-  }
-}
+    return successResponse(notes.map(serializeNote), 200, rateLimitHeaders)
+  },
+  { rateLimitSuffix: "notes-get" }
+)
 
-export async function POST(request: Request) {
-  try {
-    const { userId } = await auth()
-
-    if (!userId) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      )
-    }
-
-    // Rate limiting
-    const rateLimitResult = rateLimit(`notes-post-${userId}`)
-    if (!rateLimitResult.success) {
-      return NextResponse.json(
-        { error: "Too many requests. Please try again later." },
-        {
-          status: 429,
-          headers: getRateLimitHeaders(rateLimitResult),
-        },
-      )
-    }
-
-    let payload: Partial<NotePayload>
-
-    try {
-      payload = await request.json()
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid request format" },
-        { status: 400 }
-      )
-    }
+export const POST = withAuthAndJson(
+  async ({ userId, body, rateLimitHeaders }) => {
+    const payload = body as Partial<NotePayload>
 
     // Input validation
     if (!payload.id || typeof payload.id !== "string") {
-      return NextResponse.json(
-        { error: "Note ID is required" },
-        { status: 400 }
-      )
+      return errorResponse("Note ID is required", 400, rateLimitHeaders)
     }
 
     let notebookId: string | null = null
 
     if (typeof payload.notebookId === "string" && payload.notebookId.trim()) {
-      try {
-        const notebook = await prisma.notebook.findUnique({
-          where: { id: payload.notebookId },
-          select: { id: true, userId: true },
-        })
+      const notebook = await prisma.notebook.findUnique({
+        where: { id: payload.notebookId },
+        select: { id: true, userId: true },
+      })
 
-        if (!notebook || notebook.userId !== userId) {
-          return NextResponse.json(
-            { error: "Notebook not found" },
-            { status: 404 }
-          )
-        }
-
-        notebookId = notebook.id
-      } catch (error) {
-        console.error("Error validating notebook:", error)
-        return NextResponse.json(
-          { error: "Failed to validate notebook" },
-          { status: 500 }
-        )
+      if (!notebook || notebook.userId !== userId) {
+        return errorResponse("Notebook not found", 404, rateLimitHeaders)
       }
+
+      notebookId = notebook.id
     }
 
     const noteData: Prisma.NoteUncheckedCreateInput = {
@@ -128,7 +59,9 @@ export async function POST(request: Request) {
       content: encryptString(payload.content ?? ""),
       tags: encryptStringArray(payload.tags ?? []),
       checklist: encryptChecklist(payload.checklist ?? []) as Prisma.InputJsonValue,
-      attachments: encryptAttachments(payload.attachments ?? []) as Prisma.InputJsonValue,
+      attachments: encryptAttachments(
+        payload.attachments ?? []
+      ) as Prisma.InputJsonValue,
       type: payload.type ?? "note",
       pinned: payload.pinned ?? false,
       archived: payload.archived ?? false,
@@ -142,15 +75,7 @@ export async function POST(request: Request) {
       data: noteData,
     })
 
-    return NextResponse.json(serializeNote(created), {
-      status: 201,
-      headers: getRateLimitHeaders(rateLimitResult),
-    })
-  } catch (error) {
-    console.error("Error creating note:", error)
-    return NextResponse.json(
-      { error: "Failed to create note" },
-      { status: 500 }
-    )
-  }
-}
+    return successResponse(serializeNote(created), 201, rateLimitHeaders)
+  },
+  { rateLimitSuffix: "notes-post" }
+)
