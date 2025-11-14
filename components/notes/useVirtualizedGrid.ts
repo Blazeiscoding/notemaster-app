@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/incompatible-library */
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { NotePayload } from "@/types/note";
@@ -13,6 +14,8 @@ const getColumnsCount = (): number => {
 };
 
 export function useVirtualizedGrid(notes: NotePayload[]) {
+  "use no memo";
+
   const parentRef = useRef<HTMLDivElement>(null);
   const [columnsCount, setColumnsCount] = useState(() => getColumnsCount());
 
@@ -53,4 +56,3 @@ export function useVirtualizedGrid(notes: NotePayload[]) {
     rowVirtualizer,
   };
 }
-
