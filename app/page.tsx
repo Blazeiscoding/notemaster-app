@@ -1,13 +1,11 @@
 "use client";
 
 import React from "react";
+import dynamic from "next/dynamic";
 import AppHeader from "@/components/layout/AppHeader";
-import AccentPicker from "@/components/layout/AccentPicker";
 import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
-import NoteEditor from "@/components/notes/NoteEditor";
 import NotesGrid from "@/components/notes/NotesGrid";
-import CalendarView from "@/components/notes/CalendarView";
 import NoteCardSkeleton from "@/components/notes/NoteCardSkeleton";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
@@ -17,6 +15,23 @@ import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
 import { Plus, X } from "lucide-react";
+
+// Dynamic imports for code splitting - only load when needed
+const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
+  loading: () => (
+    <div className="min-h-[500px] animate-pulse rounded-lg bg-muted" />
+  ),
+});
+
+const CalendarView = dynamic(() => import("@/components/notes/CalendarView"), {
+  loading: () => (
+    <div className="min-h-[600px] animate-pulse rounded-lg bg-muted" />
+  ),
+});
+
+const AccentPicker = dynamic(() => import("@/components/layout/AccentPicker"), {
+  ssr: false,
+});
 
 const NoteApp = () => {
   const state = useNoteApp();
