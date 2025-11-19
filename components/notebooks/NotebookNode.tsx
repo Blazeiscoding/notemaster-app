@@ -101,9 +101,11 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
     <div className="space-y-1">
       <div
         className={cn(
-          "group rounded-md px-2 py-1 text-sm transition",
-          isActive && "bg-muted border border-border/60",
-          dragZone === "inside" && "bg-(--interactive-accent-soft)/30"
+          "group rounded-md px-2 py-1 text-sm transition-all duration-200 border border-transparent",
+          isActive 
+            ? "bg-[var(--interactive-accent-soft)] text-[var(--interactive-accent)] font-medium shadow-sm border-[var(--interactive-accent)]/20" 
+            : "hover:bg-[var(--glass-bg)] hover:border-[var(--glass-border)] hover:shadow-[var(--glass-shadow)] text-muted-foreground hover:text-foreground",
+          dragZone === "inside" && "bg-[var(--interactive-accent-soft)]/50 ring-2 ring-[var(--interactive-accent)] ring-inset"
         )}
         style={{ marginLeft: depth * 12 }}
         draggable={!isRenaming && !isAddingChild}

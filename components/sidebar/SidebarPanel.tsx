@@ -200,7 +200,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   return (
     <aside
       className={cn(
-        "space-y-6 rounded-2xl border bg-card/95 backdrop-blur-sm p-5 shadow-lg transition-all duration-300",
+        "space-y-6 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl p-5 shadow-[var(--glass-shadow)] transition-all duration-300",
         "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
         "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
         show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"

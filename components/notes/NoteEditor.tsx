@@ -128,73 +128,77 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   };
 
   return (
-    <Card className="border bg-card/95 backdrop-blur-sm shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-300">
-      <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between pb-4">
-        <div className="flex-1 space-y-3">
+    <Card className="border-none bg-background/50 backdrop-blur-sm shadow-none sm:border sm:border-[var(--glass-border)] sm:bg-[var(--glass-bg)] sm:shadow-[var(--glass-shadow)] animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between pb-6">
+        <div className="flex-1 space-y-4">
           <Input
             value={note.title}
             onChange={(event) => onTitleChange(event.target.value)}
-            placeholder="Title"
-            className="border-none px-0 text-xl font-semibold focus-visible:ring-0 placeholder:text-muted-foreground/50"
+            placeholder="Untitled Note"
+            className="border-none px-0 text-3xl font-bold tracking-tight focus-visible:ring-0 placeholder:text-muted-foreground/40 bg-transparent h-auto py-2"
           />
-          <CardDescription className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <CardDescription className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
               <Clock className="size-3.5" />
-              Edited {new Date(note.updatedAt).toLocaleString()}
+              Edited {new Date(note.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
             </span>
-            <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
               <Folder className="size-3.5" />
               {notebookName}
             </span>
             {note.dueAt && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 text-primary font-medium">
                 <CalendarClock className="size-3.5" />
-                Due {new Date(note.dueAt).toLocaleString()}
+                Due {new Date(note.dueAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
               </span>
             )}
           </CardDescription>
         </div>
-        <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <div className="flex w-full flex-col items-end gap-3 sm:w-auto sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={onOpenHistory}
               disabled={!canViewHistory}
               title={historyTitle}
+              className="text-muted-foreground hover:text-foreground"
             >
               <History className="size-4" />
-              History
+              <span className="sr-only sm:not-sr-only sm:ml-2">History</span>
             </Button>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 border-l pl-2 ml-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
                 onClick={handleExportMarkdown}
                 title="Export as Markdown"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <FileDown className="size-4" />
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
                 onClick={handleExportPDF}
                 title="Export as PDF"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <Download className="size-4" />
               </Button>
               <Button
-                variant="outline"
+                variant="ghost"
                 size="icon-sm"
                 onClick={handlePrint}
                 title="Print"
+                className="text-muted-foreground hover:text-foreground"
               >
                 <Printer className="size-4" />
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={onClose}>
+            <Button size="sm" variant="ghost" onClick={onClose}>
               <X className="size-4" />
               Close
             </Button>
@@ -202,7 +206,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               size="sm"
               onClick={onSave}
               disabled={isSaving}
-              className="bg-(--accent-primary) text-white hover:bg-(--accent-secondary)"
+              variant="accent"
+              className="min-w-[100px] shadow-md shadow-[var(--interactive-accent)]/20"
             >
               {isSaving ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -214,10 +219,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-4 sm:grid-cols-2">
+      <CardContent className="space-y-8">
+        <div className="grid gap-6 sm:grid-cols-2">
           <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               Notebook
             </label>
             <Select
@@ -225,7 +230,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               onChange={(event) =>
                 onNotebookChange(event.target.value ? event.target.value : null)
               }
-              className="w-full"
+              className="w-full bg-background/50"
             >
               <option value="">Inbox</option>
               {notebookOptions.map((option) => (
@@ -236,7 +241,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
               Reminder
             </label>
             <div className="flex items-center gap-2">
@@ -244,7 +249,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                 type="datetime-local"
                 value={dueDateValue}
                 onChange={(event) => onDueDateChange(event.target.value)}
-                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm shadow-sm focus:border-(--accent-primary) focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/50"
+                className="flex-1 rounded-md border bg-background/50 px-3 py-2 text-sm shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               {note.dueAt && (
                 <Button
@@ -264,10 +269,10 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           <Textarea
             value={note.content}
             onChange={(event) => onContentChange(event.target.value)}
-            placeholder="Capture your thoughts..."
-            className="min-h-[400px] resize-y text-base leading-relaxed placeholder:text-muted-foreground/50"
+            placeholder="Start typing..."
+            className="min-h-[500px] resize-y text-lg leading-relaxed placeholder:text-muted-foreground/30 border-none bg-transparent focus-visible:ring-0 p-0"
           />
-          <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground/60 font-medium">
             <span>
               {note.content.trim()
                 ? `${note.content.trim().split(/\s+/).filter(Boolean).length} words`
@@ -277,26 +282,28 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        <Checklist
-          items={note.checklist}
-          onAddItem={onAddChecklistItem}
-          onMarkAll={onMarkAllChecklist}
-          onClearCompleted={onClearCompletedChecklist}
-          onUpdateItem={onUpdateChecklistItem}
-          onDeleteItem={onDeleteChecklistItem}
-        />
+        <div className="space-y-6 pt-6 border-t border-border/50">
+          <Checklist
+            items={note.checklist}
+            onAddItem={onAddChecklistItem}
+            onMarkAll={onMarkAllChecklist}
+            onClearCompleted={onClearCompletedChecklist}
+            onUpdateItem={onUpdateChecklistItem}
+            onDeleteItem={onDeleteChecklistItem}
+          />
 
-        <TagsInput tags={note.tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
+          <TagsInput tags={note.tags} onAddTag={onAddTag} onRemoveTag={onRemoveTag} />
 
-        <AttachmentsList
-          attachments={note.attachments}
-          onTriggerPicker={onTriggerAttachmentPicker}
-          onDownload={onDownloadAttachment}
-          onRemove={onRemoveAttachment}
-          onClearAll={onClearAttachments}
-          fileInputRef={fileInputRef}
-          onFilesSelected={onFilesSelected}
-        />
+          <AttachmentsList
+            attachments={note.attachments}
+            onTriggerPicker={onTriggerAttachmentPicker}
+            onDownload={onDownloadAttachment}
+            onRemove={onRemoveAttachment}
+            onClearAll={onClearAttachments}
+            fileInputRef={fileInputRef}
+            onFilesSelected={onFilesSelected}
+          />
+        </div>
       </CardContent>
     </Card>
   );

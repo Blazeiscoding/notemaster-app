@@ -65,7 +65,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
     const copy = emptyStateCopy[activeSection];
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card className="col-span-full overflow-hidden rounded-2xl border-dashed border-2 bg-muted/30 py-16 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <Card className="col-span-full overflow-hidden rounded-2xl border-dashed border-2 border-muted bg-muted/10 py-16 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <CardContent className="flex flex-col items-center gap-6">
             <div className="relative h-40 w-60 opacity-60">
               <Image

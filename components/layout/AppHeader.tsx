@@ -64,7 +64,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             variant="outline"
             size="sm"
             onClick={onInstall}
-            className="border-(--accent-primary) text-(--accent-primary) hover:bg-(--accent-primary)/10"
+            className="border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/50"
           >
             <Download className="size-4" />
             Install
@@ -74,7 +74,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           variant="outline"
           size="icon-sm"
           onClick={onToggleDarkMode}
-          className="hover:border-(--accent-primary) hover:text-(--accent-primary)"
+          className="hover:border-primary/50 hover:text-primary transition-colors"
         >
           {darkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
         </Button>
@@ -82,7 +82,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           variant="outline"
           size="sm"
           onClick={onOpenAccentModal}
-          className="gap-2"
+          className="gap-2 hover:border-primary/50 hover:text-primary transition-colors"
         >
           <Palette className="size-4" />
           <span className="hidden sm:inline">Theme</span>
@@ -93,7 +93,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           size="sm"
           onClick={onSaveSmartFilter}
           disabled={!canSaveSmartFilter}
-          className="gap-2 disabled:opacity-50"
+          className="gap-2 disabled:opacity-50 hover:border-primary/50 hover:text-primary transition-colors"
         >
           <Filter className="size-4" />
           <span className="hidden sm:inline">Save filter</span>
@@ -102,7 +102,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           size="sm"
           onClick={onCreateNote}
           variant="accent"
-          className="shadow-md shadow-(--interactive-accent)/20 hover:shadow-lg hover:shadow-(--interactive-accent)/30 transition-all duration-200"
+          className="shadow-lg shadow-[var(--interactive-accent)]/20 hover:shadow-xl hover:shadow-[var(--interactive-accent)]/30 hover:-translate-y-0.5 transition-all duration-200"
         >
           <Plus className="size-4" />
           <span className="hidden sm:inline">New note</span>
@@ -115,7 +115,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           </SignInButton>
         </SignedOut>
         <SignedIn>
-          <UserButton appearance={{ elements: { userButtonAvatarBox: "size-8" } }} />
+          <UserButton appearance={{ elements: { userButtonAvatarBox: "size-8 ring-2 ring-background" } }} />
         </SignedIn>
       </div>
     </header>
