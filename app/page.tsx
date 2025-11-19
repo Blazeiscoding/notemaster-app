@@ -7,6 +7,7 @@ import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import NoteEditor from "@/components/notes/NoteEditor";
 import NotesGrid from "@/components/notes/NotesGrid";
+import CalendarView from "@/components/notes/CalendarView";
 import NoteCardSkeleton from "@/components/notes/NoteCardSkeleton";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ const NoteApp = () => {
 
   const [showThemePanel, setShowThemePanel] = React.useState(false);
   const [showSaveFilterDialog, setShowSaveFilterDialog] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<"grid" | "calendar">("grid");
   const [quickFilterName, setQuickFilterName] = React.useState("");
   const [quickFilterDescription, setQuickFilterDescription] =
     React.useState("");
@@ -239,19 +241,19 @@ const NoteApp = () => {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
         <AppHeader
-          userFirstName={userFirstName}
-          onToggleSidebar={() => setShowSidebar((prev) => !prev)}
-          canInstall={canInstall}
-          onInstall={installApp}
-          darkMode={darkMode}
-          onToggleDarkMode={() => setDarkMode((prev) => !prev)}
-          accentName={accent.name}
-          onOpenAccentModal={() => setShowThemePanel(true)}
-          canSaveSmartFilter={canSaveSmartFilter}
-          onSaveSmartFilter={handleOpenSaveFilter}
-          onCreateNote={createNote}
-        />
-
+        userFirstName={userFirstName}
+        isDark={darkMode}
+        toggleTheme={() => setDarkMode(!darkMode)}
+        onOpenThemePicker={() => setShowThemePanel(true)}
+        onSaveSmartFilter={() => setShowSaveFilterDialog(true)}
+        canSaveSmartFilter={canSaveSmartFilter}
+        onNewNote={createNote}
+        onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+        canInstall={canInstall}
+        onInstall={installApp}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
         {showIosInstallTip && (
           <InstallPromptAlert onDismiss={() => setShowIosInstallTip(false)} />
         )}
@@ -351,7 +353,7 @@ const NoteApp = () => {
                 fileInputRef={fileInputRef}
                 onFilesSelected={handleAttachmentsSelected}
               />
-            ) : (
+            ) : viewMode === "grid" ? (
               <NotesGrid
                 notes={sortedNotes}
                 activeSection={activeSection}
@@ -364,6 +366,8 @@ const NoteApp = () => {
                 onRestoreFromBin={restoreFromBin}
                 onDeleteForever={deleteForever}
               />
+            ) : (
+              <CalendarView notes={sortedNotes} onOpenNote={setCurrentNote} />
             )}
           </main>
         </div>

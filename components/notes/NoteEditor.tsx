@@ -16,7 +16,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import RichTextEditor from "@/components/ui/RichTextEditor";
 import { Select } from "@/components/ui/select";
 import {
   Card,
@@ -266,19 +266,19 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
 
         <div className="space-y-2">
-          <Textarea
-            value={note.content}
-            onChange={(event) => onContentChange(event.target.value)}
+          <RichTextEditor
+            content={note.content}
+            onChange={onContentChange}
             placeholder="Start typing..."
-            className="min-h-[500px] resize-y text-lg leading-relaxed placeholder:text-muted-foreground/30 border-none bg-transparent focus-visible:ring-0 p-0"
+            className="min-h-[500px]"
           />
           <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground/60 font-medium">
             <span>
               {note.content.trim()
-                ? `${note.content.trim().split(/\s+/).filter(Boolean).length} words`
+                ? `${note.content.replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length} words`
                 : "0 words"}
             </span>
-            <span>{note.content.length} characters</span>
+            <span>{note.content.replace(/<[^>]*>/g, '').length} characters</span>
           </div>
         </div>
 

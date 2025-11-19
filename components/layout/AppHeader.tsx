@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Download, Filter, Menu, Moon, Palette, Plus, Sun } from "lucide-react";
+import { Download, LayoutGrid, Calendar, Moon, Plus, Save, Settings, Sun, User as UserIcon, Menu, Palette, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   SignedIn,
@@ -11,98 +11,133 @@ import {
 } from "@clerk/nextjs";
 
 export type AppHeaderProps = {
-  userFirstName?: string | null;
+  userFirstName: string | null | undefined;
+  isDark: boolean;
+  toggleTheme: () => void;
+  onOpenThemePicker: () => void;
+  onSaveSmartFilter: () => void;
+  canSaveSmartFilter: boolean;
+  onNewNote: () => void;
   onToggleSidebar: () => void;
   canInstall: boolean;
   onInstall: () => void;
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
-  accentName?: string;
-  onOpenAccentModal: () => void;
-  canSaveSmartFilter: boolean;
-  onSaveSmartFilter: () => void;
-  onCreateNote: () => void;
+  viewMode: "grid" | "calendar";
+  onViewModeChange: (mode: "grid" | "calendar") => void;
 };
 
 const AppHeader: React.FC<AppHeaderProps> = ({
   userFirstName,
+  isDark,
+  toggleTheme,
+  onOpenThemePicker,
+  onSaveSmartFilter,
+  canSaveSmartFilter,
+  onNewNote,
   onToggleSidebar,
   canInstall,
   onInstall,
-  darkMode,
-  onToggleDarkMode,
-  accentName,
-  onOpenAccentModal,
-  canSaveSmartFilter,
-  onSaveSmartFilter,
-  onCreateNote,
+  viewMode,
+  onViewModeChange,
 }) => {
+  // Helper to get greeting based on time of day
+  const getGreeting = () => {
+    const hours = new Date().getHours();
+    if (hours < 12) return "Good morning";
+    if (hours < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-2">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-center gap-3">
         <Button
-          variant="outline"
-          size="icon-sm"
-          className="sm:hidden hover:bg-accent transition-colors"
+          variant="ghost"
+          size="icon"
           onClick={onToggleSidebar}
+          className="lg:hidden text-muted-foreground"
         >
-          <Menu className="size-4" />
+          <Menu className="size-5" />
         </Button>
-        <div>
-          <p className="text-sm font-medium text-muted-foreground">
-            Welcome back{userFirstName ? `, ${userFirstName}` : ""}
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
-            NoteMaster
+        
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <span className="bg-gradient-to-r from-primary to-[var(--interactive-accent)] bg-clip-text text-transparent">
+              NoteMaster
+            </span>
           </h1>
+          <p className="text-sm text-muted-foreground font-medium">
+            {getGreeting()}, {userFirstName || "Guest"}
+          </p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
+          <Button
+            variant={viewMode === "grid" ? "default" : "ghost"}
+            size="icon-sm"
+            onClick={() => onViewModeChange("grid")}
+            title="Grid View"
+            className="h-7 w-7"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+          <Button
+            variant={viewMode === "calendar" ? "default" : "ghost"}
+            size="icon-sm"
+            onClick={() => onViewModeChange("calendar")}
+            title="Calendar View"
+            className="h-7 w-7"
+          >
+            <Calendar className="size-4" />
+          </Button>
+        </div>
+        <div className="h-6 w-px bg-border/60 mx-2" />
         {canInstall && (
           <Button
             variant="outline"
             size="sm"
             onClick={onInstall}
-            className="border-primary/20 text-primary hover:bg-primary/10 hover:border-primary/50"
+            className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10"
           >
             <Download className="size-4" />
             Install
           </Button>
         )}
+
         <Button
-          variant="outline"
-          size="icon-sm"
-          onClick={onToggleDarkMode}
-          className="hover:border-primary/50 hover:text-primary transition-colors"
+          variant="ghost"
+          size="icon"
+          onClick={toggleTheme}
+          title="Toggle Theme"
         >
-          {darkMode ? <Sun className="size-4" /> : <Moon className="size-4" />}
+          {isDark ? <Moon className="size-5" /> : <Sun className="size-5" />}
         </Button>
+
         <Button
-          variant="outline"
-          size="sm"
-          onClick={onOpenAccentModal}
-          className="gap-2 hover:border-primary/50 hover:text-primary transition-colors"
+          variant="ghost"
+          size="icon"
+          onClick={onOpenThemePicker}
+          title="Customize Theme"
         >
-          <Palette className="size-4" />
-          <span className="hidden sm:inline">Theme</span>
-          {accentName && <span className="text-xs text-muted-foreground">{accentName}</span>}
+          <Palette className="size-5" />
         </Button>
+
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={onSaveSmartFilter}
           disabled={!canSaveSmartFilter}
-          className="gap-2 disabled:opacity-50 hover:border-primary/50 hover:text-primary transition-colors"
+          title="Save Smart Filter"
+          className={canSaveSmartFilter ? "text-primary" : "text-muted-foreground/50"}
         >
-          <Filter className="size-4" />
-          <span className="hidden sm:inline">Save filter</span>
+          <Save className="size-5" />
         </Button>
+
         <Button
-          size="sm"
-          onClick={onCreateNote}
+          onClick={onNewNote}
           variant="accent"
-          className="shadow-lg shadow-[var(--interactive-accent)]/20 hover:shadow-xl hover:shadow-[var(--interactive-accent)]/30 hover:-translate-y-0.5 transition-all duration-200"
+          className="gap-2 shadow-lg shadow-[var(--interactive-accent)]/20 hover:shadow-xl hover:shadow-[var(--interactive-accent)]/30 hover:-translate-y-0.5 transition-all duration-200"
         >
           <Plus className="size-4" />
           <span className="hidden sm:inline">New note</span>
