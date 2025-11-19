@@ -27,7 +27,7 @@ type ServerActions = {
     color?: string;
   }) => Promise<NotebookPayload>;
   deleteNotebookOnServer: (id: string) => Promise<{
-    success: boolean;
+    deleted: boolean;
     releasedNotes: number;
   }>;
   updateNotebookOnServer: (

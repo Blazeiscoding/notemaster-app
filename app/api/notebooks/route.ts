@@ -9,7 +9,7 @@ import {
 } from "@/lib/api-middleware"
 
 export const GET = withAuth(
-  async ({ userId, rateLimitHeaders }) => {
+  async ({ userId, rateLimitHeaders, requestId }) => {
     const notebooks = await prisma.notebook.findMany({
       where: { userId },
       orderBy: [{ parentId: "asc" }, { name: "asc" }],
@@ -18,23 +18,26 @@ export const GET = withAuth(
     return successResponse(
       notebooks.map(serializeNotebook),
       200,
-      rateLimitHeaders
+      rateLimitHeaders,
+      requestId
     )
   },
   { rateLimitSuffix: "notebooks-get" }
 )
 
 export const POST = withAuthAndJson(
-  async ({ userId, body, rateLimitHeaders }) => {
+  async ({ userId, body, rateLimitHeaders, requestId, logger }) => {
     // Input validation
     let validatedPayload
     try {
       validatedPayload = validateNotebookPayload(body)
     } catch (error) {
+      logger.warn("Notebook creation failed: validation error", { error: error instanceof Error ? error.message : "Invalid input" });
       return errorResponse(
         error instanceof Error ? error.message : "Invalid input",
         400,
-        rateLimitHeaders
+        rateLimitHeaders,
+        requestId
       )
     }
 
@@ -47,10 +50,12 @@ export const POST = withAuthAndJson(
       })
 
       if (!parent || parent.userId !== userId) {
+        logger.warn("Notebook creation failed: parent not found", { parentId });
         return errorResponse(
           "Parent notebook not found",
           404,
-          rateLimitHeaders
+          rateLimitHeaders,
+          requestId
         )
       }
 
@@ -66,7 +71,8 @@ export const POST = withAuthAndJson(
       },
     })
 
-    return successResponse(serializeNotebook(created), 201, rateLimitHeaders)
+    logger.info("Notebook created", { notebookId: created.id });
+    return successResponse(serializeNotebook(created), 201, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "notebooks-post" }
 )

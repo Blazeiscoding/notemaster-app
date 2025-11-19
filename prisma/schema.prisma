@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Note {
@@ -32,6 +31,10 @@ model Note {
   @@index([archived])
   @@index([notebookId])
   @@index([dueAt])
+  // Composite indexes for common query patterns
+  @@index([userId, trashed, archived])
+  @@index([userId, notebookId, trashed])
+  @@index([userId, updatedAt(sort: Desc)])
 }
 
 model Notebook {

@@ -1,104 +1,145 @@
-import { prisma } from "@/lib/prisma"
-import { serializeNotebook } from "../utils"
+import { prisma } from "@/lib/prisma";
+import { serializeNotebook } from "../utils";
 import {
   sanitizeString,
   sanitizeColor,
   sanitizeOptionalId,
-} from "@/lib/validation"
+} from "@/lib/validation";
 import {
   withAuthJsonAndParams,
   withAuthAndParams,
   successResponse,
   errorResponse,
-} from "@/lib/api-middleware"
+} from "@/lib/api-middleware";
 
-type ParamsPromise = Promise<{ id: string }>
+type ParamsPromise = Promise<{ id: string }>;
 
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
-  async ({ userId, body, rateLimitHeaders }, { id }) => {
-    const existing = await prisma.notebook.findUnique({ where: { id } })
+  async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } });
 
     if (!existing || existing.userId !== userId) {
-      return errorResponse("Notebook not found", 404, rateLimitHeaders)
+      logger.warn("Notebook update failed: notebook not found", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Notebook not found",
+        404,
+        rateLimitHeaders,
+        requestId
+      );
     }
 
     if (typeof body !== "object" || body === null) {
-      return errorResponse("Invalid payload format", 400, rateLimitHeaders)
+      logger.warn("Notebook update failed: invalid payload", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Invalid payload format",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
     }
 
-    const p = body as Record<string, unknown>
+    const p = body as Record<string, unknown>;
 
     const updates: {
-      name?: string
-      color?: string
-      parent?: { connect: { id: string } } | { disconnect: true }
-    } = {}
+      name?: string;
+      color?: string;
+      parent?: { connect: { id: string } } | { disconnect: true };
+    } = {};
 
     if (p.name !== undefined) {
       try {
-        updates.name = sanitizeString(p.name, 200)
+        updates.name = sanitizeString(p.name, 200);
       } catch (error) {
+        logger.warn("Notebook update failed: invalid name", { notebookId: id });
         return errorResponse(
           error instanceof Error ? error.message : "Invalid name",
           400,
-          rateLimitHeaders
-        )
+          rateLimitHeaders,
+          requestId
+        );
       }
     }
 
     if (p.color !== undefined) {
       try {
-        updates.color = sanitizeColor(p.color)
+        updates.color = sanitizeColor(p.color);
       } catch (error) {
+        logger.warn("Notebook update failed: invalid color", {
+          notebookId: id,
+        });
         return errorResponse(
           error instanceof Error ? error.message : "Invalid color",
           400,
-          rateLimitHeaders
-        )
+          rateLimitHeaders,
+          requestId
+        );
       }
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "parentId")) {
       try {
-        const parentId = sanitizeOptionalId(p.parentId)
+        const parentId = sanitizeOptionalId(p.parentId);
 
         if (!parentId) {
-          updates.parent = { disconnect: true }
+          updates.parent = { disconnect: true };
         } else {
           if (parentId === id) {
+            logger.warn("Notebook update failed: self-reference", {
+              notebookId: id,
+            });
             return errorResponse(
               "Notebook cannot reference itself",
               400,
-              rateLimitHeaders
-            )
+              rateLimitHeaders,
+              requestId
+            );
           }
 
           const parent = await prisma.notebook.findUnique({
             where: { id: parentId },
             select: { id: true, userId: true },
-          })
+          });
 
           if (!parent || parent.userId !== userId) {
+            logger.warn("Notebook update failed: parent not found", {
+              notebookId: id,
+              parentId,
+            });
             return errorResponse(
               "Parent notebook not found",
               404,
-              rateLimitHeaders
-            )
+              rateLimitHeaders,
+              requestId
+            );
           }
 
-          updates.parent = { connect: { id: parent.id } }
+          updates.parent = { connect: { id: parent.id } };
         }
       } catch (error) {
+        logger.warn("Notebook update failed: invalid parent ID", {
+          notebookId: id,
+          error: error instanceof Error ? error.message : "Invalid parent ID",
+        });
         return errorResponse(
           error instanceof Error ? error.message : "Invalid parent ID",
           400,
-          rateLimitHeaders
-        )
+          rateLimitHeaders,
+          requestId
+        );
       }
     }
 
     if (Object.keys(updates).length === 0) {
-      return successResponse(serializeNotebook(existing), 200, rateLimitHeaders)
+      return successResponse(
+        serializeNotebook(existing),
+        200,
+        rateLimitHeaders,
+        requestId
+      );
     }
 
     const updated = await prisma.notebook.update({
@@ -108,33 +149,52 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
         color: updates.color,
         parent: updates.parent,
       },
-    })
+    });
 
-    return successResponse(serializeNotebook(updated), 200, rateLimitHeaders)
+    logger.info("Notebook updated", { notebookId: id });
+    return successResponse(
+      serializeNotebook(updated),
+      200,
+      rateLimitHeaders,
+      requestId
+    );
   },
   { rateLimitSuffix: "notebooks-patch" }
-)
+);
 
 export const DELETE = withAuthAndParams<ParamsPromise>(
-  async ({ userId, rateLimitHeaders }, { id }) => {
-    const existing = await prisma.notebook.findUnique({ where: { id } })
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } });
 
     if (!existing || existing.userId !== userId) {
-      return errorResponse("Notebook not found", 404, rateLimitHeaders)
+      logger.warn("Notebook deletion failed: notebook not found", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Notebook not found",
+        404,
+        rateLimitHeaders,
+        requestId
+      );
     }
 
     const reassigned = await prisma.note.updateMany({
       where: { notebookId: existing.id },
       data: { notebookId: null },
-    })
+    });
 
-    await prisma.notebook.delete({ where: { id } })
+    await prisma.notebook.delete({ where: { id } });
 
+    logger.info("Notebook deleted", {
+      notebookId: id,
+      releasedNotes: reassigned.count,
+    });
     return successResponse(
-      { success: true, releasedNotes: reassigned.count },
+      { deleted: true, releasedNotes: reassigned.count },
       200,
-      rateLimitHeaders
-    )
+      rateLimitHeaders,
+      requestId
+    );
   },
   { rateLimitSuffix: "notebooks-delete" }
-)
+);

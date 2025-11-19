@@ -16,24 +16,25 @@ import {
 } from "@/lib/api-middleware"
 
 export const GET = withAuth(
-  async ({ userId, rateLimitHeaders }) => {
+  async ({ userId, rateLimitHeaders, requestId }) => {
     const notes = await prisma.note.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
     })
 
-    return successResponse(notes.map(serializeNote), 200, rateLimitHeaders)
+    return successResponse(notes.map(serializeNote), 200, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "notes-get" }
 )
 
 export const POST = withAuthAndJson(
-  async ({ userId, body, rateLimitHeaders }) => {
+  async ({ userId, body, rateLimitHeaders, requestId, logger }) => {
     const payload = body as Partial<NotePayload>
 
     // Input validation
     if (!payload.id || typeof payload.id !== "string") {
-      return errorResponse("Note ID is required", 400, rateLimitHeaders)
+      logger.warn("Note creation failed: missing ID");
+      return errorResponse("Note ID is required", 400, rateLimitHeaders, requestId)
     }
 
     let notebookId: string | null = null
@@ -45,7 +46,8 @@ export const POST = withAuthAndJson(
       })
 
       if (!notebook || notebook.userId !== userId) {
-        return errorResponse("Notebook not found", 404, rateLimitHeaders)
+        logger.warn("Note creation failed: notebook not found", { notebookId: payload.notebookId });
+        return errorResponse("Notebook not found", 404, rateLimitHeaders, requestId)
       }
 
       notebookId = notebook.id
@@ -75,7 +77,8 @@ export const POST = withAuthAndJson(
       data: noteData,
     })
 
-    return successResponse(serializeNote(created), 201, rateLimitHeaders)
+    logger.info("Note created", { noteId: created.id });
+    return successResponse(serializeNote(created), 201, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "notes-post" }
 )

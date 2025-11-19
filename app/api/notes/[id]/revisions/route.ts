@@ -12,14 +12,15 @@ import {
 type ParamsPromise = Promise<{ id: string }>
 
 export const GET = withAuthAndParams<ParamsPromise>(
-  async ({ userId, rateLimitHeaders }, { id }) => {
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
     const note = await prisma.note.findUnique({
       where: { id },
       select: { id: true, userId: true },
     })
 
     if (!note || note.userId !== userId) {
-      return errorResponse("Note not found", 404, rateLimitHeaders)
+      logger.warn("Revisions fetch failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId)
     }
 
     const revisions = await prisma.noteRevision.findMany({
@@ -28,41 +29,48 @@ export const GET = withAuthAndParams<ParamsPromise>(
       take: 20,
     })
 
+    logger.info("Revisions fetched", { noteId: id, count: revisions.length });
     return successResponse(
       revisions.map(serializeRevision),
       200,
-      rateLimitHeaders
+      rateLimitHeaders,
+      requestId
     )
   },
   { rateLimitSuffix: "revisions-get" }
 )
 
 export const POST = withAuthJsonAndParams<ParamsPromise>(
-  async ({ userId, body, rateLimitHeaders }, { id }) => {
+  async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
     const note = await prisma.note.findUnique({ where: { id } })
 
     if (!note || note.userId !== userId) {
-      return errorResponse("Note not found", 404, rateLimitHeaders)
+      logger.warn("Revision restore failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId)
     }
 
     if (typeof body !== "object" || body === null) {
-      return errorResponse("Invalid payload format", 400, rateLimitHeaders)
+      logger.warn("Revision restore failed: invalid payload", { noteId: id });
+      return errorResponse("Invalid payload format", 400, rateLimitHeaders, requestId)
     }
 
     const p = body as Record<string, unknown>
 
     if (!p.revisionId || typeof p.revisionId !== "string") {
-      return errorResponse("Revision ID is required", 400, rateLimitHeaders)
+      logger.warn("Revision restore failed: missing revision ID", { noteId: id });
+      return errorResponse("Revision ID is required", 400, rateLimitHeaders, requestId)
     }
 
     let revisionId: string
     try {
       revisionId = sanitizeId(p.revisionId)
     } catch (error) {
+      logger.warn("Revision restore failed: invalid revision ID", { noteId: id, error: error instanceof Error ? error.message : "Invalid revision ID" });
       return errorResponse(
         error instanceof Error ? error.message : "Invalid revision ID",
         400,
-        rateLimitHeaders
+        rateLimitHeaders,
+        requestId
       )
     }
 
@@ -71,7 +79,8 @@ export const POST = withAuthJsonAndParams<ParamsPromise>(
     })
 
     if (!revision || revision.noteId !== note.id) {
-      return errorResponse("Revision not found", 404, rateLimitHeaders)
+      logger.warn("Revision restore failed: revision not found", { noteId: id, revisionId });
+      return errorResponse("Revision not found", 404, rateLimitHeaders, requestId)
     }
 
     const updated = await prisma.note.update({
@@ -89,7 +98,8 @@ export const POST = withAuthJsonAndParams<ParamsPromise>(
       },
     })
 
-    return successResponse(serializeNote(updated), 200, rateLimitHeaders)
+    logger.info("Revision restored", { noteId: id, revisionId });
+    return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "revisions-post" }
 )

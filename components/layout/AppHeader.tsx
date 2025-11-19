@@ -39,9 +39,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   viewMode,
   onViewModeChange,
 }) => {
-  // Helper to get greeting based on time of day
+  // Helper to get greeting based on time of day in user's timezone
   const getGreeting = () => {
-    const hours = new Date().getHours();
+    // Get current hour in user's local timezone
+    // new Date() automatically uses the browser's timezone (user's timezone)
+    const now = new Date();
+    const hours = now.getHours(); // This already uses the user's timezone
+    
     if (hours < 12) return "Good morning";
     if (hours < 18) return "Good afternoon";
     return "Good evening";

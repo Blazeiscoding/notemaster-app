@@ -18,11 +18,12 @@ import {
 type ParamsPromise = Promise<{ id: string }>;
 
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
-  async ({ userId, body, rateLimitHeaders }, { id }) => {
+  async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
     const existing = await prisma.note.findUnique({ where: { id } });
 
     if (!existing || existing.userId !== userId) {
-      return errorResponse("Note not found", 404, rateLimitHeaders);
+      logger.warn("Note update failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
     }
 
     const payload = body as Partial<NotePayload>;
@@ -38,7 +39,8 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
         });
 
         if (!notebook || notebook.userId !== userId) {
-          return errorResponse("Notebook not found", 404, rateLimitHeaders);
+          logger.warn("Note update failed: notebook not found", { notebookId: payload.notebookId });
+          return errorResponse("Notebook not found", 404, rateLimitHeaders, requestId);
         }
 
         data.notebook = { connect: { id: notebook.id } };
@@ -90,10 +92,10 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
     }
 
     if (Object.keys(data).length === 0) {
-      return successResponse(serializeNote(existing), 200, rateLimitHeaders);
+      return successResponse(serializeNote(existing), 200, rateLimitHeaders, requestId);
     }
 
-    // Create revision before updating
+    // Create revision before updating - wrapped in transaction for atomicity
     const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
       noteId: existing.id,
       notebookId: existing.notebookId,
@@ -108,31 +110,42 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       dueAt: existing.dueAt ?? undefined,
     };
 
-    await prisma.noteRevision.create({
-      data: revisionData,
-    });
+    // Use transaction to ensure atomicity: if note update fails, revision creation is rolled back
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.noteRevision.create({
+          data: revisionData,
+        });
 
-    const updated = await prisma.note.update({
-      where: { id },
-      data,
-    });
+        return await tx.note.update({
+          where: { id },
+          data,
+        });
+      });
 
-    return successResponse(serializeNote(updated), 200, rateLimitHeaders);
+      logger.info("Note updated", { noteId: id });
+      return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId);
+    } catch (error) {
+      logger.error("Note update failed: transaction error", error, { noteId: id });
+      throw error;
+    }
   },
   { rateLimitSuffix: "notes-patch" }
 );
 
 export const DELETE = withAuthAndParams<ParamsPromise>(
-  async ({ userId, rateLimitHeaders }, { id }) => {
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
     const existing = await prisma.note.findUnique({ where: { id } });
 
     if (!existing || existing.userId !== userId) {
-      return errorResponse("Note not found", 404, rateLimitHeaders);
+      logger.warn("Note deletion failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
     }
 
     await prisma.note.delete({ where: { id } });
 
-    return successResponse({ success: true }, 200, rateLimitHeaders);
+    logger.info("Note deleted", { noteId: id });
+    return successResponse({ deleted: true }, 200, rateLimitHeaders, requestId);
   },
   { rateLimitSuffix: "notes-delete" }
 );

@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { NotePayload, NoteRevisionPayload } from "@/types/note";
+import { apiRequest } from "@/lib/api-client";
 
 type RevisionsState = {
   notes: NotePayload[];
@@ -58,17 +59,13 @@ export function useNoteRevisions(
       if (!isAuthenticated) return;
 
       try {
-        const response = await fetch(`/api/notes/${noteId}/revisions`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ revisionId }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to restore revision");
-        }
-
-        const restored = (await response.json()) as NotePayload;
+        const restored = await apiRequest<NotePayload>(
+          `/api/notes/${noteId}/revisions`,
+          {
+            method: "POST",
+            body: JSON.stringify({ revisionId }),
+          }
+        );
         setNotes((prev) =>
           prev.map((note) => (note.id === restored.id ? restored : note))
         );

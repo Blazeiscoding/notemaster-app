@@ -20,6 +20,7 @@ import type {
 import { generateId } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
+import { apiRequest } from "@/lib/api-client";
 
 type NoteAppSection = "notes" | "archive" | "bin";
 
@@ -70,25 +71,15 @@ export const useNoteApp = () => {
 
   // Server actions
   const fetchNotesFromServer = useCallback(async () => {
-    const response = await fetch("/api/notes", { cache: "no-store" });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to fetch notes (${response.status})`;
-      throw new Error(errorMessage);
-    }
-    return (await response.json()) as NotePayload[];
+    return apiRequest<NotePayload[]>("/api/notes", {
+      cache: "no-store",
+    });
   }, []);
 
   const fetchNotebooksFromServer = useCallback(async () => {
-    const response = await fetch("/api/notebooks", { cache: "no-store" });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to fetch notebooks (${response.status})`;
-      throw new Error(errorMessage);
-    }
-    return (await response.json()) as NotebookPayload[];
+    return apiRequest<NotebookPayload[]>("/api/notebooks", {
+      cache: "no-store",
+    });
   }, []);
 
   const createNotebookOnServer = useCallback(
@@ -97,34 +88,19 @@ export const useNoteApp = () => {
       parentId?: string | null;
       color?: string;
     }) => {
-      const response = await fetch("/api/notebooks", {
+      return apiRequest<NotebookPayload>("/api/notebooks", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.error || `Failed to create notebook (${response.status})`;
-        throw new Error(errorMessage);
-      }
-      return (await response.json()) as NotebookPayload;
     },
     []
   );
 
   const deleteNotebookOnServer = useCallback(async (id: string) => {
-    const response = await fetch(`/api/notebooks/${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to delete notebook (${response.status})`;
-      throw new Error(errorMessage);
-    }
-    return (await response.json()) as {
-      success: boolean;
-      releasedNotes: number;
-    };
+    return apiRequest<{ deleted: boolean; releasedNotes: number }>(
+      `/api/notebooks/${id}`,
+      { method: "DELETE" }
+    );
   }, []);
 
   const updateNotebookOnServer = useCallback(
@@ -132,76 +108,39 @@ export const useNoteApp = () => {
       id: string,
       updates: Partial<Pick<NotebookPayload, "name" | "parentId" | "color">>
     ) => {
-      const response = await fetch(`/api/notebooks/${id}`, {
+      return apiRequest<NotebookPayload>(`/api/notebooks/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.error || `Failed to update notebook (${response.status})`;
-        throw new Error(errorMessage);
-      }
-      return (await response.json()) as NotebookPayload;
     },
     []
   );
 
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
-    const response = await fetch(`/api/notes/${id}/revisions`, {
+    return apiRequest<NoteRevisionPayload[]>(`/api/notes/${id}/revisions`, {
       cache: "no-store",
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to fetch revisions (${response.status})`;
-      throw new Error(errorMessage);
-    }
-    return (await response.json()) as NoteRevisionPayload[];
   }, []);
 
   const createNoteOnServer = useCallback(async (note: NotePayload) => {
-    const response = await fetch("/api/notes", {
+    return apiRequest<NotePayload>("/api/notes", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(note),
     });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to create note (${response.status})`;
-      throw new Error(errorMessage);
-    }
-    return (await response.json()) as NotePayload;
   }, []);
 
   const updateNoteOnServer = useCallback(
     async (id: string, updates: Partial<NotePayload>) => {
-      const response = await fetch(`/api/notes/${id}`, {
+      return apiRequest<NotePayload>(`/api/notes/${id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage =
-          errorData.error || `Failed to update note (${response.status})`;
-        throw new Error(errorMessage);
-      }
-      return (await response.json()) as NotePayload;
     },
     []
   );
 
   const deleteNoteOnServer = useCallback(async (id: string) => {
-    const response = await fetch(`/api/notes/${id}`, { method: "DELETE" });
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMessage =
-        errorData.error || `Failed to delete note (${response.status})`;
-      throw new Error(errorMessage);
-    }
+    await apiRequest(`/api/notes/${id}`, { method: "DELETE" });
   }, []);
 
   // Data loading
