@@ -2,7 +2,6 @@
 
 import React from "react";
 import {
-  CalendarClock,
   Check,
   Clock,
   Folder,
@@ -46,15 +45,12 @@ type NoteEditorProps = {
   historyTitle: string;
   notebooksById: Map<string, NotebookPayload>;
   notebookOptions: NotebookOption[];
-  dueDateValue: string;
   onClose: () => void;
   onOpenHistory: () => void;
   onSave: () => void;
   onNotebookChange: (notebookId: string | null) => void;
   onTitleChange: (value: string) => void;
   onContentChange: (value: string) => void;
-  onDueDateChange: (value: string) => void;
-  onClearDueDate: () => void;
   onAddChecklistItem: () => void;
   onMarkAllChecklist: (checked: boolean) => void;
   onClearCompletedChecklist: () => void;
@@ -81,15 +77,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   historyTitle,
   notebooksById,
   notebookOptions,
-  dueDateValue,
   onClose,
   onOpenHistory,
   onSave,
   onNotebookChange,
   onTitleChange,
   onContentChange,
-  onDueDateChange,
-  onClearDueDate,
   onAddChecklistItem,
   onMarkAllChecklist,
   onClearCompletedChecklist,
@@ -146,12 +139,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               <Folder className="size-3.5" />
               {notebookName}
             </span>
-            {note.dueAt && (
-              <span className="inline-flex items-center gap-1.5 text-primary font-medium">
-                <CalendarClock className="size-3.5" />
-                Due {new Date(note.dueAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-              </span>
-            )}
           </CardDescription>
         </div>
         <div className="flex w-full flex-col items-end gap-3 sm:w-auto sm:flex-row sm:items-center">
@@ -239,29 +226,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                 </option>
               ))}
             </Select>
-          </div>
-          <div className="space-y-2">
-            <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-              Reminder
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="datetime-local"
-                value={dueDateValue}
-                onChange={(event) => onDueDateChange(event.target.value)}
-                className="flex-1 rounded-md border bg-background/50 px-3 py-2 text-sm shadow-sm transition-all focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-              />
-              {note.dueAt && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-destructive"
-                  onClick={onClearDueDate}
-                >
-                  <X className="size-4" />
-                </Button>
-              )}
-            </div>
           </div>
         </div>
 

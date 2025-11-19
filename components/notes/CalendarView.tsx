@@ -14,7 +14,7 @@ import {
   subMonths,
   isToday,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { NotePayload } from "@/types/note";
@@ -33,8 +33,8 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart);
-  const endDate = endOfWeek(monthEnd);
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 }); // Sunday
 
   const calendarDays = eachDayOfInterval({
     start: startDate,
@@ -45,8 +45,11 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
 
   const getNotesForDay = (day: Date) => {
     return notes.filter((note) => {
-      if (!note.dueAt) return false;
-      return isSameDay(new Date(note.dueAt), day);
+      // Show notes on their creation date
+      if (note.createdAt) {
+        return isSameDay(new Date(note.createdAt), day);
+      }
+      return false;
     });
   };
 

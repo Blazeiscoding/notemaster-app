@@ -13,7 +13,6 @@ import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDateTimeForInput } from "@/components/note-app/util";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
@@ -74,8 +73,6 @@ const NoteApp = () => {
     handleNotebookChange,
     handleTitleChange,
     handleContentChange,
-    handleDueDateChange,
-    handleClearDueDate,
     handleCloseEditor,
     fileInputRef,
     addChecklistItem,
@@ -241,19 +238,19 @@ const NoteApp = () => {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
         <AppHeader
-        userFirstName={userFirstName}
-        isDark={darkMode}
-        toggleTheme={() => setDarkMode(!darkMode)}
-        onOpenThemePicker={() => setShowThemePanel(true)}
-        onSaveSmartFilter={() => setShowSaveFilterDialog(true)}
-        canSaveSmartFilter={canSaveSmartFilter}
-        onNewNote={createNote}
-        onToggleSidebar={() => setShowSidebar((prev) => !prev)}
-        canInstall={canInstall}
-        onInstall={installApp}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-      />
+          userFirstName={userFirstName}
+          isDark={darkMode}
+          toggleTheme={() => setDarkMode(!darkMode)}
+          onOpenThemePicker={() => setShowThemePanel(true)}
+          onSaveSmartFilter={handleOpenSaveFilter}
+          canSaveSmartFilter={canSaveSmartFilter}
+          onNewNote={createNote}
+          onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+          canInstall={canInstall}
+          onInstall={installApp}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+        />
         {showIosInstallTip && (
           <InstallPromptAlert onDismiss={() => setShowIosInstallTip(false)} />
         )}
@@ -330,15 +327,12 @@ const NoteApp = () => {
                 }
                 notebooksById={notebooksById}
                 notebookOptions={notebookOptions}
-                dueDateValue={formatDateTimeForInput(currentNote.dueAt)}
                 onClose={handleCloseEditor}
                 onOpenHistory={() => handleOpenRevisions(currentNote.id)}
                 onSave={saveCurrentNote}
                 onNotebookChange={handleNotebookChange}
                 onTitleChange={handleTitleChange}
                 onContentChange={handleContentChange}
-                onDueDateChange={handleDueDateChange}
-                onClearDueDate={handleClearDueDate}
                 onAddChecklistItem={addChecklistItem}
                 onMarkAllChecklist={markAllChecklist}
                 onClearCompletedChecklist={clearCompletedChecklist}
@@ -389,7 +383,7 @@ const NoteApp = () => {
           aria-modal="true"
           onClick={handleCloseThemePanel}
         >
-          <div 
+          <div
             className="w-full max-w-lg rounded-2xl border bg-card/95 backdrop-blur-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >

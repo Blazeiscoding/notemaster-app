@@ -4,7 +4,6 @@ import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ArchiveRestore,
-  CalendarDays,
   Clock,
   Pin,
   Trash2,
@@ -244,40 +243,6 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     const LeftIcon = swipeActions.left.Icon;
     const RightIcon = swipeActions.right.Icon;
 
-    const dueDateMetadata = useMemo(() => {
-      if (!note.dueAt) return null;
-
-      const dueDate = new Date(note.dueAt);
-      if (Number.isNaN(dueDate.getTime())) return null;
-
-      const now = new Date();
-      const diffMs = dueDate.getTime() - now.getTime();
-      const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-      const shortDate = dueDate.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      });
-
-      if (diffMs < 0) {
-        return {
-          label: `Overdue • ${shortDate}`,
-          className: "bg-rose-500/15 text-rose-600",
-        } as const;
-      }
-
-      if (diffDays <= 2) {
-        return {
-          label: `Due soon • ${shortDate}`,
-          className: "bg-amber-500/15 text-amber-700",
-        } as const;
-      }
-
-      return {
-        label: `Due ${shortDate}`,
-        className: "bg-sky-500/10 text-sky-600",
-      } as const;
-    }, [note.dueAt]);
 
     return (
       <div className="relative">
@@ -324,25 +289,12 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
           onClick={isNotesSection ? handleCardClick : undefined}
         >
           <CardHeader className="space-y-3 pb-3">
-            {(note.pinned || dueDateMetadata) && (
+            {note.pinned && (
               <div className="flex flex-wrap gap-2">
-                {note.pinned && (
-                  <Badge className="flex items-center gap-1.5 bg-(--interactive-accent-soft) text-(--interactive-accent) border border-(--interactive-accent)/30 shadow-sm">
-                    <Pin className="size-3" />
-                    <span className="font-medium">Pinned</span>
-                  </Badge>
-                )}
-                {dueDateMetadata && (
-                  <Badge
-                    className={cn(
-                      "flex items-center gap-1.5 shadow-sm",
-                      dueDateMetadata.className
-                    )}
-                  >
-                    <CalendarDays className="size-3" />
-                    <span className="font-medium">{dueDateMetadata.label}</span>
-                  </Badge>
-                )}
+                <Badge className="flex items-center gap-1.5 bg-(--interactive-accent-soft) text-(--interactive-accent) border border-(--interactive-accent)/30 shadow-sm">
+                  <Pin className="size-3" />
+                  <span className="font-medium">Pinned</span>
+                </Badge>
               </div>
             )}
             <div className="flex items-start justify-between gap-2">
