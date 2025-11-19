@@ -300,16 +300,16 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
 
         <Card
           className={cn(
-            "group relative border bg-card/80 transition animate-in fade-in slide-in-from-bottom-2",
+            "group relative border bg-card/90 backdrop-blur-sm transition-all duration-200 animate-in fade-in slide-in-from-bottom-2",
             isNotesSection &&
-              "hover:-translate-y-1 hover:border-(--interactive-accent)/40 hover:shadow-lg hover:shadow-(--interactive-accent)/10 cursor-pointer",
-            isDragging && "cursor-grabbing"
+              "hover:-translate-y-1.5 hover:border-(--interactive-accent)/50 hover:shadow-xl hover:shadow-(--interactive-accent)/15 cursor-pointer",
+            isDragging && "cursor-grabbing scale-[0.98]"
           )}
           style={{
-            transform: `translateX(${translateX}px)`,
+            transform: `translateX(${translateX}px)${isDragging ? " scale(0.98)" : ""}`,
             transition: isDragging
               ? "none"
-              : "transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease",
+              : "transform 200ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 200ms ease, border-color 200ms ease",
           }}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -317,30 +317,30 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
           onPointerCancel={handlePointerEnd}
           onClick={isNotesSection ? handleCardClick : undefined}
         >
-          <CardHeader className="space-y-2">
+          <CardHeader className="space-y-3 pb-3">
             {(note.pinned || dueDateMetadata) && (
               <div className="flex flex-wrap gap-2">
                 {note.pinned && (
-                  <Badge className="flex items-center gap-1 bg-(--interactive-accent-soft) text-(--interactive-accent) border border-(--interactive-accent)/20">
+                  <Badge className="flex items-center gap-1.5 bg-(--interactive-accent-soft) text-(--interactive-accent) border border-(--interactive-accent)/30 shadow-sm">
                     <Pin className="size-3" />
-                    <span>Pinned</span>
+                    <span className="font-medium">Pinned</span>
                   </Badge>
                 )}
                 {dueDateMetadata && (
                   <Badge
                     className={cn(
-                      "flex items-center gap-1",
+                      "flex items-center gap-1.5 shadow-sm",
                       dueDateMetadata.className
                     )}
                   >
                     <CalendarDays className="size-3" />
-                    <span>{dueDateMetadata.label}</span>
+                    <span className="font-medium">{dueDateMetadata.label}</span>
                   </Badge>
                 )}
               </div>
             )}
             <div className="flex items-start justify-between gap-2">
-              <CardTitle className="text-base font-semibold">
+              <CardTitle className="text-base font-semibold leading-snug line-clamp-2 flex-1">
                 {note.title || "Untitled note"}
               </CardTitle>
               <div className="flex items-center gap-1">
@@ -442,23 +442,27 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
               {new Date(note.updatedAt).toLocaleDateString()}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="line-clamp-3 text-sm text-muted-foreground">
+          <CardContent className="space-y-3 pt-0">
+            <p className="line-clamp-3 text-sm text-muted-foreground leading-relaxed">
               {note.content || "No content yet"}
             </p>
             {note.checklist.length > 0 && (
-              <div className="rounded-md bg-muted px-3 py-2 text-xs">
-                {note.checklist.filter((item) => item.checked).length} of
-                {note.checklist.length} tasks complete
+              <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs font-medium border border-border/50">
+                <span className="text-foreground">
+                  {note.checklist.filter((item) => item.checked).length}
+                </span>
+                <span className="text-muted-foreground"> of </span>
+                <span className="text-foreground">{note.checklist.length}</span>
+                <span className="text-muted-foreground"> tasks complete</span>
               </div>
             )}
             {note.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1">
+              <div className="flex flex-wrap gap-1.5">
                 {note.tags.map((tag) => (
                   <Badge
                     key={tag}
                     variant="outline"
-                    className="border-(--interactive-accent)/30 text-(--interactive-accent) hover:bg-(--interactive-accent-soft) transition-colors"
+                    className="border-(--interactive-accent)/30 text-(--interactive-accent) hover:bg-(--interactive-accent-soft) hover:border-(--interactive-accent)/50 transition-all duration-150 text-xs font-medium"
                   >
                     #{tag}
                   </Badge>

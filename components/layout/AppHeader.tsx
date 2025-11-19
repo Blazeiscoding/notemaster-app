@@ -38,12 +38,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onCreateNote,
 }) => {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-2">
       <div className="flex items-center gap-3">
         <Button
           variant="outline"
           size="icon-sm"
-          className="sm:hidden"
+          className="sm:hidden hover:bg-accent transition-colors"
           onClick={onToggleSidebar}
         >
           <Menu className="size-4" />
@@ -52,11 +52,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           <p className="text-sm font-medium text-muted-foreground">
             Welcome back{userFirstName ? `, ${userFirstName}` : ""}
           </p>
-          <h1 className="text-2xl font-semibold tracking-tight">NoteMaster</h1>
+          <h1 className="text-2xl font-semibold tracking-tight bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+            NoteMaster
+          </h1>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {canInstall && (
           <Button
             variant="outline"
@@ -100,7 +102,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           size="sm"
           onClick={onCreateNote}
           variant="accent"
-          className="shadow-md shadow-(--interactive-accent)/20"
+          className="shadow-md shadow-(--interactive-accent)/20 hover:shadow-lg hover:shadow-(--interactive-accent)/30 transition-all duration-200"
         >
           <Plus className="size-4" />
           <span className="hidden sm:inline">New note</span>

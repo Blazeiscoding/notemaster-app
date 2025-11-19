@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatDateTimeForInput } from "@/components/note-app/util";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
+import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
 import { Plus, X } from "lucide-react";
 
@@ -60,8 +61,6 @@ const NoteApp = () => {
     installApp,
     showIosInstallTip,
     setShowIosInstallTip,
-    showPreview,
-    togglePreview,
     createNote,
     saveCurrentNote,
     isSavingNote,
@@ -119,6 +118,19 @@ const NoteApp = () => {
   const [quickFilterError, setQuickFilterError] = React.useState<string | null>(
     null
   );
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onCreateNote: createNote,
+    onSaveNote: saveCurrentNote,
+    onCloseEditor: handleCloseEditor,
+    onFocusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    currentNote,
+    isSaving: isSavingNote,
+  });
 
   const computeDefaultFilterName = React.useCallback(() => {
     const base = "Smart filter";
@@ -184,12 +196,17 @@ const NoteApp = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-(--interactive-accent)" />
-          <p className="mt-4 text-gray-600 dark:text-gray-400">
-            Loading your notes...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-(--interactive-accent)" />
+          <div className="space-y-2">
+            <p className="text-base font-medium text-foreground">
+              Loading your notes...
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Just a moment
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -209,7 +226,7 @@ const NoteApp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
         <AppHeader
           userFirstName={userFirstName}
@@ -243,6 +260,7 @@ const NoteApp = () => {
             onSortChange={setSortBy}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            searchInputRef={searchInputRef}
             activeSection={activeSection}
             sectionCounts={sectionCounts}
             onSectionChange={setActiveSection}
@@ -288,7 +306,6 @@ const NoteApp = () => {
             {currentNote ? (
               <NoteEditor
                 note={currentNote}
-                showPreview={showPreview}
                 isSaving={isSavingNote}
                 canViewHistory={
                   isAuthenticated &&
@@ -303,7 +320,6 @@ const NoteApp = () => {
                 notebookOptions={notebookOptions}
                 dueDateValue={formatDateTimeForInput(currentNote.dueAt)}
                 onClose={handleCloseEditor}
-                onTogglePreview={togglePreview}
                 onOpenHistory={() => handleOpenRevisions(currentNote.id)}
                 onSave={saveCurrentNote}
                 onNotebookChange={handleNotebookChange}
@@ -354,11 +370,15 @@ const NoteApp = () => {
       )}
       {showThemePanel && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
+          onClick={handleCloseThemePanel}
         >
-          <div className="w-full max-w-lg rounded-2xl border bg-card p-6 shadow-xl">
+          <div 
+            className="w-full max-w-lg rounded-2xl border bg-card/95 backdrop-blur-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold">Choose theme</h2>
@@ -403,13 +423,15 @@ const NoteApp = () => {
 
       {showSaveFilterDialog && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200"
           role="dialog"
           aria-modal="true"
+          onClick={handleCloseSaveFilter}
         >
           <form
-            className="w-full max-w-md space-y-4 rounded-2xl border bg-card p-6 shadow-xl"
+            className="w-full max-w-md space-y-4 rounded-2xl border bg-card/95 backdrop-blur-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200"
             onSubmit={handleSubmitQuickFilter}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-4">
               <div>

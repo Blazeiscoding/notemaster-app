@@ -41,7 +41,6 @@ export const useNoteApp = () => {
     "updated"
   );
   const [activeSection, setActiveSection] = useState<NoteAppSection>("notes");
-  const [showPreview, setShowPreview] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [customOrder, setCustomOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -409,7 +408,7 @@ export const useNoteApp = () => {
       }
     } else {
       applyLocal(baseNote);
-      setCurrentNote(baseNote);
+      setCurrentNote(null);
     }
 
     setIsSavingNote(false);
@@ -423,10 +422,6 @@ export const useNoteApp = () => {
     setNotes,
     setCurrentNote,
   ]);
-
-  const togglePreview = useCallback(() => {
-    setShowPreview((prev) => !prev);
-  }, []);
 
   return {
     isLoading,
@@ -472,8 +467,6 @@ export const useNoteApp = () => {
     installApp,
     showIosInstallTip,
     setShowIosInstallTip,
-    showPreview,
-    togglePreview,
     createNote,
     saveCurrentNote,
     isSavingNote,

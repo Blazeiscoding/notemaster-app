@@ -29,14 +29,14 @@ const SectionFilters: React.FC<SectionFiltersProps> = ({
             variant={activeSection === section ? "accent" : "ghost"}
             size="sm"
             className={cn(
-              "justify-between capitalize transition-colors",
-              activeSection === section && "shadow-sm shadow-(--interactive-accent)/20"
+              "justify-between capitalize transition-all duration-200",
+              activeSection === section && "shadow-md shadow-(--interactive-accent)/20"
             )}
             onClick={() => onSelect(section)}
           >
-            <span>{section}</span>
+            <span className="font-medium">{section}</span>
             <span className={cn(
-              "rounded-full px-2 py-0.5 text-xs",
+              "rounded-full px-2 py-0.5 text-xs font-medium",
               activeSection === section
                 ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
                 : "bg-background text-muted-foreground"

@@ -1,23 +1,23 @@
 "use client";
 
 import React from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import {
   CalendarClock,
   Check,
   Clock,
-  Eye,
-  EyeOff,
   Folder,
   History,
   Loader2,
   X,
+  Download,
+  FileDown,
+  Printer,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -27,6 +27,7 @@ import {
 import Checklist from "./Checklist";
 import TagsInput from "./TagsInput";
 import AttachmentsList from "./AttachmentsList";
+import { exportNoteToMarkdown, exportNoteToPDF, printNote } from "@/lib/export-utils";
 import type {
   Attachment,
   NotePayload,
@@ -40,7 +41,6 @@ type NotebookOption = {
 
 type NoteEditorProps = {
   note: NotePayload;
-  showPreview: boolean;
   isSaving: boolean;
   canViewHistory: boolean;
   historyTitle: string;
@@ -48,7 +48,6 @@ type NoteEditorProps = {
   notebookOptions: NotebookOption[];
   dueDateValue: string;
   onClose: () => void;
-  onTogglePreview: () => void;
   onOpenHistory: () => void;
   onSave: () => void;
   onNotebookChange: (notebookId: string | null) => void;
@@ -77,7 +76,6 @@ type NoteEditorProps = {
 
 const NoteEditor: React.FC<NoteEditorProps> = ({
   note,
-  showPreview,
   isSaving,
   canViewHistory,
   historyTitle,
@@ -85,7 +83,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   notebookOptions,
   dueDateValue,
   onClose,
-  onTogglePreview,
   onOpenHistory,
   onSave,
   onNotebookChange,
@@ -111,15 +108,34 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     ? notebooksById.get(note.notebookId)?.name ?? "Notebook"
     : "Inbox";
 
+  const handleExportMarkdown = () => {
+    const markdown = exportNoteToMarkdown(note);
+    const blob = new Blob([markdown], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${note.title || "note"}.md`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = async () => {
+    await exportNoteToPDF(note);
+  };
+
+  const handlePrint = () => {
+    printNote(note);
+  };
+
   return (
-    <Card className="border bg-card/60 backdrop-blur animate-in fade-in slide-in-from-bottom-4">
-      <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="border bg-card/95 backdrop-blur-sm shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <CardHeader className="gap-4 sm:flex-row sm:items-center sm:justify-between pb-4">
         <div className="flex-1 space-y-3">
           <Input
             value={note.title}
             onChange={(event) => onTitleChange(event.target.value)}
             placeholder="Title"
-            className="border-none px-0 text-xl font-semibold focus-visible:ring-0"
+            className="border-none px-0 text-xl font-semibold focus-visible:ring-0 placeholder:text-muted-foreground/50"
           />
           <CardDescription className="flex flex-wrap items-center gap-3 text-xs sm:text-sm">
             <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -140,19 +156,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         </div>
         <div className="flex w-full flex-col items-end gap-2 sm:w-auto sm:flex-row sm:items-center">
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" onClick={onTogglePreview}>
-              {showPreview ? (
-                <>
-                  <EyeOff className="size-4" />
-                  Editor
-                </>
-              ) : (
-                <>
-                  <Eye className="size-4" />
-                  Preview
-                </>
-              )}
-            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -163,6 +166,32 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               <History className="size-4" />
               History
             </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handleExportMarkdown}
+                title="Export as Markdown"
+              >
+                <FileDown className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handleExportPDF}
+                title="Export as PDF"
+              >
+                <Download className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                onClick={handlePrint}
+                title="Print"
+              >
+                <Printer className="size-4" />
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={onClose}>
@@ -191,12 +220,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Notebook
             </label>
-            <select
+            <Select
               value={note.notebookId ?? ""}
               onChange={(event) =>
                 onNotebookChange(event.target.value ? event.target.value : null)
               }
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm shadow-sm focus:border-(--accent-primary) focus:outline-none focus:ring-2 focus:ring-(--accent-primary)/50"
+              className="w-full"
             >
               <option value="">Inbox</option>
               {notebookOptions.map((option) => (
@@ -204,7 +233,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="space-y-2">
             <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -231,24 +260,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        {showPreview ? (
-          <div className="rounded-2xl border bg-muted/40 p-4">
-            <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {note.content.trim().length > 0
-                  ? note.content
-                  : "_Nothing to preview yet. Start writing in the editor._"}
-              </ReactMarkdown>
-            </div>
-          </div>
-        ) : (
-          <Textarea
-            value={note.content}
-            onChange={(event) => onContentChange(event.target.value)}
-            placeholder="Capture your thoughts..."
-            className="min-h-[240px] resize-y border-none bg-transparent px-0 text-base focus-visible:ring-0"
-          />
-        )}
+        <Textarea
+          value={note.content}
+          onChange={(event) => onContentChange(event.target.value)}
+          placeholder="Capture your thoughts..."
+          className="min-h-[400px] resize-y text-base leading-relaxed placeholder:text-muted-foreground/50"
+        />
 
         <Checklist
           items={note.checklist}

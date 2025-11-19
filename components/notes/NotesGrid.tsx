@@ -64,9 +64,9 @@ const NotesGrid: React.FC<NotesGridProps> = ({
     const copy = emptyStateCopy[activeSection];
     return (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Card className="col-span-full overflow-hidden rounded-2xl border-dashed py-12 text-center animate-in fade-in">
+        <Card className="col-span-full overflow-hidden rounded-2xl border-dashed border-2 bg-muted/30 py-16 text-center animate-in fade-in slide-in-from-bottom-4 duration-500">
           <CardContent className="flex flex-col items-center gap-6">
-            <div className="relative h-40 w-60">
+            <div className="relative h-40 w-60 opacity-60">
               <Image
                 src="/note-empty.svg"
                 alt="Empty notebook illustration"
@@ -75,15 +75,20 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                 priority
               />
             </div>
-            <div className="space-y-2">
-              <h2 className="text-lg font-semibold">{copy.title}</h2>
-              <p className="text-sm text-muted-foreground">
+            <div className="space-y-2 max-w-md">
+              <h2 className="text-xl font-semibold text-foreground">{copy.title}</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed">
                 {copy.description}
               </p>
             </div>
             {activeSection === "notes" && (
-              <Button onClick={onCreateNote} className="gap-2">
-                <Plus className="size-4" />
+              <Button 
+                onClick={onCreateNote} 
+                variant="accent"
+                size="lg"
+                className="gap-2 shadow-lg shadow-(--interactive-accent)/20 mt-2"
+              >
+                <Plus className="size-5" />
                 Create your first note
               </Button>
             )}

@@ -7,12 +7,14 @@ type SearchBarProps = {
   value: string;
   onChange: (value: string) => void;
   debounceMs?: number;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 };
 
 const SearchBar: React.FC<SearchBarProps> = ({
   value,
   onChange,
   debounceMs = 300,
+  inputRef,
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -35,6 +37,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
     <div className="relative">
       <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
       <input
+        ref={inputRef}
         type="text"
         autoComplete="off"
         spellCheck={false}

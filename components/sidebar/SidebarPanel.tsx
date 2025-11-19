@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import {
   ChevronDown,
   Download,
@@ -72,6 +73,7 @@ type SidebarPanelProps = {
   onSortChange: (value: SortKey) => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   activeSection: "notes" | "archive" | "bin";
   sectionCounts: Record<"notes" | "archive" | "bin", number>;
   onSectionChange: (section: "notes" | "archive" | "bin") => void;
@@ -124,6 +126,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onSortChange,
   searchQuery,
   onSearchChange,
+  searchInputRef,
   activeSection,
   sectionCounts,
   onSectionChange,
@@ -197,28 +200,28 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   return (
     <aside
       className={cn(
-        "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300",
+        "space-y-6 rounded-2xl border bg-card/95 backdrop-blur-sm p-5 shadow-lg transition-all duration-300",
         "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
         "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
         show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
-      <SearchBar value={searchQuery} onChange={onSearchChange} />
+      <SearchBar value={searchQuery} onChange={onSearchChange} inputRef={searchInputRef} />
 
       <div className="flex gap-2">
         <Button
           variant={filterTag === "all" ? "accent" : "outline"}
           size="sm"
           className={cn(
-            "flex-1",
-            filterTag === "all" && "shadow-sm shadow-(--interactive-accent)/20"
+            "flex-1 transition-all duration-200",
+            filterTag === "all" && "shadow-md shadow-(--interactive-accent)/20"
           )}
           onClick={() => onTagSelect("all")}
         >
           All
           <span
             className={cn(
-              "ml-2 rounded-full px-2 py-0.5 text-xs",
+              "ml-2 rounded-full px-2 py-0.5 text-xs font-medium",
               filterTag === "all"
                 ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
                 : "bg-background text-muted-foreground"
@@ -227,17 +230,17 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
             {notes.length}
           </span>
         </Button>
-        <select
+        <Select
           value={sortBy}
           onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
             onSortChange(event.target.value as SortKey)
           }
-          className="w-36 rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-36"
         >
           <option value="updated">Last updated</option>
           <option value="created">Date created</option>
           <option value="title">Title</option>
-        </select>
+        </Select>
       </div>
 
       <SectionFilters
@@ -255,16 +258,16 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         onClear={onClearTags}
       />
 
-      <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
+      <div className="rounded-xl border border-(--interactive-accent-soft) bg-muted/30 p-3 transition-colors hover:bg-muted/50">
         <button
           type="button"
           onClick={() => toggleSection("smartFiltersOpen")}
-          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
         >
           <span>Smart filters</span>
           <ChevronDown
             className={cn(
-              "size-4 text-muted-foreground transition-transform",
+              "size-4 text-muted-foreground transition-transform duration-200",
               smartFiltersOpen ? "rotate-0" : "-rotate-90"
             )}
           />
@@ -284,16 +287,16 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         )}
       </div>
 
-      <div className="rounded-xl border border-(--interactive-accent-soft) p-3">
+      <div className="rounded-xl border border-(--interactive-accent-soft) bg-muted/30 p-3 transition-colors hover:bg-muted/50">
         <button
           type="button"
           onClick={() => toggleSection("notebooksOpen")}
-          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-colors hover:text-(--interactive-accent-strong)"
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
         >
           <span>Notebooks</span>
           <ChevronDown
             className={cn(
-              "size-4 text-muted-foreground transition-transform",
+              "size-4 text-muted-foreground transition-transform duration-200",
               notebooksOpen ? "rotate-0" : "-rotate-90"
             )}
           />
