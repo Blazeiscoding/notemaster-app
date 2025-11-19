@@ -7,6 +7,7 @@ import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import NoteEditor from "@/components/notes/NoteEditor";
 import NotesGrid from "@/components/notes/NotesGrid";
+import NoteCardSkeleton from "@/components/notes/NoteCardSkeleton";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -196,16 +197,25 @@ const NoteApp = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-muted border-t-(--interactive-accent)" />
-          <div className="space-y-2">
-            <p className="text-base font-medium text-foreground">
-              Loading your notes...
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Just a moment
-            </p>
+      <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="h-6 w-32 animate-pulse rounded-md bg-muted" />
+                <div className="h-4 w-48 animate-pulse rounded-md bg-muted" />
+              </div>
+              <div className="flex gap-2">
+                <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
+                <div className="h-8 w-8 animate-pulse rounded-md bg-muted" />
+                <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <NoteCardSkeleton key={i} />
+              ))}
+            </div>
           </div>
         </div>
       </div>

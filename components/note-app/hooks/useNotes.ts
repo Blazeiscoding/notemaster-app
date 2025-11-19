@@ -52,6 +52,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? saved : note))
           );
+          toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
         } catch (error) {
           console.error("Failed to toggle pin", error);
           setNotes((prev) =>
@@ -59,6 +60,8 @@ export function useNotes(
           );
           toast.error("Failed to update note. Please try again.");
         }
+      } else {
+        toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
       }
     },
     [notes, isAuthenticated, updateNoteOnServer, setNotes]
@@ -91,6 +94,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? saved : note))
           );
+          toast.success("Note archived");
         } catch (error) {
           console.error("Failed to archive note", error);
           setNotes((prev) =>
@@ -98,6 +102,8 @@ export function useNotes(
           );
           toast.error("Failed to archive note. Please try again.");
         }
+      } else {
+        toast.success("Note archived");
       }
     },
     [notes, isAuthenticated, updateNoteOnServer, setNotes]
@@ -128,6 +134,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? saved : note))
           );
+          toast.success("Note restored");
         } catch (error) {
           console.error("Failed to unarchive note", error);
           setNotes((prev) =>
@@ -135,6 +142,8 @@ export function useNotes(
           );
           toast.error("Failed to unarchive note. Please try again.");
         }
+      } else {
+        toast.success("Note restored");
       }
     },
     [notes, isAuthenticated, updateNoteOnServer, setNotes]
@@ -172,6 +181,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? saved : note))
           );
+          toast.success("Note moved to bin");
         } catch (error) {
           console.error("Failed to move note to bin", error);
           setNotes((prev) =>
@@ -180,6 +190,8 @@ export function useNotes(
           if (wasCurrent) setCurrentNote(existing);
           toast.error("Failed to move note to bin. Please try again.");
         }
+      } else {
+        toast.success("Note moved to bin");
       }
     },
     [notes, currentNote, isAuthenticated, updateNoteOnServer, setNotes, setCurrentNote]
@@ -212,6 +224,7 @@ export function useNotes(
           setNotes((prev) =>
             prev.map((note) => (note.id === id ? saved : note))
           );
+          toast.success("Note restored");
         } catch (error) {
           console.error("Failed to restore note", error);
           setNotes((prev) =>
@@ -219,6 +232,8 @@ export function useNotes(
           );
           toast.error("Failed to restore note. Please try again.");
         }
+      } else {
+        toast.success("Note restored");
       }
     },
     [notes, isAuthenticated, updateNoteOnServer, setNotes]
@@ -239,6 +254,7 @@ export function useNotes(
       if (isAuthenticated) {
         try {
           await deleteNoteOnServer(id);
+          toast.success("Note deleted permanently");
         } catch (error) {
           console.error("Failed to delete note", error);
           setNotes((prev) => {
@@ -249,6 +265,8 @@ export function useNotes(
           if (wasCurrent) setCurrentNote(existing);
           toast.error("Failed to delete note. Please try again.");
         }
+      } else {
+        toast.success("Note deleted permanently");
       }
     },
     [notes, currentNote, isAuthenticated, deleteNoteOnServer, setNotes, setCurrentNote]

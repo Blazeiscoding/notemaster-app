@@ -19,6 +19,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { NotePayload } from "@/types/note";
 
@@ -343,99 +349,150 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
               <CardTitle className="text-base font-semibold leading-snug line-clamp-2 flex-1">
                 {note.title || "Untitled note"}
               </CardTitle>
-              <div className="flex items-center gap-1">
-                {isNotesSection && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onPin(note.id);
-                      }}
-                      className={cn(
-                        "text-muted-foreground transition hover:text-(--interactive-accent)",
-                        note.pinned && "text-(--interactive-accent)"
-                      )}
-                    >
-                      <Pin className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onArchive(note.id);
-                      }}
-                    >
-                      <Archive className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onTrash(note.id);
-                      }}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </>
-                )}
-                {isArchiveSection && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onUnarchive(note.id);
-                      }}
-                      className="text-muted-foreground hover:text-(--interactive-accent)"
-                    >
-                      <ArchiveRestore className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onTrash(note.id);
-                      }}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </>
-                )}
-                {isBinSection && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onRestoreFromBin(note.id);
-                      }}
-                      className="text-muted-foreground hover:text-(--interactive-accent)"
-                    >
-                      <Undo2 className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteForever(note.id);
-                      }}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
+              <TooltipProvider delayDuration={300}>
+                <div className="flex items-center gap-1">
+                  {isNotesSection && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onPin(note.id);
+                            }}
+                            className={cn(
+                              "text-muted-foreground transition hover:text-(--interactive-accent)",
+                              note.pinned && "text-(--interactive-accent)"
+                            )}
+                          >
+                            <Pin className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{note.pinned ? "Unpin note" : "Pin note"}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onArchive(note.id);
+                            }}
+                          >
+                            <Archive className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Archive note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onTrash(note.id);
+                            }}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Move to bin</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                  {isArchiveSection && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onUnarchive(note.id);
+                            }}
+                            className="text-muted-foreground hover:text-(--interactive-accent)"
+                          >
+                            <ArchiveRestore className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Restore note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onTrash(note.id);
+                            }}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Move to bin</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                  {isBinSection && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onRestoreFromBin(note.id);
+                            }}
+                            className="text-muted-foreground hover:text-(--interactive-accent)"
+                          >
+                            <Undo2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Restore note</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onDeleteForever(note.id);
+                            }}
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete forever</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
+                </div>
+              </TooltipProvider>
             </div>
             <CardDescription className="flex items-center gap-2 text-xs">
               <Clock className="size-3" />

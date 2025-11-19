@@ -260,12 +260,22 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         </div>
 
-        <Textarea
-          value={note.content}
-          onChange={(event) => onContentChange(event.target.value)}
-          placeholder="Capture your thoughts..."
-          className="min-h-[400px] resize-y text-base leading-relaxed placeholder:text-muted-foreground/50"
-        />
+        <div className="space-y-2">
+          <Textarea
+            value={note.content}
+            onChange={(event) => onContentChange(event.target.value)}
+            placeholder="Capture your thoughts..."
+            className="min-h-[400px] resize-y text-base leading-relaxed placeholder:text-muted-foreground/50"
+          />
+          <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground">
+            <span>
+              {note.content.trim()
+                ? `${note.content.trim().split(/\s+/).filter(Boolean).length} words`
+                : "0 words"}
+            </span>
+            <span>{note.content.length} characters</span>
+          </div>
+        </div>
 
         <Checklist
           items={note.checklist}
