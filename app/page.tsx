@@ -315,12 +315,7 @@ const NoteApp = () => {
             notes={notes}
             onTagSelect={setFilterTag}
             onClearTags={handleClearTags}
-            accent={accent}
-            accentPreview={accentPreview}
-            onAccentPreview={handlePreviewAccent}
-            onAccentPreviewEnd={handleCancelAccentPreview}
-            onAccentApply={handleSelectAccent}
-            accentPalettes={accentPalettes}
+
             smartFilters={smartFilters}
             activeSmartFilterId={activeSmartFilterId}
             canSaveSmartFilter={canSaveSmartFilter}

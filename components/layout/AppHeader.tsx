@@ -1,14 +1,20 @@
 "use client";
 
 import React from "react";
-import { Download, LayoutGrid, Calendar, Moon, Plus, Save, Settings, Sun, User as UserIcon, Menu, Palette, Filter } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  UserButton,
-} from "@clerk/nextjs";
+  Download,
+  LayoutGrid,
+  Calendar,
+  Moon,
+  Plus,
+  Save,
+  Sun,
+  Menu,
+  Palette,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import AnimatedLogo from "@/components/ui/AnimatedLogo";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 
 export type AppHeaderProps = {
   userFirstName: string | null | undefined;
@@ -45,7 +51,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     // new Date() automatically uses the browser's timezone (user's timezone)
     const now = new Date();
     const hours = now.getHours(); // This already uses the user's timezone
-    
+
     if (hours < 12) return "Good morning";
     if (hours < 18) return "Good afternoon";
     return "Good evening";
@@ -62,13 +68,16 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         >
           <Menu className="size-5" />
         </Button>
-        
+
         <div className="flex flex-col">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-            <span className="bg-gradient-to-r from-primary to-[var(--interactive-accent)] bg-clip-text text-transparent">
-              NoteMaster
-            </span>
-          </h1>
+          <div className="flex items-center gap-2">
+            <AnimatedLogo size={32} />
+            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <span className="bg-linear-to-r from-primary to-(--interactive-accent) bg-clip-text text-transparent">
+                NoteMaster
+              </span>
+            </h1>
+          </div>
           <p className="text-sm text-muted-foreground font-medium">
             {getGreeting()}, {userFirstName || "Guest"}
           </p>
@@ -102,7 +111,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             variant="outline"
             size="sm"
             onClick={onInstall}
-            className="border-[var(--accent-primary)] text-[var(--accent-primary)] hover:bg-[var(--accent-primary)]/10"
+            className="border-(--accent-primary) text-(--accent-primary) hover:bg-(--accent-primary)/10"
           >
             <Download className="size-4" />
             Install
@@ -133,7 +142,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           onClick={onSaveSmartFilter}
           disabled={!canSaveSmartFilter}
           title="Save Smart Filter"
-          className={canSaveSmartFilter ? "text-primary" : "text-muted-foreground/50"}
+          className={
+            canSaveSmartFilter ? "text-primary" : "text-muted-foreground/50"
+          }
         >
           <Save className="size-5" />
         </Button>
@@ -141,7 +152,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         <Button
           onClick={onNewNote}
           variant="accent"
-          className="gap-2 shadow-lg shadow-[var(--interactive-accent)]/20 hover:shadow-xl hover:shadow-[var(--interactive-accent)]/30 hover:-translate-y-0.5 transition-all duration-200"
+          className="gap-2 shadow-lg shadow-(--interactive-accent)/20 hover:shadow-xl hover:shadow-(--interactive-accent)/30 hover:-translate-y-0.5 transition-all duration-200"
         >
           <Plus className="size-4" />
           <span className="hidden sm:inline">New note</span>
@@ -154,7 +165,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           </SignInButton>
         </SignedOut>
         <SignedIn>
-          <UserButton appearance={{ elements: { userButtonAvatarBox: "size-8 ring-2 ring-background" } }} />
+          <UserButton
+            appearance={{
+              elements: {
+                userButtonAvatarBox: "size-8 ring-2 ring-background",
+              },
+            }}
+          />
         </SignedIn>
       </div>
     </header>

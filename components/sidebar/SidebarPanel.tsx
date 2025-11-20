@@ -9,7 +9,7 @@ import {
   Palette as PaletteIcon,
   Upload,
 } from "lucide-react";
-import AccentPicker from "@/components/layout/AccentPicker";
+
 import type {
   AccentPalette,
   NotebookPayload,
@@ -82,12 +82,7 @@ type SidebarPanelProps = {
   notes: NotePayload[];
   onTagSelect: (tag: string) => void;
   onClearTags: () => void;
-  accent: AccentPalette;
-  accentPreview: AccentPalette | null;
-  onAccentPreview: (palette: AccentPalette) => void;
-  onAccentPreviewEnd: () => void;
-  onAccentApply: (palette: AccentPalette) => void;
-  accentPalettes: AccentPalette[];
+
   smartFilters: SmartFilter[];
   activeSmartFilterId: string | null;
   canSaveSmartFilter: boolean;
@@ -135,12 +130,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   notes,
   onTagSelect,
   onClearTags,
-  accent,
-  accentPreview,
-  onAccentPreview,
-  onAccentPreviewEnd,
-  onAccentApply,
-  accentPalettes,
+
   smartFilters,
   activeSmartFilterId,
   canSaveSmartFilter,
@@ -324,20 +314,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         )}
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <PaletteIcon className="size-4" />
-          Accent color
-        </div>
-        <AccentPicker
-          palettes={accentPalettes}
-          activePaletteId={accent.id}
-          previewPaletteId={accentPreview?.id ?? null}
-          onPreview={onAccentPreview}
-          onCancelPreview={onAccentPreviewEnd}
-          onApply={onAccentApply}
-        />
-      </div>
+
 
       <div className="space-y-2">
         <Button

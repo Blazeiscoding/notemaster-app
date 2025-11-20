@@ -80,11 +80,11 @@ export function Modal({
       onClick={handleOverlayClick}
     >
       {Component === "form" && onSubmit ? (
-        <form onSubmit={onSubmit} className="w-full">
+        <form onSubmit={onSubmit}>
           {content}
         </form>
       ) : (
-        <div className="w-full">{content}</div>
+        <>{content}</>
       )}
     </div>
   );

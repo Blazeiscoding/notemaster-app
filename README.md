@@ -199,7 +199,7 @@ model NoteRevision {
 
 ## 🏗️ Project Structure
 
-```
+```text
 notemaster/
 ├── app/
 │   ├── api/
