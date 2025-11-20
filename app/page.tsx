@@ -5,16 +5,17 @@ import dynamic from "next/dynamic";
 import AppHeader from "@/components/layout/AppHeader";
 import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
 import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import { MobileFloatingButton } from "@/components/layout/MobileFloatingButton";
 import NotesGrid from "@/components/notes/NotesGrid";
-import NoteCardSkeleton from "@/components/notes/NoteCardSkeleton";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Modal } from "@/components/ui/modal";
+import { LoadingSkeleton } from "@/components/note-app/LoadingSkeleton";
+import { SaveFilterForm } from "@/components/note-app/SaveFilterForm";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
-import { Plus, X } from "lucide-react";
+import type { AccentPalette } from "@/types/note";
 
 // Dynamic imports for code splitting - only load when needed
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
@@ -165,9 +166,7 @@ const NoteApp = () => {
   const handleOpenSaveFilter = React.useCallback(() => {
     setQuickFilterError(null);
     setQuickFilterDescription("");
-    setQuickFilterName((prev) =>
-      prev.trim() ? prev : computeDefaultFilterName()
-    );
+    setQuickFilterName(computeDefaultFilterName());
     setShowSaveFilterDialog(true);
   }, [computeDefaultFilterName]);
 
@@ -209,31 +208,54 @@ const NoteApp = () => {
     setShowThemePanel(false);
   }, [handleCancelAccentPreview]);
 
+  // Memoized callbacks for better performance
+  const handleToggleTheme = React.useCallback(
+    () => setDarkMode(!darkMode),
+    [darkMode, setDarkMode]
+  );
+  const handleOpenThemePicker = React.useCallback(
+    () => setShowThemePanel(true),
+    []
+  );
+  const handleToggleSidebar = React.useCallback(
+    () => setShowSidebar((prev) => !prev),
+    [setShowSidebar]
+  );
+  const handleCloseSidebar = React.useCallback(
+    () => setShowSidebar(false),
+    [setShowSidebar]
+  );
+  const handleDismissIosTip = React.useCallback(
+    () => setShowIosInstallTip(false),
+    [setShowIosInstallTip]
+  );
+  const handleClearTags = React.useCallback(
+    () => setFilterTag("all"),
+    [setFilterTag]
+  );
+  const handleAddSmartFilter = React.useCallback(
+    ({ name, description }: { name: string; description?: string }) =>
+      addSmartFilter({ name, description }),
+    [addSmartFilter]
+  );
+  const handleOpenRevisionsCallback = React.useCallback(
+    () => currentNote && handleOpenRevisions(currentNote.id),
+    [currentNote, handleOpenRevisions]
+  );
+  const handleOpenSidebar = React.useCallback(
+    () => setShowSidebar(true),
+    [setShowSidebar]
+  );
+  const handleApplyAccent = React.useCallback(
+    (palette: AccentPalette) => {
+      handleSelectAccent(palette);
+      setShowThemePanel(false);
+    },
+    [handleSelectAccent]
+  );
+
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-2">
-                <div className="h-6 w-32 animate-pulse rounded-md bg-muted" />
-                <div className="h-4 w-48 animate-pulse rounded-md bg-muted" />
-              </div>
-              <div className="flex gap-2">
-                <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
-                <div className="h-8 w-8 animate-pulse rounded-md bg-muted" />
-                <div className="h-8 w-20 animate-pulse rounded-md bg-muted" />
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <NoteCardSkeleton key={i} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    return <LoadingSkeleton />;
   }
 
   if (dataError && isAuthenticated) {
@@ -255,26 +277,26 @@ const NoteApp = () => {
         <AppHeader
           userFirstName={userFirstName}
           isDark={darkMode}
-          toggleTheme={() => setDarkMode(!darkMode)}
-          onOpenThemePicker={() => setShowThemePanel(true)}
+          toggleTheme={handleToggleTheme}
+          onOpenThemePicker={handleOpenThemePicker}
           onSaveSmartFilter={handleOpenSaveFilter}
           canSaveSmartFilter={canSaveSmartFilter}
           onNewNote={createNote}
-          onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+          onToggleSidebar={handleToggleSidebar}
           canInstall={canInstall}
           onInstall={installApp}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
         />
         {showIosInstallTip && (
-          <InstallPromptAlert onDismiss={() => setShowIosInstallTip(false)} />
+          <InstallPromptAlert onDismiss={handleDismissIosTip} />
         )}
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           {showSidebar && (
             <div
               className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-              onClick={() => setShowSidebar(false)}
+              onClick={handleCloseSidebar}
             />
           )}
 
@@ -292,7 +314,7 @@ const NoteApp = () => {
             tags={allTags}
             notes={notes}
             onTagSelect={setFilterTag}
-            onClearTags={() => setFilterTag("all")}
+            onClearTags={handleClearTags}
             accent={accent}
             accentPreview={accentPreview}
             onAccentPreview={handlePreviewAccent}
@@ -303,9 +325,7 @@ const NoteApp = () => {
             activeSmartFilterId={activeSmartFilterId}
             canSaveSmartFilter={canSaveSmartFilter}
             currentSmartFilterCriteria={currentSmartFilterCriteria}
-            onAddSmartFilter={({ name, description }) =>
-              addSmartFilter({ name, description })
-            }
+            onAddSmartFilter={handleAddSmartFilter}
             onApplySmartFilter={applySmartFilter}
             onRemoveSmartFilter={removeSmartFilter}
             onExport={exportNotes}
@@ -343,7 +363,7 @@ const NoteApp = () => {
                 notebooksById={notebooksById}
                 notebookOptions={notebookOptions}
                 onClose={handleCloseEditor}
-                onOpenHistory={() => handleOpenRevisions(currentNote.id)}
+                onOpenHistory={handleOpenRevisionsCallback}
                 onSave={saveCurrentNote}
                 onNotebookChange={handleNotebookChange}
                 onTitleChange={handleTitleChange}
@@ -387,142 +407,69 @@ const NoteApp = () => {
             activeSection={activeSection}
             sectionCounts={sectionCounts}
             onSelectSection={setActiveSection}
-            onOpenSidebar={() => setShowSidebar(true)}
+            onOpenSidebar={handleOpenSidebar}
           />
         </div>
       )}
-      {showThemePanel && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-          onClick={handleCloseThemePanel}
-        >
-          <div
-            className="w-full max-w-lg rounded-2xl border bg-card/95 backdrop-blur-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">Choose theme</h2>
-                <p className="text-sm text-muted-foreground">
-                  Preview palettes and click one to apply instantly.
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleCloseThemePanel}
-                aria-label="Close theme picker"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-            <div className="mt-4">
-              <AccentPicker
-                palettes={accentPalettes}
-                activePaletteId={accent.id}
-                previewPaletteId={accentPreview?.id ?? null}
-                onPreview={handlePreviewAccent}
-                onCancelPreview={handleCancelAccentPreview}
-                onApply={(palette) => {
-                  handleSelectAccent(palette);
-                  setShowThemePanel(false);
-                }}
-              />
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCloseThemePanel}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
+      <Modal
+        open={showThemePanel}
+        onClose={handleCloseThemePanel}
+        title="Choose theme"
+        description="Preview palettes and click one to apply instantly."
+        maxWidth="lg"
+        footer={
+          <Button variant="outline" size="sm" onClick={handleCloseThemePanel}>
+            Done
+          </Button>
+        }
+      >
+        <div className="mt-4">
+          <AccentPicker
+            palettes={accentPalettes}
+            activePaletteId={accent.id}
+            previewPaletteId={accentPreview?.id ?? null}
+            onPreview={handlePreviewAccent}
+            onCancelPreview={handleCancelAccentPreview}
+            onApply={handleApplyAccent}
+          />
         </div>
-      )}
+      </Modal>
 
-      {showSaveFilterDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 animate-in fade-in duration-200"
-          role="dialog"
-          aria-modal="true"
-          onClick={handleCloseSaveFilter}
-        >
-          <form
-            className="w-full max-w-md space-y-4 rounded-2xl border bg-card/95 backdrop-blur-sm p-6 shadow-2xl animate-in zoom-in-95 duration-200"
-            onSubmit={handleSubmitQuickFilter}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">Save current filter</h2>
-                <p className="text-sm text-muted-foreground">
-                  Name your saved search so you can reuse it later.
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleCloseSaveFilter}
-                aria-label="Close save filter dialog"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-            <div className="space-y-2">
-              <Input
-                value={quickFilterName}
-                onChange={(event) => setQuickFilterName(event.target.value)}
-                placeholder="Filter name"
-                aria-label="Smart filter name"
-              />
-              <Textarea
-                value={quickFilterDescription}
-                onChange={(event) =>
-                  setQuickFilterDescription(event.target.value)
-                }
-                placeholder="Description (optional)"
-                aria-label="Smart filter description"
-                className="min-h-[96px]"
-              />
-              {quickFilterError && (
-                <p className="text-sm text-destructive">{quickFilterError}</p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleCloseSaveFilter}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" size="sm" disabled={!canSaveSmartFilter}>
-                Save filter
-              </Button>
-            </div>
-          </form>
-        </div>
+      <Modal
+        open={showSaveFilterDialog}
+        onClose={handleCloseSaveFilter}
+        title="Save current filter"
+        description="Name your saved search so you can reuse it later."
+        maxWidth="md"
+        as="form"
+        onSubmit={handleSubmitQuickFilter}
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCloseSaveFilter}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={!canSaveSmartFilter}>
+              Save filter
+            </Button>
+          </>
+        }
+      >
+        <SaveFilterForm
+          name={quickFilterName}
+          description={quickFilterDescription}
+          error={quickFilterError}
+          onNameChange={setQuickFilterName}
+          onDescriptionChange={setQuickFilterDescription}
+        />
+      </Modal>
+      {currentNote === null && (
+        <MobileFloatingButton onCreateNote={createNote} />
       )}
-      <div className="pointer-events-none sm:hidden">
-        <Button
-          aria-label="Create a new note"
-          variant="accent"
-          size="lg"
-          className="pointer-events-auto fixed right-4 z-50 h-14 rounded-full px-6 font-semibold shadow-xl shadow-(--interactive-accent)/25 transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-(--accent-primary)"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 7.5rem)" }}
-          onClick={() => {
-            createNote();
-          }}
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          New note
-        </Button>
-      </div>
     </div>
   );
 };

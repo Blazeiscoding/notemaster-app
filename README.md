@@ -1,6 +1,6 @@
 # NoteMaster 📝
 
-A modern, secure, and feature-rich note-taking application built with Next.js 15, featuring end-to-end encryption, offline support, and a beautiful user interface.
+A modern, secure, and feature-rich note-taking application built with Next.js 16, featuring end-to-end encryption, offline support, hierarchical notebooks, and a beautiful user interface.
 
 ![NoteMaster App](./public/note-empty.svg)
 
@@ -27,16 +27,32 @@ A modern, secure, and feature-rich note-taking application built with Next.js 15
 - **Pin important notes** for quick access
 - **Archive notes** to keep workspace organized
 - **Trash bin** with restore capability
+- **Note revisions** - View and restore previous versions
+- **File attachments** support
+- **Reminders** with due dates
 - Real-time search across titles and content
+- **Smart filters** - Save and reuse complex search queries
+- **Calendar view** - Visualize notes by date
+
+### 📚 Notebook Organization
+
+- **Hierarchical notebooks** - Organize notes in nested folders
+- **Custom notebook colors** for visual organization
+- **Quick notebook creation** from note editor
+- **Notebook filtering** - View notes by notebook
+- Drag-and-drop notebook organization
 
 ### 🎨 User Experience
 
+- **Customizable accent colors** - Choose from multiple theme palettes
 - **Dark mode** support with system preference detection
 - Beautiful animations and transitions
 - Sorting options (Last updated, Date created, Title)
 - Tag-based filtering and organization
+- **Smart filters** - Advanced search with saved queries
 - Empty state illustrations
-- Mobile-optimized sidebar
+- Mobile-optimized sidebar with floating action button
+- **Keyboard shortcuts** for power users
 
 ### 💾 Data Management
 
@@ -51,6 +67,14 @@ A modern, secure, and feature-rich note-taking application built with Next.js 15
 - Authenticated users with database sync
 - User-specific note isolation
 - Seamless migration from guest to authenticated
+
+## ⌨️ Keyboard Shortcuts
+
+- `Ctrl/Cmd + N` - Create new note
+- `Ctrl/Cmd + S` - Save current note
+- `Ctrl/Cmd + K` - Focus search bar
+- `Esc` - Close note editor
+- `Ctrl/Cmd + /` - Show keyboard shortcuts help
 
 ## 🚀 Getting Started
 
@@ -124,18 +148,52 @@ bun -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 ```prisma
 model Note {
-  id         String   @id @default(uuid())
-  userId     String
-  title      String   @default("")      // Encrypted
-  content    String   @default("")      // Encrypted
-  tags       String[] @default([])      // Encrypted array
-  checklist  Json                       // Encrypted JSON
-  type       String   @default("note")
-  pinned     Boolean  @default(false)
-  archived   Boolean  @default(false)
-  trashed    Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String
+  notebookId  String?
+  title       String   @default("")      // Encrypted
+  content     String   @default("")      // Encrypted
+  tags        String[] @default([])      // Encrypted array
+  checklist   Json                       // Encrypted JSON
+  attachments Json                       // Encrypted JSON
+  type        String   @default("note")
+  pinned      Boolean  @default(false)
+  archived    Boolean  @default(false)
+  trashed     Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  notebook    Notebook? @relation(...)
+  revisions   NoteRevision[]
+}
+
+model Notebook {
+  id        String    @id @default(uuid())
+  userId    String
+  parentId  String?
+  name      String
+  color     String    @default("#2563EB")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  parent    Notebook? @relation("NotebookHierarchy", ...)
+  children  Notebook[] @relation("NotebookHierarchy")
+  notes     Note[]
+}
+
+model NoteRevision {
+  id          String   @id @default(uuid())
+  noteId      String
+  title       String
+  content     String
+  tags        String[] @default([])
+  checklist   Json
+  attachments Json
+  pinned      Boolean  @default(false)
+  archived    Boolean  @default(false)
+  trashed     Boolean  @default(false)
+  dueAt       DateTime?
+  createdAt   DateTime @default(now())
+  note        Note     @relation(...)
 }
 ```
 
@@ -145,17 +203,29 @@ model Note {
 notemaster/
 ├── app/
 │   ├── api/
-│   │   └── notes/          # API routes for CRUD operations
+│   │   ├── health/         # Health check endpoint
+│   │   ├── notes/          # Note CRUD operations & revisions
+│   │   └── notebooks/      # Notebook CRUD operations
 │   ├── sign-in/            # Clerk sign-in page
 │   ├── sign-up/            # Clerk sign-up page
 │   ├── globals.css         # Global styles with Tailwind
 │   ├── layout.tsx          # Root layout with Clerk provider
-│   └── page.tsx            # Main app component
+│   └── page.tsx            # Main app component (optimized)
 ├── components/
-│   └── ui/                 # Reusable UI components
+│   ├── layout/             # Layout components (Header, Sidebar, etc.)
+│   ├── notes/              # Note-related components
+│   ├── notebooks/          # Notebook components
+│   ├── sidebar/            # Sidebar components
+│   ├── note-app/           # App-specific components & hooks
+│   │   ├── hooks/         # Custom React hooks
+│   │   ├── LoadingSkeleton.tsx
+│   │   └── SaveFilterForm.tsx
+│   └── ui/                 # Reusable UI components (Modal, Button, etc.)
 ├── lib/
 │   ├── encryption.ts       # AES-256-GCM encryption utilities
 │   ├── prisma.ts           # Prisma client singleton
+│   ├── api-client.ts       # API client utilities
+│   ├── validation.ts       # Data validation
 │   └── utils.ts            # Utility functions
 ├── prisma/
 │   ├── migrations/         # Database migrations
@@ -210,14 +280,25 @@ bun run backfill     # Encrypt existing unencrypted data
 ### Tech Stack
 
 - **Runtime:** Bun
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js 16 (App Router)
 - **Language:** TypeScript
 - **Database:** PostgreSQL with Prisma ORM
 - **Authentication:** Clerk
-- **Styling:** Tailwind CSS
+- **Styling:** Tailwind CSS 4
 - **UI Components:** Radix UI primitives
+- **Rich Text Editor:** Tiptap
 - **Encryption:** Node.js crypto module
 - **PWA:** next-pwa
+- **Virtualization:** @tanstack/react-virtual
+- **Notifications:** Sonner
+
+### Code Quality & Performance
+
+- **Optimized components** - Reusable Modal, LoadingSkeleton, and form components
+- **Code splitting** - Dynamic imports for better performance
+- **Memoized callbacks** - Optimized re-renders with React.useCallback
+- **Virtual scrolling** - Efficient rendering of large note lists
+- **Type safety** - Full TypeScript coverage
 
 ## 🚢 Deployment
 
@@ -271,6 +352,26 @@ Ensure your platform supports:
 2. Verify `manifest.json` is accessible
 3. Check browser PWA requirements
 
+## 🎯 Recent Improvements
+
+### Code Optimization (Latest)
+
+- ✅ **Reusable Modal Component** - Extracted common modal pattern for theme picker and save filter dialogs
+- ✅ **Component Extraction** - Separated LoadingSkeleton, SaveFilterForm, and MobileFloatingButton into reusable components
+- ✅ **Performance Optimization** - Memoized callbacks to reduce unnecessary re-renders
+- ✅ **Code Organization** - Improved project structure and component separation
+
+### Features Added
+
+- 📚 **Notebooks** - Hierarchical organization system
+- 📝 **Note Revisions** - View and restore previous versions
+- 📎 **File Attachments** - Attach files to notes
+- ⏰ **Reminders** - Set due dates for notes
+- 🔍 **Smart Filters** - Save and reuse complex search queries
+- 📅 **Calendar View** - Visualize notes by date
+- 🎨 **Custom Themes** - Multiple accent color palettes
+- ⌨️ **Keyboard Shortcuts** - Power user productivity features
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -280,6 +381,14 @@ Contributions are welcome! Please follow these steps:
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Code Style
+
+- Use TypeScript for all new code
+- Follow existing component patterns
+- Extract reusable components when appropriate
+- Add proper TypeScript types
+- Use React hooks and memoization for performance
 
 ## 📝 License
 
