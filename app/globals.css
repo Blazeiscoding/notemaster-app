@@ -46,7 +46,7 @@
 
 :root {
   --radius: 0.75rem;
-  --background: oklch(0.96 0.04 250);
+  --background: var(--accent-background-light, oklch(0.96 0.04 250));
   --foreground: oklch(0.16 0.04 250);
   --card: oklch(0.99 0.01 240);
   --card-foreground: oklch(0.16 0.04 240);
@@ -91,9 +91,19 @@
   --halo: 0 0 60px rgba(103, 132, 255, 0.35);
   --shadow-soft: 0 20px 60px -25px rgba(15, 23, 42, 0.35);
 
-  --canvas-gradient: radial-gradient(circle at 20% 20%, rgba(255, 198, 137, 0.45), transparent 55%),
-    radial-gradient(circle at 80% 0%, rgba(141, 163, 255, 0.55), transparent 55%),
-    linear-gradient(135deg, oklch(0.97 0.02 255), oklch(0.92 0.06 210));
+  --canvas-blob-1: rgba(255, 198, 137, 0.45);
+  --canvas-blob-2: rgba(141, 163, 255, 0.55);
+  --canvas-bg-start: oklch(0.97 0.02 255);
+  --canvas-bg-end: oklch(0.92 0.06 210);
+
+  /* Default gradients for fallback */
+  --default-texture: radial-gradient(circle at 20% 20%, var(--canvas-blob-1), transparent 55%),
+    radial-gradient(circle at 80% 0%, var(--canvas-blob-2), transparent 55%);
+  --default-bg: linear-gradient(135deg, var(--canvas-bg-start), var(--canvas-bg-end));
+
+  /* Use dynamic accent background if available, otherwise default */
+  --canvas-gradient: var(--app-background-texture, var(--default-texture)),
+    var(--app-background-gradient, var(--default-bg));
 
   /* Glassmorphism */
   --glass-bg: rgba(255, 255, 255, 0.65);

@@ -70,8 +70,13 @@ export function useAccent() {
     const accentForeground = pickAccessibleTextColor(appliedAccent.primary);
     const accentRing = hexToRgba(appliedAccent.primary, 0.45);
     const accentSoft = hexToRgba(appliedAccent.primary, 0.12);
+    const accentBgLight = hexToRgba(appliedAccent.primary, 0.03); // 3% opacity for subtle tint
+    
+    console.log("Applying accent:", appliedAccent.name, appliedAccent.background);
 
     root.style.setProperty("--accent-foreground", accentForeground);
+    root.style.setProperty("--accent-background-light", accentBgLight);
+    
     root.style.setProperty("--accent-primary", appliedAccent.primary);
     root.style.setProperty("--accent-secondary", appliedAccent.accent);
     root.style.setProperty("--interactive-accent", appliedAccent.primary);
