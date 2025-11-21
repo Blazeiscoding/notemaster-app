@@ -190,9 +190,9 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   return (
     <aside
       className={cn(
-        "space-y-6 rounded-2xl border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-xl p-5 shadow-[var(--glass-shadow)] transition-all duration-300",
-        "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
-        "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
+        "space-y-6 rounded-2xl border border-white/15 bg-[var(--sidebar)]/95 text-(--sidebar-foreground) backdrop-blur-2xl p-5 shadow-[var(--glass-shadow)] transition-all duration-300",
+        "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-sm overflow-y-auto",
+        "lg:border-[var(--glass-border)] lg:bg-[var(--glass-bg)] lg:text-inherit lg:w-auto lg:max-w-none lg:static lg:z-auto lg:translate-x-0 lg:block",
         show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
@@ -248,7 +248,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         onClear={onClearTags}
       />
 
-      <div className="rounded-xl border border-(--interactive-accent-soft) bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
         <button
           type="button"
           onClick={() => toggleSection("smartFiltersOpen")}
@@ -277,7 +277,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         )}
       </div>
 
-      <div className="rounded-xl border border-(--interactive-accent-soft) bg-muted/30 p-3 transition-colors hover:bg-muted/50">
+      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
         <button
           type="button"
           onClick={() => toggleSection("notebooksOpen")}
