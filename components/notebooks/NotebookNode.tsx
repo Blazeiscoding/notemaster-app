@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { Folder, GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Folder, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,10 @@ export type NotebookNodeProps = {
   dragDataType: string;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  onAddChild: (parentId: string | null, name: string) => Promise<boolean> | boolean;
+  onAddChild: (
+    parentId: string | null,
+    name: string
+  ) => Promise<boolean> | boolean;
   onRename: (id: string, name: string) => Promise<boolean> | boolean;
   onMove: (
     id: string,
@@ -41,7 +44,9 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
   const [renameValue, setRenameValue] = React.useState(node.name);
   const [isAddingChild, setIsAddingChild] = React.useState(false);
   const [childName, setChildName] = React.useState("");
-  const [dragZone, setDragZone] = React.useState<"before" | "inside" | "after" | null>(null);
+  const [dragZone, setDragZone] = React.useState<
+    "before" | "inside" | "after" | null
+  >(null);
 
   React.useEffect(() => {
     setRenameValue(node.name);
@@ -78,7 +83,9 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
     event.dataTransfer.effectAllowed = "move";
   };
 
-  const handleRenameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRenameSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
     const success = await onRename(node.id, renameValue);
     if (success) {
@@ -86,7 +93,9 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
     }
   };
 
-  const handleAddChildSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddChildSubmit = async (
+    event: React.FormEvent<HTMLFormElement>
+  ) => {
     event.preventDefault();
     const trimmed = childName.trim();
     if (!trimmed) return;
@@ -98,16 +107,14 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
   };
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <div
         className={cn(
-          "group rounded-md px-2 py-1 text-sm transition-all duration-200 border border-transparent",
-          isActive 
-            ? "bg-[var(--interactive-accent-soft)] text-[var(--interactive-accent)] font-medium shadow-sm border-[var(--interactive-accent)]/20" 
-            : "hover:bg-[var(--glass-bg)] hover:border-[var(--glass-border)] hover:shadow-[var(--glass-shadow)] text-muted-foreground hover:text-foreground",
-          dragZone === "inside" && "bg-[var(--interactive-accent-soft)]/50 ring-2 ring-[var(--interactive-accent)] ring-inset"
+          "group rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-center text-sm text-muted-foreground transition-all duration-200",
+          isActive && "ring-2 ring-(--interactive-accent)",
+          dragZone === "inside" && "bg-(--interactive-accent-soft)/40"
         )}
-        style={{ marginLeft: depth * 12 }}
+        style={{ marginLeft: depth * 8 }}
         draggable={!isRenaming && !isAddingChild}
         onDragStart={handleDragStart}
         onDragOver={(event) => {
@@ -119,28 +126,21 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
         onDragLeave={() => setDragZone(null)}
         onDrop={handleDrop}
       >
-        <div
-          className={cn(
-            "flex items-center gap-2 rounded-md px-1 py-0.5",
-            dragZone === "before" && "ring-2 ring-(--interactive-accent)",
-            dragZone === "after" && "ring-2 ring-(--interactive-accent)"
-          )}
-        >
-          <GripVertical className="size-3.5 text-muted-foreground opacity-0 transition group-hover:opacity-60" />
-          {isRenaming ? (
-            <form onSubmit={handleRenameSubmit} className="flex flex-1 items-center gap-2">
-              <Input
-                value={renameValue}
-                onChange={(event) => setRenameValue(event.target.value)}
-                autoFocus
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setIsRenaming(false);
-                    setRenameValue(node.name);
-                  }
-                }}
-              />
+        {isRenaming ? (
+          <form onSubmit={handleRenameSubmit} className="flex flex-col gap-2">
+            <Input
+              value={renameValue}
+              onChange={(event) => setRenameValue(event.target.value)}
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setIsRenaming(false);
+                  setRenameValue(node.name);
+                }
+              }}
+            />
+            <div className="flex justify-center gap-2">
               <Button size="sm" type="submit">
                 Save
               </Button>
@@ -155,87 +155,86 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
               >
                 <X className="size-3.5" />
               </Button>
-            </form>
-          ) : (
-            <button
-              type="button"
-              className="flex flex-1 items-center gap-2 text-left"
-              onClick={() => onSelect(node.id)}
-            >
-              <Folder className="size-4 text-muted-foreground" />
-              <span className="truncate">{node.name}</span>
-              {hasChildren && (
-                <span className="text-xs text-muted-foreground">
-                  ({node.children.length})
-                </span>
-              )}
-            </button>
-          )}
-          {!isRenaming && (
-            <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-(--interactive-accent)"
-                onClick={() => {
-                  setIsAddingChild((prev) => !prev);
-                  setChildName("");
-                }}
-                title="Add sub-notebook"
-              >
-                <Plus className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-(--interactive-accent)"
-                onClick={() => setIsRenaming(true)}
-                title="Rename notebook"
-              >
-                <Pencil className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(node.id)}
-                title="Delete notebook"
-              >
-                <Trash2 className="size-3.5" />
-              </Button>
             </div>
-          )}
-        </div>
-        {isAddingChild && (
-          <form
-            onSubmit={handleAddChildSubmit}
-            className="mt-2 flex items-center gap-2 pl-6"
+          </form>
+        ) : (
+          <button
+            type="button"
+            className="flex w-full flex-col items-center gap-2"
+            onClick={() => onSelect(node.id)}
           >
+            <span className="inline-flex items-center gap-1 text-xs uppercase tracking-[0.3em] text-muted-foreground/70">
+              depth {depth}
+            </span>
+            <Folder className="size-5 text-muted-foreground" />
+            <span className="font-medium text-foreground">{node.name}</span>
+            {hasChildren && (
+              <span className="text-[0.7rem] text-muted-foreground">
+                {node.children.length} nested
+              </span>
+            )}
+          </button>
+        )}
+        {!isRenaming && (
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => {
+                setIsAddingChild((prev) => !prev);
+                setChildName("");
+              }}
+              title="Add sub-notebook"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() => setIsRenaming(true)}
+              title="Rename notebook"
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+            <Button
+              variant="destructive"
+              size="icon-sm"
+              onClick={() => onDelete(node.id)}
+              title="Delete notebook"
+            >
+              <Trash2 className="size-3.5" />
+            </Button>
+          </div>
+        )}
+        {isAddingChild && (
+          <form onSubmit={handleAddChildSubmit} className="mt-3 space-y-2">
             <Input
               value={childName}
               onChange={(event) => setChildName(event.target.value)}
               placeholder="Sub-notebook name"
               autoFocus
             />
-            <Button type="submit" size="sm" disabled={!childName.trim()}>
-              Add
-            </Button>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => {
-                setIsAddingChild(false);
-                setChildName("");
-              }}
-            >
-              <X className="size-3.5" />
-            </Button>
+            <div className="flex justify-center gap-2">
+              <Button type="submit" size="sm" disabled={!childName.trim()}>
+                Add
+              </Button>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                onClick={() => {
+                  setIsAddingChild(false);
+                  setChildName("");
+                }}
+              >
+                <X className="size-3.5" />
+              </Button>
+            </div>
           </form>
         )}
       </div>
       {hasChildren && (
-        <div className="space-y-1">
+        <div className="space-y-2">
           {node.children.map((child, childIndex) => (
             <NotebookNode
               key={child.id}

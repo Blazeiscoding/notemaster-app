@@ -23,40 +23,33 @@ export function useReminders(): NotificationState {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const notesRef = useRef<NotePayload[]>([]);
 
-  // Initialize permission state
-  useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      return;
-    }
-    setPermission(Notification.permission);
-  }, []);
+  const requestPermission =
+    useCallback(async (): Promise<NotificationPermission> => {
+      if (typeof window === "undefined" || !("Notification" in window)) {
+        setPermission("denied");
+        return "denied";
+      }
 
-  const requestPermission = useCallback(async (): Promise<NotificationPermission> => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      setPermission("denied");
-      return "denied";
-    }
+      if (Notification.permission === "granted") {
+        setPermission("granted");
+        return "granted";
+      }
 
-    if (Notification.permission === "granted") {
-      setPermission("granted");
-      return "granted";
-    }
+      if (Notification.permission === "denied") {
+        setPermission("denied");
+        return "denied";
+      }
 
-    if (Notification.permission === "denied") {
-      setPermission("denied");
-      return "denied";
-    }
-
-    try {
-      const newPermission = await Notification.requestPermission();
-      setPermission(newPermission);
-      return newPermission;
-    } catch (error) {
-      console.error("Error requesting notification permission:", error);
-      setPermission("denied");
-      return "denied";
-    }
-  }, []);
+      try {
+        const newPermission = await Notification.requestPermission();
+        setPermission(newPermission);
+        return newPermission;
+      } catch (error) {
+        console.error("Error requesting notification permission:", error);
+        setPermission("denied");
+        return "denied";
+      }
+    }, []);
 
   const checkReminders = useCallback((notes: NotePayload[]) => {
     notesRef.current = notes;
@@ -65,7 +58,7 @@ export function useReminders(): NotificationState {
     if (typeof window === "undefined" || !("Notification" in window)) {
       return;
     }
-    
+
     const currentPermission = Notification.permission;
     if (currentPermission !== "granted") {
       return;
@@ -170,4 +163,3 @@ export function useReminders(): NotificationState {
     checkReminders,
   };
 }
-

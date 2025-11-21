@@ -16,7 +16,7 @@ type ServerActions = {
 
 export function useNoteRevisions(
   { notes, setNotes, currentNote, setCurrentNote }: RevisionsState,
-  isAuthenticated: boolean,
+  isAuthenticated: boolean, 
   serverActions: ServerActions
 ) {
   const { fetchRevisionsFromServer } = serverActions;
