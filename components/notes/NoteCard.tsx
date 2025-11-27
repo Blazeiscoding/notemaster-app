@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo } from "react";
+import Image from "next/image";
 import {
   Archive,
   ArchiveRestore,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { NotePayload } from "@/types/note";
+import { useSwipe } from "./hooks/useSwipe";
 
 type SectionKey = "notes" | "archive" | "bin";
 
@@ -57,25 +59,60 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     const isArchiveSection = activeSection === "archive";
     const isBinSection = activeSection === "bin";
 
-    const [translateX, setTranslateX] = useState(0);
-    const [isDragging, setIsDragging] = useState(false);
-    const [swipeDirection, setSwipeDirection] = useState<
-      "left" | "right" | null
-    >(null);
+    const handleSwipeLeft = useCallback(() => {
+      if (isNotesSection) {
+        onArchive(note.id);
+      } else if (isArchiveSection) {
+        onTrash(note.id);
+      } else {
+        onDeleteForever(note.id);
+      }
+    }, [
+      isNotesSection,
+      isArchiveSection,
+      note.id,
+      onArchive,
+      onTrash,
+      onDeleteForever,
+    ]);
 
-    const startXRef = useRef(0);
-    const startYRef = useRef(0);
-    const pointerIdRef = useRef<number | null>(null);
-    const swipeActiveRef = useRef(false);
-    const didSwipeRef = useRef(false);
+    const handleSwipeRight = useCallback(() => {
+      if (isNotesSection) {
+        onPin(note.id);
+      } else if (isArchiveSection) {
+        onUnarchive(note.id);
+      } else {
+        onRestoreFromBin(note.id);
+      }
+    }, [
+      isNotesSection,
+      isArchiveSection,
+      note.id,
+      onPin,
+      onUnarchive,
+      onRestoreFromBin,
+    ]);
 
-    const resetGesture = useCallback(() => {
-      setIsDragging(false);
-      setSwipeDirection(null);
-      swipeActiveRef.current = false;
-      pointerIdRef.current = null;
-      setTranslateX(0);
-    }, []);
+    const {
+      translateX,
+      isDragging,
+      handlers,
+      didSwipeRef,
+    } = useSwipe({
+      onSwipeLeft: handleSwipeLeft,
+      onSwipeRight: handleSwipeRight,
+    });
+
+    const handleCardClick = useCallback(() => {
+      if (!isNotesSection) return;
+
+      if (didSwipeRef.current) {
+        didSwipeRef.current = false;
+        return;
+      }
+
+      onOpen(note);
+    }, [isNotesSection, note, onOpen, didSwipeRef]);
 
     const swipeActions = useMemo(() => {
       if (isNotesSection) {
@@ -122,126 +159,16 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
       } as const;
     }, [isNotesSection, isArchiveSection, note.pinned]);
 
-    const handleSwipeAction = useCallback(
-      (direction: "left" | "right") => {
-        if (direction === "right") {
-          if (isNotesSection) {
-            onPin(note.id);
-          } else if (isArchiveSection) {
-            onUnarchive(note.id);
-          } else {
-            onRestoreFromBin(note.id);
-          }
-        } else {
-          if (isNotesSection) {
-            onArchive(note.id);
-          } else if (isArchiveSection) {
-            onTrash(note.id);
-          } else {
-            onDeleteForever(note.id);
-          }
-        }
-      },
-      [
-        isArchiveSection,
-        isNotesSection,
-        note.id,
-        onArchive,
-        onDeleteForever,
-        onPin,
-        onRestoreFromBin,
-        onTrash,
-        onUnarchive,
-      ]
-    );
-
-    const handlePointerDown = useCallback(
-      (event: React.PointerEvent<HTMLDivElement>) => {
-        if (event.pointerType === "mouse") {
-          return;
-        }
-
-        startXRef.current = event.clientX;
-        startYRef.current = event.clientY;
-        pointerIdRef.current = event.pointerId;
-        swipeActiveRef.current = false;
-        didSwipeRef.current = false;
-        setTranslateX(0);
-        setIsDragging(true);
-        setSwipeDirection(null);
-      },
-      []
-    );
-
-    const handlePointerMove = useCallback(
-      (event: React.PointerEvent<HTMLDivElement>) => {
-        if (!isDragging || pointerIdRef.current !== event.pointerId) {
-          return;
-        }
-
-        const deltaX = event.clientX - startXRef.current;
-        const deltaY = event.clientY - startYRef.current;
-
-        if (!swipeActiveRef.current) {
-          const absX = Math.abs(deltaX);
-          const absY = Math.abs(deltaY);
-
-          if (absY > absX && absY > 10) {
-            resetGesture();
-            return;
-          }
-
-          if (absX > 10 && absX > absY) {
-            swipeActiveRef.current = true;
-          } else {
-            return;
-          }
-        }
-
-        event.preventDefault();
-        const clamped = Math.max(Math.min(deltaX, 140), -140);
-        setTranslateX(clamped);
-        setSwipeDirection(clamped > 0 ? "right" : clamped < 0 ? "left" : null);
-      },
-      [isDragging, resetGesture]
-    );
-
-    const handlePointerEnd = useCallback(() => {
-      if (!isDragging) return;
-
-      const finalDirection = swipeDirection;
-      const finalTranslate = translateX;
-      const wasActive = swipeActiveRef.current;
-
-      resetGesture();
-
-      if (wasActive && finalDirection && Math.abs(finalTranslate) > 80) {
-        didSwipeRef.current = true;
-        handleSwipeAction(finalDirection);
-      } else {
-        didSwipeRef.current = false;
-      }
-    }, [
-      handleSwipeAction,
-      isDragging,
-      resetGesture,
-      swipeDirection,
-      translateX,
-    ]);
-
-    const handleCardClick = useCallback(() => {
-      if (!isNotesSection) return;
-
-      if (didSwipeRef.current) {
-        didSwipeRef.current = false;
-        return;
-      }
-
-      onOpen(note);
-    }, [isNotesSection, note, onOpen]);
-
     const LeftIcon = swipeActions.left.Icon;
     const RightIcon = swipeActions.right.Icon;
+
+    const formattedDate = useMemo(() => {
+      return new Date(note.updatedAt).toLocaleDateString();
+    }, [note.updatedAt]);
+
+    const strippedContent = useMemo(() => {
+      return note.content?.replace(/<[^>]*>/g, "") || "No content yet";
+    }, [note.content]);
 
 
     const firstImage = useMemo(() => {
@@ -286,10 +213,10 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
               ? "none"
               : "transform 200ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 200ms ease, border-color 200ms ease",
           }}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerEnd}
-          onPointerCancel={handlePointerEnd}
+          onPointerDown={handlers.onPointerDown}
+          onPointerMove={handlers.onPointerMove}
+          onPointerUp={handlers.onPointerUp}
+          onPointerCancel={handlers.onPointerCancel}
           onClick={isNotesSection ? handleCardClick : undefined}
         >
 
@@ -453,21 +380,21 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
             </div>
             <CardDescription className="flex items-center gap-2 text-xs">
               <Clock className="size-3" />
-              {new Date(note.updatedAt).toLocaleDateString()}
+              {formattedDate}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             <p className="line-clamp-3 text-sm text-muted-foreground leading-relaxed">
-              {note.content || "No content yet"}
+              {strippedContent}
             </p>
             {firstImage && (
               <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-md bg-muted/30 border border-border/40">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={firstImage.data}
                   alt={firstImage.name}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                  loading="lazy"
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
               </div>
             )}

@@ -1,30 +1,19 @@
 import { useRef, useCallback, type ChangeEvent } from "react";
 import type { NotePayload, Attachment } from "@/types/note";
 import { generateId, toBase64, parseInputToIso } from "@/components/note-app/util";
+import { useAttachmentUpload } from "./useAttachmentUpload";
 
 type CurrentNoteState = {
   currentNote: NotePayload | null;
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
 
-interface ImageKitUploadResult {
-  fileId: string;
-  name: string;
-  url: string;
-  thumbnailUrl: string;
-  height: number;
-  width: number;
-  size: number;
-  filePath: string;
-  tags?: string[];
-  isPrivateFile?: boolean;
-  customCoordinates?: string | null;
-  metadata?: unknown;
-  fileType: string;
-}
+
 
 export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const { uploadFiles, isUploading } = useAttachmentUpload();
 
   const triggerAttachmentPicker = useCallback(() => {
     fileInputRef.current?.click();
@@ -36,66 +25,24 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
       if (!files || !currentNote) return;
 
       try {
-        const ImageKit = (await import("imagekit-javascript")).default;
-        const imagekit = new ImageKit({
-          publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
-          urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
-        });
+        const newAttachments = await uploadFiles(files);
 
-        const attachments: Attachment[] = [];
-        for (const file of Array.from(files)) {
-          // Only process images
-          if (!file.type.startsWith("image/")) continue;
-
-          // Manually fetch authentication parameters
-          const authResponse = await fetch("/api/auth/imagekit");
-          if (!authResponse.ok) {
-            throw new Error("Failed to fetch authentication parameters");
-          }
-          const authData = await authResponse.json();
-          const { token, signature, expire } = authData;
-
-          const uploadResult = await new Promise<ImageKitUploadResult>((resolve, reject) => {
-            imagekit.upload(
-              {
-                file,
-                fileName: file.name,
-                tags: ["note-attachment"],
-                token,
-                signature,
-                expire,
-              },
-              (err: Error | null, result: ImageKitUploadResult | null) => {
-                if (err) reject(err);
-                else if (result) resolve(result);
-                else reject(new Error("Upload failed"));
-              }
-            );
-          });
-
-          attachments.push({
-            id: generateId(),
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            data: uploadResult.url, // Store the URL instead of base64
-          });
-        }
-
-        if (attachments.length > 0) {
+        if (newAttachments.length > 0) {
           setCurrentNote({
             ...currentNote,
-            attachments: [...currentNote.attachments, ...attachments],
+            attachments: [...currentNote.attachments, ...newAttachments],
           });
         }
       } catch (error) {
-        console.error("Failed to upload files to ImageKit", error);
+        console.error("Failed to upload files", error);
         // Optionally show a toast error here
       } finally {
-        event.target.value = "";
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     },
-    [currentNote, setCurrentNote]
+    [currentNote, setCurrentNote, uploadFiles]
   );
 
   const handleRemoveAttachment = useCallback(
@@ -271,6 +218,7 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
     deleteChecklistItem,
     addTag,
     removeTag,
+    isUploading,
   };
 }
 
