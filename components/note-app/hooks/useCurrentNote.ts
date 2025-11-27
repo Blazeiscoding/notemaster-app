@@ -7,6 +7,22 @@ type CurrentNoteState = {
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
 
+interface ImageKitUploadResult {
+  fileId: string;
+  name: string;
+  url: string;
+  thumbnailUrl: string;
+  height: number;
+  width: number;
+  size: number;
+  filePath: string;
+  tags?: string[];
+  isPrivateFile?: boolean;
+  customCoordinates?: string | null;
+  metadata?: unknown;
+  fileType: string;
+}
+
 export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -20,24 +36,61 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
       if (!files || !currentNote) return;
 
       try {
+        const ImageKit = (await import("imagekit-javascript")).default;
+        const imagekit = new ImageKit({
+          publicKey: process.env.NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY!,
+          urlEndpoint: process.env.NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT!,
+        });
+
         const attachments: Attachment[] = [];
         for (const file of Array.from(files)) {
-          const data = await toBase64(file);
+          // Only process images
+          if (!file.type.startsWith("image/")) continue;
+
+          // Manually fetch authentication parameters
+          const authResponse = await fetch("/api/auth/imagekit");
+          if (!authResponse.ok) {
+            throw new Error("Failed to fetch authentication parameters");
+          }
+          const authData = await authResponse.json();
+          const { token, signature, expire } = authData;
+
+          const uploadResult = await new Promise<ImageKitUploadResult>((resolve, reject) => {
+            imagekit.upload(
+              {
+                file,
+                fileName: file.name,
+                tags: ["note-attachment"],
+                token,
+                signature,
+                expire,
+              },
+              (err: Error | null, result: ImageKitUploadResult | null) => {
+                if (err) reject(err);
+                else if (result) resolve(result);
+                else reject(new Error("Upload failed"));
+              }
+            );
+          });
+
           attachments.push({
             id: generateId(),
             name: file.name,
             type: file.type,
             size: file.size,
-            data,
+            data: uploadResult.url, // Store the URL instead of base64
           });
         }
 
-        setCurrentNote({
-          ...currentNote,
-          attachments: [...currentNote.attachments, ...attachments],
-        });
+        if (attachments.length > 0) {
+          setCurrentNote({
+            ...currentNote,
+            attachments: [...currentNote.attachments, ...attachments],
+          });
+        }
       } catch (error) {
-        console.error("Failed to attach files", error);
+        console.error("Failed to upload files to ImageKit", error);
+        // Optionally show a toast error here
       } finally {
         event.target.value = "";
       }
