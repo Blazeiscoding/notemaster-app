@@ -244,6 +244,10 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     const RightIcon = swipeActions.right.Icon;
 
 
+    const firstImage = useMemo(() => {
+      return note.attachments.find((att) => att.type.startsWith("image/"));
+    }, [note.attachments]);
+
     return (
       <div className="relative">
         <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-4">
@@ -271,7 +275,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
 
         <Card
           className={cn(
-            "group relative border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2",
+            "group relative border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 overflow-hidden",
             isNotesSection &&
               "hover:-translate-y-1 hover:shadow-[var(--glass-shadow)] hover:border-primary/30 cursor-pointer",
             isDragging && "cursor-grabbing scale-[0.98]"
@@ -288,6 +292,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
           onPointerCancel={handlePointerEnd}
           onClick={isNotesSection ? handleCardClick : undefined}
         >
+
           <CardHeader className="space-y-3 pb-3">
             {note.pinned && (
               <div className="flex flex-wrap gap-2">
@@ -455,6 +460,17 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
             <p className="line-clamp-3 text-sm text-muted-foreground leading-relaxed">
               {note.content || "No content yet"}
             </p>
+            {firstImage && (
+              <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-md bg-muted/30 border border-border/40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={firstImage.data}
+                  alt={firstImage.name}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  loading="lazy"
+                />
+              </div>
+            )}
             {note.checklist.length > 0 && (
               <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs font-medium border border-border/50">
                 <span className="text-foreground">
