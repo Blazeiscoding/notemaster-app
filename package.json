@@ -27,6 +27,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "diff": "^8.0.2",
+    "idb": "^8.0.3",
     "imagekit": "^6.0.0",
     "imagekit-javascript": "^4.0.1",
     "jspdf": "^3.0.3",

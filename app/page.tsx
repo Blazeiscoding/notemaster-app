@@ -12,10 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { LoadingSkeleton } from "@/components/note-app/LoadingSkeleton";
 import { SaveFilterForm } from "@/components/note-app/SaveFilterForm";
+import { OfflineIndicator } from "@/components/ui/OfflineIndicator";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
 import type { AccentPalette } from "@/types/note";
+
 
 // Dynamic imports for code splitting - only load when needed
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
@@ -273,6 +275,7 @@ const NoteApp = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
+      <OfflineIndicator />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
         <AppHeader
           userFirstName={userFirstName}
