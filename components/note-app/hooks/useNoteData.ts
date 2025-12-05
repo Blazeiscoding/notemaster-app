@@ -54,7 +54,6 @@ export function useNoteData(
         // Guest users: load from IndexedDB (with localStorage migration)
         if (useIndexedDB) {
           // First, try to migrate from localStorage if not done yet
-          const userId = "guest";
           const migrated = await migrateFromLocalStorage(storageKey);
           
           if (migrated.notes.length > 0 || migrated.notebooks.length > 0) {
@@ -64,8 +63,8 @@ export function useNoteData(
           } else {
             // Load from IndexedDB
             const [dbNotes, dbNotebooks] = await Promise.all([
-              getAllNotes(userId),
-              getAllNotebooks(userId),
+              getAllNotes(),
+              getAllNotebooks(),
             ]);
             setNotes(dbNotes);
             setNotebooks(dbNotebooks);

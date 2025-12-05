@@ -110,9 +110,10 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
 // Notes Operations
 // =====================
 
-export async function getAllNotes(userId: string): Promise<NotePayload[]> {
+export async function getAllNotes(): Promise<NotePayload[]> {
   const db = await getDB();
-  const allNotes = await db.getAllFromIndex("notes", "by-userId", userId);
+  // Get all notes (for guest users, notes don't have userId field)
+  const allNotes = await db.getAll("notes");
   return allNotes;
 }
 
@@ -165,11 +166,10 @@ export async function clearAllNotes(userId: string): Promise<void> {
 // Notebooks Operations
 // =====================
 
-export async function getAllNotebooks(
-  userId: string
-): Promise<NotebookPayload[]> {
+export async function getAllNotebooks(): Promise<NotebookPayload[]> {
   const db = await getDB();
-  return db.getAllFromIndex("notebooks", "by-userId", userId);
+  // Get all notebooks (for guest users, notebooks don't have userId field)
+  return db.getAll("notebooks");
 }
 
 export async function saveNotebook(notebook: NotebookPayload): Promise<void> {

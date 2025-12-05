@@ -100,6 +100,10 @@ const nextConfig: NextConfig = {
         hostname: "ik.imagekit.io",
       },
     ],
+    // Skip Next.js optimization for ImageKit (they have their own CDN optimization)
+    unoptimized: process.env.NODE_ENV === "development",
+    // Increase timeout for slow connections
+    minimumCacheTTL: 60,
   },
   
   // Experimental features for better performance
