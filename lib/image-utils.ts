@@ -44,7 +44,7 @@ export async function compressImage(
     return file;
   }
 
-  // Skip GIFs (to preserve animation)
+  // Skip GIFs (to preserve animation from upload)
   if (file.type === "image/gif") {
     return file;
   }
