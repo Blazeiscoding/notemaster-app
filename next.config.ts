@@ -15,6 +15,33 @@ const nextConfig: NextConfig = {
   // so Next doesn't error out.
   // Turbopack is used in dev; next-pwa augments webpack only for prod builds.
   turbopack: {},
+  
+  // Build optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production" ? {
+      exclude: ["error", "warn"],
+    } : false,
+  },
+  
+  // Optimize images
+  images: {
+    formats: ["image/avif", "image/webp"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "ik.imagekit.io",
+      },
+    ],
+  },
+  
+  // Experimental features for better performance
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-slot",
+    ],
+  },
 };
 
 export default withPWAFn(nextConfig);

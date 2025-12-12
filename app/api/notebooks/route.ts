@@ -1,70 +1,78 @@
-import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
 import { prisma } from "@/lib/prisma"
 import { serializeNotebook } from "./utils"
+import { validateNotebookPayload } from "@/lib/validation"
+import {
+  withAuth,
+  withAuthAndJson,
+  successResponse,
+  errorResponse,
+} from "@/lib/api-middleware"
 
-export async function GET() {
-  const { userId } = await auth()
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const notebooks = await prisma.notebook.findMany({
-    where: { userId },
-    orderBy: [{ parentId: "asc" }, { name: "asc" }],
-  })
-
-  return NextResponse.json(notebooks.map(serializeNotebook))
-}
-
-export async function POST(request: Request) {
-  const { userId } = await auth()
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  let payload: {
-    name?: string
-    color?: string
-    parentId?: string | null
-  }
-
-  try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
-  }
-
-  const name = typeof payload.name === "string" && payload.name.trim()
-  if (!name) {
-    return NextResponse.json({ error: "Name is required" }, { status: 400 })
-  }
-
-  let parentId: string | null = null
-
-  if (typeof payload.parentId === "string" && payload.parentId.trim()) {
-    const parent = await prisma.notebook.findUnique({
-      where: { id: payload.parentId },
-      select: { id: true, userId: true },
+export const GET = withAuth(
+  async ({ userId, rateLimitHeaders, requestId }) => {
+    const notebooks = await prisma.notebook.findMany({
+      where: { userId },
+      orderBy: [{ parentId: "asc" }, { name: "asc" }],
     })
 
-    if (!parent || parent.userId !== userId) {
-      return NextResponse.json({ error: "Parent notebook not found" }, { status: 400 })
+    return successResponse(
+      notebooks.map(serializeNotebook),
+      200,
+      rateLimitHeaders,
+      requestId
+    )
+  },
+  { rateLimitSuffix: "notebooks-get" }
+)
+
+export const POST = withAuthAndJson(
+  async ({ userId, body, rateLimitHeaders, requestId, logger }) => {
+    // Input validation
+    let validatedPayload
+    try {
+      validatedPayload = validateNotebookPayload(body)
+    } catch (error) {
+      logger.warn("Notebook creation failed: validation error", { error: error instanceof Error ? error.message : "Invalid input" });
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid input",
+        400,
+        rateLimitHeaders,
+        requestId
+      )
     }
 
-    parentId = parent.id
-  }
+    let parentId: string | null = validatedPayload.parentId ?? null
 
-  const created = await prisma.notebook.create({
-    data: {
-      name,
-      userId,
-      parentId,
-      color: typeof payload.color === "string" && payload.color.trim() ? payload.color : undefined,
-    },
-  })
+    if (parentId) {
+      const parent = await prisma.notebook.findUnique({
+        where: { id: parentId },
+        select: { id: true, userId: true },
+      })
 
-  return NextResponse.json(serializeNotebook(created), { status: 201 })
-}
+      if (!parent || parent.userId !== userId) {
+        logger.warn("Notebook creation failed: parent not found", { parentId });
+        return errorResponse(
+          "Parent notebook not found",
+          404,
+          rateLimitHeaders,
+          requestId
+        )
+      }
+
+      parentId = parent.id
+    }
+
+    const created = await prisma.notebook.create({
+      data: {
+        name: validatedPayload.name,
+        userId,
+        parentId,
+        color: validatedPayload.color,
+      },
+    })
+
+    logger.info("Notebook created", { notebookId: created.id });
+    return successResponse(serializeNotebook(created), 201, rateLimitHeaders, requestId)
+  },
+  { rateLimitSuffix: "notebooks-post" }
+)

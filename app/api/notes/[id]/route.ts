@@ -1,144 +1,151 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
-import { Prisma } from "@prisma/client"
-import { prisma } from "@/lib/prisma"
-import { serializeNote } from "../utils"
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { serializeNote } from "../utils";
 import {
   encryptAttachments,
   encryptChecklist,
   encryptString,
   encryptStringArray,
-} from "@/lib/encryption"
-import type { NotePayload } from "@/types/note"
+} from "@/lib/encryption";
+import type { NotePayload } from "@/types/note";
+import {
+  withAuthJsonAndParams,
+  withAuthAndParams,
+  successResponse,
+  errorResponse,
+} from "@/lib/api-middleware";
 
-type ParamsPromise = Promise<{ id: string }>
+type ParamsPromise = Promise<{ id: string }>;
 
-export async function PATCH(request: NextRequest, { params }: { params: ParamsPromise }) {
-  const { id } = await params
-  const { userId } = await auth()
+export const PATCH = withAuthJsonAndParams<ParamsPromise>(
+  async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.note.findUnique({ where: { id } });
 
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const existing = await prisma.note.findUnique({ where: { id } })
-
-  if (!existing || existing.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
-
-  let payload: Partial<NotePayload>
-
-  try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
-  }
-
-  const data: Prisma.NoteUpdateInput = {}
-
-  if (typeof payload.notebookId === "string") {
-    if (payload.notebookId === "") {
-      data.notebook = { disconnect: true }
-    } else {
-      const notebook = await prisma.notebook.findUnique({
-        where: { id: payload.notebookId },
-        select: { id: true, userId: true },
-      })
-
-      if (!notebook || notebook.userId !== userId) {
-        return NextResponse.json({ error: "Notebook not found" }, { status: 400 })
-      }
-
-      data.notebook = { connect: { id: notebook.id } }
+    if (!existing || existing.userId !== userId) {
+      logger.warn("Note update failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
     }
-  }
 
-  if (typeof payload.title === "string") {
-    data.title = encryptString(payload.title)
-  }
+    const payload = body as Partial<NotePayload>;
+    const data: Prisma.NoteUpdateInput = {};
 
-  if (typeof payload.content === "string") {
-    data.content = encryptString(payload.content)
-  }
+    if (typeof payload.notebookId === "string") {
+      if (payload.notebookId === "") {
+        data.notebook = { disconnect: true };
+      } else {
+        const notebook = await prisma.notebook.findUnique({
+          where: { id: payload.notebookId },
+          select: { id: true, userId: true },
+        });
 
-  if (Array.isArray(payload.tags)) {
-    data.tags = encryptStringArray(payload.tags)
-  }
+        if (!notebook || notebook.userId !== userId) {
+          logger.warn("Note update failed: notebook not found", { notebookId: payload.notebookId });
+          return errorResponse("Notebook not found", 404, rateLimitHeaders, requestId);
+        }
 
-  if (Array.isArray(payload.checklist)) {
-    data.checklist = encryptChecklist(payload.checklist) as Prisma.InputJsonValue
-  }
+        data.notebook = { connect: { id: notebook.id } };
+      }
+    }
 
-  if (Array.isArray(payload.attachments)) {
-    data.attachments = encryptAttachments(payload.attachments) as Prisma.InputJsonValue
-  }
+    if (typeof payload.title === "string") {
+      data.title = encryptString(payload.title);
+    }
 
-  if (typeof payload.type === "string") {
-    data.type = payload.type
-  }
+    if (typeof payload.content === "string") {
+      data.content = encryptString(payload.content);
+    }
 
-  if (typeof payload.pinned === "boolean") {
-    data.pinned = payload.pinned
-  }
+    if (Array.isArray(payload.tags)) {
+      data.tags = encryptStringArray(payload.tags);
+    }
 
-  if (typeof payload.archived === "boolean") {
-    data.archived = payload.archived
-  }
+    if (Array.isArray(payload.checklist)) {
+      data.checklist = encryptChecklist(
+        payload.checklist
+      ) as Prisma.InputJsonValue;
+    }
 
-  if (typeof payload.trashed === "boolean") {
-    data.trashed = payload.trashed
-  }
+    if (Array.isArray(payload.attachments)) {
+      data.attachments = encryptAttachments(
+        payload.attachments
+      ) as Prisma.InputJsonValue;
+    }
 
-  if (typeof payload.dueAt === "string") {
-    data.dueAt = payload.dueAt ? new Date(payload.dueAt) : null
-  }
+    if (typeof payload.type === "string") {
+      data.type = payload.type;
+    }
 
-  if (Object.keys(data).length === 0) {
-    return NextResponse.json(serializeNote(existing))
-  }
+    if (typeof payload.pinned === "boolean") {
+      data.pinned = payload.pinned;
+    }
 
-  const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
-    noteId: existing.id,
-    notebookId: existing.notebookId,
-    title: existing.title,
-    content: existing.content,
-    tags: existing.tags,
-    checklist: existing.checklist as Prisma.InputJsonValue,
-    attachments: existing.attachments as Prisma.InputJsonValue,
-    pinned: existing.pinned,
-    archived: existing.archived,
-    trashed: existing.trashed,
-    dueAt: existing.dueAt ?? undefined,
-  }
+    if (typeof payload.archived === "boolean") {
+      data.archived = payload.archived;
+    }
 
-  await prisma.noteRevision.create({
-    data: revisionData,
-  })
+    if (typeof payload.trashed === "boolean") {
+      data.trashed = payload.trashed;
+    }
 
-  const updated = await prisma.note.update({
-    where: { id },
-    data,
-  })
+    if (typeof payload.dueAt === "string") {
+      data.dueAt = payload.dueAt ? new Date(payload.dueAt) : null;
+    }
 
-  return NextResponse.json(serializeNote(updated))
-}
+    if (Object.keys(data).length === 0) {
+      return successResponse(serializeNote(existing), 200, rateLimitHeaders, requestId);
+    }
 
-export async function DELETE(_request: NextRequest, { params }: { params: ParamsPromise }) {
-  const { id } = await params
-  const { userId } = await auth()
+    // Create revision before updating - wrapped in transaction for atomicity
+    const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
+      noteId: existing.id,
+      notebookId: existing.notebookId,
+      title: existing.title,
+      content: existing.content,
+      tags: existing.tags,
+      checklist: existing.checklist as Prisma.InputJsonValue,
+      attachments: existing.attachments as Prisma.InputJsonValue,
+      pinned: existing.pinned,
+      archived: existing.archived,
+      trashed: existing.trashed,
+      dueAt: existing.dueAt ?? undefined,
+    };
 
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+    // Use transaction to ensure atomicity: if note update fails, revision creation is rolled back
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        await tx.noteRevision.create({
+          data: revisionData,
+        });
 
-  const existing = await prisma.note.findUnique({ where: { id } })
+        return await tx.note.update({
+          where: { id },
+          data,
+        });
+      });
 
-  if (!existing || existing.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
+      logger.info("Note updated", { noteId: id });
+      return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId);
+    } catch (error) {
+      logger.error("Note update failed: transaction error", error, { noteId: id });
+      throw error;
+    }
+  },
+  { rateLimitSuffix: "notes-patch" }
+);
 
-  await prisma.note.delete({ where: { id } })
+export const DELETE = withAuthAndParams<ParamsPromise>(
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.note.findUnique({ where: { id } });
 
-  return NextResponse.json({ success: true })
-}
+    if (!existing || existing.userId !== userId) {
+      logger.warn("Note deletion failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
+    }
+
+    await prisma.note.delete({ where: { id } });
+
+    logger.info("Note deleted", { noteId: id });
+    return successResponse({ deleted: true }, 200, rateLimitHeaders, requestId);
+  },
+  { rateLimitSuffix: "notes-delete" }
+);

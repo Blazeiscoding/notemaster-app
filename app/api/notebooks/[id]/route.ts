@@ -1,107 +1,200 @@
-import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
-import { prisma } from "@/lib/prisma"
-import { serializeNotebook } from "../utils"
+import { prisma } from "@/lib/prisma";
+import { serializeNotebook } from "../utils";
+import {
+  sanitizeString,
+  sanitizeColor,
+  sanitizeOptionalId,
+} from "@/lib/validation";
+import {
+  withAuthJsonAndParams,
+  withAuthAndParams,
+  successResponse,
+  errorResponse,
+} from "@/lib/api-middleware";
 
-interface Params {
-  id: string
-}
+type ParamsPromise = Promise<{ id: string }>;
 
-type ParamsPromise = Promise<Params>
+export const PATCH = withAuthJsonAndParams<ParamsPromise>(
+  async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } });
 
-export async function PATCH(request: Request, { params }: { params: ParamsPromise }) {
-  const { userId } = await auth()
-  const { id } = await params
-
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-
-  const existing = await prisma.notebook.findUnique({ where: { id } })
-
-  if (!existing || existing.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
-
-  let payload: { name?: string; color?: string; parentId?: string | null }
-
-  try {
-    payload = await request.json()
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
-  }
-
-  const updates: {
-    name?: string
-    color?: string
-    parent?: { connect: { id: string } } | { disconnect: true }
-  } = {}
-
-  if (typeof payload.name === "string" && payload.name.trim()) {
-    updates.name = payload.name.trim()
-  }
-
-  if (typeof payload.color === "string" && payload.color.trim()) {
-    updates.color = payload.color.trim()
-  }
-
-  if (Object.prototype.hasOwnProperty.call(payload, "parentId")) {
-    if (!payload.parentId) {
-      updates.parent = { disconnect: true }
-    } else {
-      if (payload.parentId === id) {
-        return NextResponse.json({ error: "Notebook cannot reference itself" }, { status: 400 })
-      }
-
-      const parent = await prisma.notebook.findUnique({
-        where: { id: payload.parentId },
-        select: { id: true, userId: true },
-      })
-
-      if (!parent || parent.userId !== userId) {
-        return NextResponse.json({ error: "Parent notebook not found" }, { status: 400 })
-      }
-
-      updates.parent = { connect: { id: parent.id } }
+    if (!existing || existing.userId !== userId) {
+      logger.warn("Notebook update failed: notebook not found", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Notebook not found",
+        404,
+        rateLimitHeaders,
+        requestId
+      );
     }
-  }
 
-  if (Object.keys(updates).length === 0) {
-    return NextResponse.json(serializeNotebook(existing))
-  }
+    if (typeof body !== "object" || body === null) {
+      logger.warn("Notebook update failed: invalid payload", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Invalid payload format",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
 
-  const updated = await prisma.notebook.update({
-    where: { id },
-    data: {
-      name: updates.name,
-      color: updates.color,
-      parent: updates.parent,
-    },
-  })
+    const p = body as Record<string, unknown>;
 
-  return NextResponse.json(serializeNotebook(updated))
-}
+    const updates: {
+      name?: string;
+      color?: string;
+      parent?: { connect: { id: string } } | { disconnect: true };
+    } = {};
 
-export async function DELETE(_request: Request, { params }: { params: ParamsPromise }) {
-  const { userId } = await auth()
-  const { id } = await params
+    if (p.name !== undefined) {
+      try {
+        updates.name = sanitizeString(p.name, 200);
+      } catch (error) {
+        logger.warn("Notebook update failed: invalid name", { notebookId: id });
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid name",
+          400,
+          rateLimitHeaders,
+          requestId
+        );
+      }
+    }
 
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+    if (p.color !== undefined) {
+      try {
+        updates.color = sanitizeColor(p.color);
+      } catch (error) {
+        logger.warn("Notebook update failed: invalid color", {
+          notebookId: id,
+        });
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid color",
+          400,
+          rateLimitHeaders,
+          requestId
+        );
+      }
+    }
 
-  const existing = await prisma.notebook.findUnique({ where: { id } })
+    if (Object.prototype.hasOwnProperty.call(body, "parentId")) {
+      try {
+        const parentId = sanitizeOptionalId(p.parentId);
 
-  if (!existing || existing.userId !== userId) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 })
-  }
+        if (!parentId) {
+          updates.parent = { disconnect: true };
+        } else {
+          if (parentId === id) {
+            logger.warn("Notebook update failed: self-reference", {
+              notebookId: id,
+            });
+            return errorResponse(
+              "Notebook cannot reference itself",
+              400,
+              rateLimitHeaders,
+              requestId
+            );
+          }
 
-  const reassigned = await prisma.note.updateMany({
-    where: { notebookId: existing.id },
-    data: { notebookId: null },
-  })
+          const parent = await prisma.notebook.findUnique({
+            where: { id: parentId },
+            select: { id: true, userId: true },
+          });
 
-  await prisma.notebook.delete({ where: { id } })
+          if (!parent || parent.userId !== userId) {
+            logger.warn("Notebook update failed: parent not found", {
+              notebookId: id,
+              parentId,
+            });
+            return errorResponse(
+              "Parent notebook not found",
+              404,
+              rateLimitHeaders,
+              requestId
+            );
+          }
 
-  return NextResponse.json({ success: true, releasedNotes: reassigned.count })
-}
+          updates.parent = { connect: { id: parent.id } };
+        }
+      } catch (error) {
+        logger.warn("Notebook update failed: invalid parent ID", {
+          notebookId: id,
+          error: error instanceof Error ? error.message : "Invalid parent ID",
+        });
+        return errorResponse(
+          error instanceof Error ? error.message : "Invalid parent ID",
+          400,
+          rateLimitHeaders,
+          requestId
+        );
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return successResponse(
+        serializeNotebook(existing),
+        200,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
+    const updated = await prisma.notebook.update({
+      where: { id },
+      data: {
+        name: updates.name,
+        color: updates.color,
+        parent: updates.parent,
+      },
+    });
+
+    logger.info("Notebook updated", { notebookId: id });
+    return successResponse(
+      serializeNotebook(updated),
+      200,
+      rateLimitHeaders,
+      requestId
+    );
+  },
+  { rateLimitSuffix: "notebooks-patch" }
+);
+
+export const DELETE = withAuthAndParams<ParamsPromise>(
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    const existing = await prisma.notebook.findUnique({ where: { id } });
+
+    if (!existing || existing.userId !== userId) {
+      logger.warn("Notebook deletion failed: notebook not found", {
+        notebookId: id,
+      });
+      return errorResponse(
+        "Notebook not found",
+        404,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
+    const reassigned = await prisma.note.updateMany({
+      where: { notebookId: existing.id },
+      data: { notebookId: null },
+    });
+
+    await prisma.notebook.delete({ where: { id } });
+
+    logger.info("Notebook deleted", {
+      notebookId: id,
+      releasedNotes: reassigned.count,
+    });
+    return successResponse(
+      { deleted: true, releasedNotes: reassigned.count },
+      200,
+      rateLimitHeaders,
+      requestId
+    );
+  },
+  { rateLimitSuffix: "notebooks-delete" }
+);

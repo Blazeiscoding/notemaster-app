@@ -2,8 +2,14 @@
 
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Download, Palette as PaletteIcon, Upload, X } from "lucide-react";
-import AccentPicker from "@/components/layout/AccentPicker";
+import { Select } from "@/components/ui/select";
+import {
+  ChevronDown,
+  Download,
+  Palette as PaletteIcon,
+  Upload,
+} from "lucide-react";
+
 import type {
   AccentPalette,
   NotebookPayload,
@@ -15,16 +21,59 @@ import SectionFilters from "./SectionFilters";
 import TagFilters from "./TagFilters";
 import NotebookList from "@/components/notebooks/NotebookList";
 import { cn } from "@/lib/utils";
+import SmartFiltersSection from "./SmartFiltersSection";
+import type {
+  SmartFilter,
+  SmartFilterCriteria,
+} from "@/components/note-app/types";
+
+const SIDEBAR_PANEL_STATE_KEY = "notemaster:sidebar-panel-state";
+
+type CollapsibleState = {
+  smartFiltersOpen: boolean;
+  notebooksOpen: boolean;
+};
+
+const DEFAULT_PANEL_STATE: CollapsibleState = {
+  smartFiltersOpen: true,
+  notebooksOpen: true,
+};
+
+const readPanelStateFromStorage = (): CollapsibleState => {
+  if (typeof window === "undefined") {
+    return DEFAULT_PANEL_STATE;
+  }
+  try {
+    const raw = window.localStorage?.getItem(SIDEBAR_PANEL_STATE_KEY);
+    if (!raw) {
+      return DEFAULT_PANEL_STATE;
+    }
+    const parsed = JSON.parse(raw) as Partial<CollapsibleState>;
+    return {
+      smartFiltersOpen:
+        typeof parsed.smartFiltersOpen === "boolean"
+          ? parsed.smartFiltersOpen
+          : DEFAULT_PANEL_STATE.smartFiltersOpen,
+      notebooksOpen:
+        typeof parsed.notebooksOpen === "boolean"
+          ? parsed.notebooksOpen
+          : DEFAULT_PANEL_STATE.notebooksOpen,
+    };
+  } catch (error) {
+    console.error("Failed to read sidebar state", error);
+    return DEFAULT_PANEL_STATE;
+  }
+};
 
 type SortKey = "updated" | "created" | "title";
 
 type SidebarPanelProps = {
   show: boolean;
-  onClose: () => void;
   sortBy: SortKey;
   onSortChange: (value: SortKey) => void;
   searchQuery: string;
   onSearchChange: (value: string) => void;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   activeSection: "notes" | "archive" | "bin";
   sectionCounts: Record<"notes" | "archive" | "bin", number>;
   onSectionChange: (section: "notes" | "archive" | "bin") => void;
@@ -33,9 +82,14 @@ type SidebarPanelProps = {
   notes: NotePayload[];
   onTagSelect: (tag: string) => void;
   onClearTags: () => void;
-  accent: AccentPalette;
-  onAccentSelect: (palette: AccentPalette) => void;
-  accentPalettes: AccentPalette[];
+
+  smartFilters: SmartFilter[];
+  activeSmartFilterId: string | null;
+  canSaveSmartFilter: boolean;
+  currentSmartFilterCriteria: SmartFilterCriteria;
+  onAddSmartFilter: (input: { name: string; description?: string }) => boolean;
+  onApplySmartFilter: (id: string | null) => void;
+  onRemoveSmartFilter: (id: string) => void;
   onExport: () => void;
   onImport: (file: File) => void;
   notebooks: NotebookPayload[];
@@ -46,6 +100,16 @@ type SidebarPanelProps = {
   onNotebookNameChange: (value: string) => void;
   onNotebookParentChange: (value: string | null) => void;
   onCreateNotebook: () => void;
+  onQuickAddNotebook: (
+    parentId: string | null,
+    name: string
+  ) => Promise<boolean> | boolean;
+  onRenameNotebook: (id: string, name: string) => Promise<boolean> | boolean;
+  onMoveNotebook: (
+    id: string,
+    targetParentId: string | null,
+    targetIndex: number
+  ) => Promise<boolean> | boolean;
   activeNotebookId: string;
   onSelectNotebookFilter: (id: string) => void;
   onDeleteNotebook: (id: string) => void;
@@ -53,11 +117,11 @@ type SidebarPanelProps = {
 
 const SidebarPanel: React.FC<SidebarPanelProps> = ({
   show,
-  onClose,
   sortBy,
   onSortChange,
   searchQuery,
   onSearchChange,
+  searchInputRef,
   activeSection,
   sectionCounts,
   onSectionChange,
@@ -66,9 +130,14 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   notes,
   onTagSelect,
   onClearTags,
-  accent,
-  onAccentSelect,
-  accentPalettes,
+
+  smartFilters,
+  activeSmartFilterId,
+  canSaveSmartFilter,
+  currentSmartFilterCriteria,
+  onAddSmartFilter,
+  onApplySmartFilter,
+  onRemoveSmartFilter,
   onExport,
   onImport,
   notebooks,
@@ -79,6 +148,9 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
   onNotebookNameChange,
   onNotebookParentChange,
   onCreateNotebook,
+  onQuickAddNotebook,
+  onRenameNotebook,
+  onMoveNotebook,
   activeNotebookId,
   onSelectNotebookFilter,
   onDeleteNotebook,
@@ -93,49 +165,72 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
     return counts;
   }, [notes]);
 
+  const [panelState, setPanelState] = React.useState<CollapsibleState>(
+    readPanelStateFromStorage
+  );
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage?.setItem(
+        SIDEBAR_PANEL_STATE_KEY,
+        JSON.stringify(panelState)
+      );
+    } catch (error) {
+      console.error("Failed to persist sidebar state", error);
+    }
+  }, [panelState]);
+
+  const toggleSection = (section: keyof CollapsibleState) => {
+    setPanelState((prev) => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const { smartFiltersOpen, notebooksOpen } = panelState;
+
   return (
     <aside
       className={cn(
-        "space-y-6 rounded-2xl border bg-card p-4 shadow-sm transition-all duration-300",
-        "fixed inset-y-0 left-0 z-50 w-[280px] overflow-y-auto",
-        "lg:static lg:z-auto lg:w-auto lg:translate-x-0 lg:block",
-        show ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+        "space-y-6 rounded-2xl border border-white/15 bg-[var(--sidebar)]/95 text-(--sidebar-foreground) backdrop-blur-2xl p-5 shadow-[var(--glass-shadow)] transition-all duration-300",
+        "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-sm overflow-y-auto",
+        "lg:border-[var(--glass-border)] lg:bg-[var(--glass-bg)] lg:text-inherit lg:w-auto lg:max-w-none lg:static lg:z-auto lg:translate-x-0 lg:block",
+        show ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       )}
     >
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="absolute right-2 top-2 lg:hidden"
-        onClick={onClose}
-      >
-        <X className="size-4" />
-      </Button>
-
-      <SearchBar value={searchQuery} onChange={onSearchChange} />
+      <SearchBar value={searchQuery} onChange={onSearchChange} inputRef={searchInputRef} />
 
       <div className="flex gap-2">
         <Button
-          variant={filterTag === "all" ? "default" : "outline"}
+          variant={filterTag === "all" ? "accent" : "outline"}
           size="sm"
-          className="flex-1"
+          className={cn(
+            "flex-1 transition-all duration-200",
+            filterTag === "all" && "shadow-md shadow-(--interactive-accent)/20"
+          )}
           onClick={() => onTagSelect("all")}
         >
           All
-          <span className="ml-2 rounded-full bg-background px-2 py-0.5 text-xs text-muted-foreground">
+          <span
+            className={cn(
+              "ml-2 rounded-full px-2 py-0.5 text-xs font-medium",
+              filterTag === "all"
+                ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
+                : "bg-background text-muted-foreground"
+            )}
+          >
             {notes.length}
           </span>
         </Button>
-        <select
+        <Select
           value={sortBy}
           onChange={(event: React.ChangeEvent<HTMLSelectElement>) =>
             onSortChange(event.target.value as SortKey)
           }
-          className="w-36 rounded-md border bg-background px-3 py-2 text-sm"
+          className="w-36"
         >
           <option value="updated">Last updated</option>
           <option value="created">Date created</option>
           <option value="title">Title</option>
-        </select>
+        </Select>
       </div>
 
       <SectionFilters
@@ -153,33 +248,73 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
         onClear={onClearTags}
       />
 
-      <NotebookList
-        notebooks={notebooks}
-        notebookTree={notebookTree}
-        activeNotebookId={activeNotebookId}
-        newNotebookName={newNotebookName}
-        newNotebookParent={newNotebookParent}
-        isCreatingNotebook={isCreatingNotebook}
-        totalNotesCount={notes.length}
-        onNotebookNameChange={onNotebookNameChange}
-        onNotebookParentChange={onNotebookParentChange}
-        onCreateNotebook={onCreateNotebook}
-        onSelectNotebookFilter={onSelectNotebookFilter}
-        onDeleteNotebook={onDeleteNotebook}
-        onCloseSidebar={onClose}
-      />
-
-      <div className="space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <PaletteIcon className="size-4" />
-          Accent color
-        </div>
-        <AccentPicker
-          palettes={accentPalettes}
-          activePaletteId={accent.id}
-          onSelect={onAccentSelect}
-        />
+      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
+        <button
+          type="button"
+          onClick={() => toggleSection("smartFiltersOpen")}
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
+        >
+          <span>Smart filters</span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform duration-200",
+              smartFiltersOpen ? "rotate-0" : "-rotate-90"
+            )}
+          />
+        </button>
+        {smartFiltersOpen && (
+          <div className="pt-3">
+            <SmartFiltersSection
+              smartFilters={smartFilters}
+              activeSmartFilterId={activeSmartFilterId}
+              canSaveSmartFilter={canSaveSmartFilter}
+              currentCriteria={currentSmartFilterCriteria}
+              onAdd={onAddSmartFilter}
+              onApply={onApplySmartFilter}
+              onRemove={onRemoveSmartFilter}
+            />
+          </div>
+        )}
       </div>
+
+      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
+        <button
+          type="button"
+          onClick={() => toggleSection("notebooksOpen")}
+          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
+        >
+          <span>Notebooks</span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-muted-foreground transition-transform duration-200",
+              notebooksOpen ? "rotate-0" : "-rotate-90"
+            )}
+          />
+        </button>
+        {notebooksOpen && (
+          <div className="pt-3">
+            <NotebookList
+              notebooks={notebooks}
+              notebookTree={notebookTree}
+              activeNotebookId={activeNotebookId}
+              newNotebookName={newNotebookName}
+              newNotebookParent={newNotebookParent}
+              isCreatingNotebook={isCreatingNotebook}
+              totalNotesCount={notes.length}
+              onNotebookNameChange={onNotebookNameChange}
+              onNotebookParentChange={onNotebookParentChange}
+              onCreateNotebook={onCreateNotebook}
+              onSelectNotebookFilter={onSelectNotebookFilter}
+              onDeleteNotebook={onDeleteNotebook}
+              onQuickAddNotebook={onQuickAddNotebook}
+              onRenameNotebook={onRenameNotebook}
+              onMoveNotebook={onMoveNotebook}
+            />
+          </div>
+        )}
+      </div>
+
+
 
       <div className="space-y-2">
         <Button

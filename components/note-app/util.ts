@@ -1,6 +1,13 @@
 import type { NotebookPayload, NotebookTreeNode } from "@/types/note";
 
-export const buildNotebookTree = (items: NotebookPayload[]): NotebookTreeNode[] => {
+export const NOTEBOOK_ROOT_ORDER_KEY = "__root__";
+
+export type NotebookOrderMap = Record<string, string[]>;
+
+export const buildNotebookTree = (
+  items: NotebookPayload[],
+  orderMap: NotebookOrderMap = {}
+): NotebookTreeNode[] => {
   const map = new Map<string, NotebookTreeNode>();
   const roots: NotebookTreeNode[] = [];
 
@@ -16,7 +23,45 @@ export const buildNotebookTree = (items: NotebookPayload[]): NotebookTreeNode[] 
     }
   });
 
-  return roots.sort((a, b) => a.name.localeCompare(b.name));
+  const withChildrenSorted = roots.map((root) => ({
+    ...root,
+    children: sortChildren(root.children, root.id),
+  }));
+
+  return sortNodes(withChildrenSorted, NOTEBOOK_ROOT_ORDER_KEY);
+
+  function sortChildren(
+    children: NotebookTreeNode[],
+    parentId: string
+  ): NotebookTreeNode[] {
+    return sortNodes(
+      children.map((child) => ({
+        ...child,
+        children: sortChildren(child.children, child.id),
+      })),
+      parentId
+    );
+  }
+
+  function sortNodes(
+    nodes: NotebookTreeNode[],
+    parentKey: string
+  ): NotebookTreeNode[] {
+    const order = orderMap[parentKey] ?? [];
+    return nodes.sort((a, b) => {
+      const indexA = order.indexOf(a.id);
+      const indexB = order.indexOf(b.id);
+      if (indexA === -1 && indexB === -1) {
+        return a.name.localeCompare(b.name);
+      }
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      if (indexA === indexB) {
+        return a.name.localeCompare(b.name);
+      }
+      return indexA - indexB;
+    });
+  }
 };
 
 export const generateId = () => {

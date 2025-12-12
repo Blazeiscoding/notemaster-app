@@ -1,21 +1,23 @@
 "use client";
 
 import React from "react";
+import dynamic from "next/dynamic";
 import AppHeader from "@/components/layout/AppHeader";
 import InstallPromptAlert from "@/components/layout/InstallPromptAlert";
-import NoteEditor from "@/components/notes/NoteEditor";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
+import { MobileFloatingButton } from "@/components/layout/MobileFloatingButton";
 import NotesGrid from "@/components/notes/NotesGrid";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
-import { Button } from "@/components/ui/button";
 import { formatDateTimeForInput } from "@/components/note-app/util";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
-import { Plus } from "lucide-react";
 
 const NoteApp = () => {
   const state = useNoteApp();
 
   const {
     isLoading,
+    dataError,
+    retryLoadData,
     userFirstName,
     isAuthenticated,
     darkMode,
@@ -37,14 +39,22 @@ const NoteApp = () => {
     setFilterTag,
     allTags,
     accent,
+    accentPreview,
+    handlePreviewAccent,
+    handleCancelAccentPreview,
     accentPalettes,
     handleSelectAccent,
+    smartFilters,
+    activeSmartFilterId,
+    currentSmartFilterCriteria,
+    canSaveSmartFilter,
+    addSmartFilter,
+    applySmartFilter,
+    removeSmartFilter,
     canInstall,
     installApp,
     showIosInstallTip,
     setShowIosInstallTip,
-    showPreview,
-    togglePreview,
     createNote,
     saveCurrentNote,
     isSavingNote,
@@ -56,8 +66,6 @@ const NoteApp = () => {
     handleNotebookChange,
     handleTitleChange,
     handleContentChange,
-    handleDueDateChange,
-    handleClearDueDate,
     handleCloseEditor,
     fileInputRef,
     addChecklistItem,
@@ -85,55 +93,197 @@ const NoteApp = () => {
     setNewNotebookParent,
     isCreatingNotebook,
     handleCreateNotebook,
+    handleCreateNotebookChild,
+    handleRenameNotebook,
+    handleMoveNotebook,
     activeNotebookId,
     handleSelectNotebookFilter,
     handleDeleteNotebook,
     handleOpenRevisions,
   } = state;
 
+  const [showThemePanel, setShowThemePanel] = React.useState(false);
+  const [showSaveFilterDialog, setShowSaveFilterDialog] = React.useState(false);
+  const [viewMode, setViewMode] = React.useState<"grid" | "calendar">("grid");
+  const [quickFilterName, setQuickFilterName] = React.useState("");
+  const [quickFilterDescription, setQuickFilterDescription] =
+    React.useState("");
+  const [quickFilterError, setQuickFilterError] = React.useState<string | null>(
+    null
+  );
+  const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onCreateNote: createNote,
+    onSaveNote: saveCurrentNote,
+    onCloseEditor: handleCloseEditor,
+    onFocusSearch: () => {
+      searchInputRef.current?.focus();
+    },
+    currentNote,
+    isSaving: isSavingNote,
+  });
+
+  const computeDefaultFilterName = React.useCallback(() => {
+    const base = "Smart filter";
+    const existing = new Set(
+      smartFilters.map((filter) => filter.name.toLowerCase())
+    );
+    if (!existing.has(base.toLowerCase())) return base;
+    let suffix = 2;
+    let candidate = `${base} ${suffix}`;
+    while (existing.has(candidate.toLowerCase())) {
+      suffix += 1;
+      candidate = `${base} ${suffix}`;
+    }
+    return candidate;
+  }, [smartFilters]);
+
+  const handleOpenSaveFilter = React.useCallback(() => {
+    setQuickFilterError(null);
+    setQuickFilterDescription("");
+    setQuickFilterName(computeDefaultFilterName());
+    setShowSaveFilterDialog(true);
+  }, [computeDefaultFilterName]);
+
+  const handleCloseSaveFilter = React.useCallback(() => {
+    setShowSaveFilterDialog(false);
+    setQuickFilterError(null);
+    setQuickFilterDescription("");
+    setQuickFilterName("");
+  }, []);
+
+  const handleSubmitQuickFilter = React.useCallback(
+    (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      const trimmed = quickFilterName.trim();
+      if (!trimmed) {
+        setQuickFilterError("Give your filter a name.");
+        return;
+      }
+      const success = addSmartFilter({
+        name: trimmed,
+        description: quickFilterDescription.trim() || undefined,
+      });
+      if (!success) {
+        setQuickFilterError("Unable to save filter. Try a different name.");
+        return;
+      }
+      handleCloseSaveFilter();
+    },
+    [
+      addSmartFilter,
+      handleCloseSaveFilter,
+      quickFilterDescription,
+      quickFilterName,
+    ]
+  );
+
+  const handleCloseThemePanel = React.useCallback(() => {
+    handleCancelAccentPreview();
+    setShowThemePanel(false);
+  }, [handleCancelAccentPreview]);
+
+  // Memoized callbacks for better performance
+  const handleToggleTheme = React.useCallback(
+    () => setDarkMode(!darkMode),
+    [darkMode, setDarkMode]
+  );
+  const handleOpenThemePicker = React.useCallback(
+    () => setShowThemePanel(true),
+    []
+  );
+  const handleToggleSidebar = React.useCallback(
+    () => setShowSidebar((prev) => !prev),
+    [setShowSidebar]
+  );
+  const handleCloseSidebar = React.useCallback(
+    () => setShowSidebar(false),
+    [setShowSidebar]
+  );
+  const handleDismissIosTip = React.useCallback(
+    () => setShowIosInstallTip(false),
+    [setShowIosInstallTip]
+  );
+  const handleClearTags = React.useCallback(
+    () => setFilterTag("all"),
+    [setFilterTag]
+  );
+  const handleAddSmartFilter = React.useCallback(
+    ({ name, description }: { name: string; description?: string }) =>
+      addSmartFilter({ name, description }),
+    [addSmartFilter]
+  );
+  const handleOpenRevisionsCallback = React.useCallback(
+    () => currentNote && handleOpenRevisions(currentNote.id),
+    [currentNote, handleOpenRevisions]
+  );
+  const handleOpenSidebar = React.useCallback(
+    () => setShowSidebar(true),
+    [setShowSidebar]
+  );
+  const handleApplyAccent = React.useCallback(
+    (palette: AccentPalette) => {
+      handleSelectAccent(palette);
+      setShowThemePanel(false);
+    },
+    [handleSelectAccent]
+  );
+
   if (isLoading) {
+    return <LoadingSkeleton />;
+  }
+
+  if (dataError && isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
-          <p className="mt-4 text-gray-600">Loading your notes...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
+        <ErrorState
+          title="Failed to load your notes"
+          message={dataError}
+          onRetry={retryLoadData}
+          retryLabel="Retry"
+        />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-32 sm:pb-16 lg:px-8">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 lg:px-8">
         <AppHeader
           userFirstName={userFirstName}
-          onToggleSidebar={() => setShowSidebar((prev) => !prev)}
+          isDark={darkMode}
+          toggleTheme={handleToggleTheme}
+          onOpenThemePicker={handleOpenThemePicker}
+          onSaveSmartFilter={handleOpenSaveFilter}
+          canSaveSmartFilter={canSaveSmartFilter}
+          onNewNote={createNote}
+          onToggleSidebar={handleToggleSidebar}
           canInstall={canInstall}
           onInstall={installApp}
-          darkMode={darkMode}
-          onToggleDarkMode={() => setDarkMode((prev) => !prev)}
-          onCreateNote={createNote}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
-
         {showIosInstallTip && (
-          <InstallPromptAlert onDismiss={() => setShowIosInstallTip(false)} />
+          <InstallPromptAlert onDismiss={handleDismissIosTip} />
         )}
 
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           {showSidebar && (
             <div
               className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-              onClick={() => setShowSidebar(false)}
+              onClick={handleCloseSidebar}
             />
           )}
 
           <SidebarPanel
             show={showSidebar}
-            onClose={() => setShowSidebar(false)}
             sortBy={sortBy}
             onSortChange={setSortBy}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            searchInputRef={searchInputRef}
             activeSection={activeSection}
             sectionCounts={sectionCounts}
             onSectionChange={setActiveSection}
@@ -141,10 +291,15 @@ const NoteApp = () => {
             tags={allTags}
             notes={notes}
             onTagSelect={setFilterTag}
-            onClearTags={() => setFilterTag("all")}
-            accent={accent}
-            onAccentSelect={handleSelectAccent}
-            accentPalettes={accentPalettes}
+            onClearTags={handleClearTags}
+
+            smartFilters={smartFilters}
+            activeSmartFilterId={activeSmartFilterId}
+            canSaveSmartFilter={canSaveSmartFilter}
+            currentSmartFilterCriteria={currentSmartFilterCriteria}
+            onAddSmartFilter={handleAddSmartFilter}
+            onApplySmartFilter={applySmartFilter}
+            onRemoveSmartFilter={removeSmartFilter}
             onExport={exportNotes}
             onImport={importNotes}
             notebooks={notebooks}
@@ -155,16 +310,18 @@ const NoteApp = () => {
             onNotebookNameChange={setNewNotebookName}
             onNotebookParentChange={setNewNotebookParent}
             onCreateNotebook={handleCreateNotebook}
+            onQuickAddNotebook={handleCreateNotebookChild}
+            onRenameNotebook={handleRenameNotebook}
+            onMoveNotebook={handleMoveNotebook}
             activeNotebookId={activeNotebookId}
             onSelectNotebookFilter={handleSelectNotebookFilter}
             onDeleteNotebook={handleDeleteNotebook}
           />
 
-          <main className="space-y-6 pb-10 sm:pb-0">
+          <main className="space-y-6">
             {currentNote ? (
               <NoteEditor
                 note={currentNote}
-                showPreview={showPreview}
                 isSaving={isSavingNote}
                 canViewHistory={
                   isAuthenticated &&
@@ -177,16 +334,12 @@ const NoteApp = () => {
                 }
                 notebooksById={notebooksById}
                 notebookOptions={notebookOptions}
-                dueDateValue={formatDateTimeForInput(currentNote.dueAt)}
                 onClose={handleCloseEditor}
-                onTogglePreview={togglePreview}
-                onOpenHistory={() => handleOpenRevisions(currentNote.id)}
+                onOpenHistory={handleOpenRevisionsCallback}
                 onSave={saveCurrentNote}
                 onNotebookChange={handleNotebookChange}
                 onTitleChange={handleTitleChange}
                 onContentChange={handleContentChange}
-                onDueDateChange={handleDueDateChange}
-                onClearDueDate={handleClearDueDate}
                 onAddChecklistItem={addChecklistItem}
                 onMarkAllChecklist={markAllChecklist}
                 onClearCompletedChecklist={clearCompletedChecklist}
@@ -201,7 +354,7 @@ const NoteApp = () => {
                 fileInputRef={fileInputRef}
                 onFilesSelected={handleAttachmentsSelected}
               />
-            ) : (
+            ) : viewMode === "grid" ? (
               <NotesGrid
                 notes={sortedNotes}
                 activeSection={activeSection}
@@ -214,22 +367,11 @@ const NoteApp = () => {
                 onRestoreFromBin={restoreFromBin}
                 onDeleteForever={deleteForever}
               />
+            ) : (
+              <CalendarView notes={sortedNotes} onOpenNote={setCurrentNote} />
             )}
           </main>
         </div>
-      </div>
-      <div className="sm:hidden">
-        <Button
-          aria-label="Create a new note"
-          variant="accent"
-          size="lg"
-          className="fixed right-4 z-50 h-14 rounded-full px-6 font-semibold shadow-xl shadow-(--interactive-accent)/25 transition-transform duration-200 focus-visible:ring-2 focus-visible:ring-(--accent-primary)"
-          style={{ bottom: "calc(env(safe-area-inset-bottom, 16px) + 1rem)" }}
-          onClick={createNote}
-        >
-          <Plus className="mr-2 h-5 w-5" />
-          New note
-        </Button>
       </div>
     </div>
   );
