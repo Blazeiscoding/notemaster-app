@@ -1,6 +1,14 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import type { NotePayload, NotebookPayload } from "@/types/note";
+import {
+  getAllNotes,
+  getAllNotebooks,
+  saveNotes as saveNotesToDB,
+  saveNotebooks as saveNotebooksToDB,
+  migrateFromLocalStorage,
+  isIndexedDBAvailable,
+} from "@/lib/indexeddb";
 
 type ServerActions = {
   fetchNotesFromServer: () => Promise<NotePayload[]>;
@@ -17,29 +25,67 @@ export function useNoteData(
   const [notebooks, setNotebooks] = useState<NotebookPayload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [useIndexedDB, setUseIndexedDB] = useState(true);
+  const initialLoadComplete = useRef(false);
+
+  // Check IndexedDB availability on mount
+  useEffect(() => {
+    isIndexedDBAvailable().then((available) => {
+      setUseIndexedDB(available);
+      if (!available) {
+        console.warn("IndexedDB not available, falling back to localStorage");
+      }
+    });
+  }, []);
 
   const loadNotesAndNotebooks = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
       if (isAuthenticated) {
+        // Authenticated users: fetch from server
         const [remoteNotes, remoteNotebooks] = await Promise.all([
           fetchNotesFromServer(),
           fetchNotebooksFromServer(),
         ]);
         setNotes(remoteNotes);
         setNotebooks(remoteNotebooks);
-      } else if (typeof window !== "undefined" && window.localStorage) {
-        const rawNotes = window.localStorage.getItem(storageKey);
-        const rawNotebooks = window.localStorage.getItem(
-          `${storageKey}-notebooks`
-        );
-        setNotes(rawNotes ? JSON.parse(rawNotes) : []);
-        setNotebooks(rawNotebooks ? JSON.parse(rawNotebooks) : []);
+      } else if (typeof window !== "undefined") {
+        // Guest users: load from IndexedDB (with localStorage migration)
+        if (useIndexedDB) {
+          // First, try to migrate from localStorage if not done yet
+          const migrated = await migrateFromLocalStorage(storageKey);
+          
+          if (migrated.notes.length > 0 || migrated.notebooks.length > 0) {
+            // Use migrated data
+            setNotes(migrated.notes);
+            setNotebooks(migrated.notebooks);
+          } else {
+            // Load from IndexedDB
+            const [dbNotes, dbNotebooks] = await Promise.all([
+              getAllNotes(),
+              getAllNotebooks(),
+            ]);
+            setNotes(dbNotes);
+            setNotebooks(dbNotebooks);
+          }
+        } else if (window.localStorage) {
+          // Fallback to localStorage
+          const rawNotes = window.localStorage.getItem(storageKey);
+          const rawNotebooks = window.localStorage.getItem(
+            `${storageKey}-notebooks`
+          );
+          setNotes(rawNotes ? JSON.parse(rawNotes) : []);
+          setNotebooks(rawNotebooks ? JSON.parse(rawNotebooks) : []);
+        } else {
+          setNotes([]);
+          setNotebooks([]);
+        }
       } else {
         setNotes([]);
         setNotebooks([]);
       }
+      initialLoadComplete.current = true;
     } catch (error) {
       console.error("Failed to load workspace", error);
       const errorMessage =
@@ -61,6 +107,7 @@ export function useNoteData(
     storageKey,
     fetchNotesFromServer,
     fetchNotebooksFromServer,
+    useIndexedDB,
   ]);
 
   useEffect(() => {
@@ -69,32 +116,56 @@ export function useNoteData(
 
   // Persist notes for guest users
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
+    // Don't persist during initial load or for authenticated users
+    if (isAuthenticated || !initialLoadComplete.current || isLoading) {
+      return;
+    }
+
+    const persistNotes = async () => {
       try {
-        if (typeof window !== "undefined" && window.localStorage) {
+        if (typeof window === "undefined") return;
+
+        if (useIndexedDB) {
+          await saveNotesToDB(notes);
+        } else if (window.localStorage) {
           window.localStorage.setItem(storageKey, JSON.stringify(notes));
         }
       } catch (err) {
         console.error("Failed to save notes:", err);
         toast.error("Failed to save notes locally");
       }
-    }
-  }, [notes, isLoading, isAuthenticated, storageKey]);
+    };
+
+    persistNotes();
+  }, [notes, isLoading, isAuthenticated, storageKey, useIndexedDB]);
 
   // Persist notebooks for guest users
   useEffect(() => {
-    if (!isAuthenticated && typeof window !== "undefined") {
+    // Don't persist during initial load or for authenticated users
+    if (isAuthenticated || !initialLoadComplete.current || isLoading) {
+      return;
+    }
+
+    const persistNotebooks = async () => {
       try {
-        window.localStorage?.setItem(
-          `${storageKey}-notebooks`,
-          JSON.stringify(notebooks)
-        );
-      } catch (error) {
-        console.error("Failed to save notebooks", error);
+        if (typeof window === "undefined") return;
+
+        if (useIndexedDB) {
+          await saveNotebooksToDB(notebooks);
+        } else if (window.localStorage) {
+          window.localStorage.setItem(
+            `${storageKey}-notebooks`,
+            JSON.stringify(notebooks)
+          );
+        }
+      } catch (err) {
+        console.error("Failed to save notebooks:", err);
         toast.error("Failed to save notebooks locally");
       }
-    }
-  }, [notebooks, isAuthenticated, storageKey]);
+    };
+
+    persistNotebooks();
+  }, [notebooks, isAuthenticated, storageKey, useIndexedDB, isLoading]);
 
   return {
     notes,
@@ -106,4 +177,3 @@ export function useNoteData(
     retry: loadNotesAndNotebooks,
   };
 }
-
