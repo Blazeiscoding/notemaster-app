@@ -8,10 +8,6 @@ import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { MobileFloatingButton } from "@/components/layout/MobileFloatingButton";
 import NotesGrid from "@/components/notes/NotesGrid";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
-<<<<<<< HEAD
-import { formatDateTimeForInput } from "@/components/note-app/util";
-import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
-=======
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { LoadingSkeleton } from "@/components/note-app/LoadingSkeleton";
@@ -39,7 +35,6 @@ const CalendarView = dynamic(() => import("@/components/notes/CalendarView"), {
 const AccentPicker = dynamic(() => import("@/components/layout/AccentPicker"), {
   ssr: false,
 });
->>>>>>> d23b92eb4c55ee32f2566b66eb1dc37ffceba257
 
 const NoteApp = () => {
   const state = useNoteApp();
@@ -279,14 +274,9 @@ const NoteApp = () => {
   }
 
   return (
-<<<<<<< HEAD
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 lg:px-8">
-=======
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
       <OfflineIndicator />
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 pt-6 pb-36 sm:pb-16 lg:px-8">
->>>>>>> d23b92eb4c55ee32f2566b66eb1dc37ffceba257
         <AppHeader
           userFirstName={userFirstName}
           isDark={darkMode}
