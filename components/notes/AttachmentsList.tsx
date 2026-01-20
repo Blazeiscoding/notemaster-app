@@ -78,6 +78,7 @@ const AttachmentsList: React.FC<AttachmentsListProps> = ({
             <div className="flex items-center gap-3 min-w-0 flex-1">
               {attachment.type.startsWith("image/") && (
                 <div className="relative size-10 shrink-0 overflow-hidden rounded-md border bg-background">
+                  {/* Using native img because attachments use base64 data URLs which Next.js Image doesn't optimize */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={attachment.data}

@@ -71,8 +71,6 @@ export function useAccent() {
     const accentRing = hexToRgba(appliedAccent.primary, 0.45);
     const accentSoft = hexToRgba(appliedAccent.primary, 0.12);
     const accentBgLight = hexToRgba(appliedAccent.primary, 0.03); // 3% opacity for subtle tint
-    
-    console.log("Applying accent:", appliedAccent.name, appliedAccent.background);
 
     root.style.setProperty("--accent-foreground", accentForeground);
     root.style.setProperty("--accent-background-light", accentBgLight);

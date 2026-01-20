@@ -222,12 +222,10 @@ export function setupConnectivityListeners(
 export function initBackgroundSync(): () => void {
   return setupConnectivityListeners(
     async () => {
-      console.log("Back online - processing sync queue");
-      const result = await processSyncQueue();
-      console.log("Sync queue processed:", result);
+      await processSyncQueue();
     },
     () => {
-      console.log("Went offline - operations will be queued");
+      // Operations will be queued automatically when offline
     }
   );
 }

@@ -111,8 +111,6 @@ export function useSSE(
         const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
         reconnectAttemptsRef.current++;
         
-        console.log(`SSE reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`);
-        
         reconnectTimeoutRef.current = setTimeout(() => {
           connect();
         }, delay);
