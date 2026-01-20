@@ -21,6 +21,7 @@ import { generateId } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
 import { apiRequest } from "@/lib/api-client";
+import { useSSE } from "@/lib/use-sse";
 
 type NoteAppSection = "notes" | "archive" | "bin";
 
@@ -217,6 +218,40 @@ export const useNoteApp = () => {
     {
       fetchRevisionsFromServer,
     }
+  );
+
+  // Real-time updates via SSE (only when authenticated)
+  useSSE(
+    {
+      onNoteCreated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
+        if (!data) return;
+        // Only add if not already in list (to avoid duplicates from own actions)
+        setNotes((prev) => {
+          if (prev.some((n) => n.id === noteId)) return prev;
+          return [data as NotePayload, ...prev];
+        });
+      }, [setNotes]),
+      
+      onNoteUpdated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
+        if (!data) return;
+        setNotes((prev) => {
+          const index = prev.findIndex((n) => n.id === noteId);
+          if (index === -1) return prev;
+          const next = [...prev];
+          next[index] = { ...next[index], ...data };
+          return next;
+        });
+      }, [setNotes]),
+      
+      onNoteDeleted: useCallback((noteId: string) => {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        // Close editor if the deleted note was being edited
+        if (currentNote?.id === noteId) {
+          setCurrentNote(null);
+        }
+      }, [setNotes, currentNote, setCurrentNote]),
+    },
+    { enabled: isAuthenticated }
   );
 
   // Close editor when switching away from notes section
