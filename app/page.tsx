@@ -399,6 +399,51 @@ const NoteApp = () => {
           </main>
         </div>
       </div>
+
+      {/* Theme Picker Modal */}
+      <Modal
+        open={showThemePanel}
+        onClose={handleCloseThemePanel}
+        title="Choose Theme"
+        description="Select your preferred accent color palette"
+      >
+        <AccentPicker
+          palettes={accentPalettes}
+          activePaletteId={accent.id}
+          previewPaletteId={accentPreview?.id}
+          onPreview={handlePreviewAccent}
+          onCancelPreview={handleCancelAccentPreview}
+          onApply={handleApplyAccent}
+        />
+      </Modal>
+
+      {/* Save Smart Filter Modal */}
+      <Modal
+        open={showSaveFilterDialog}
+        onClose={handleCloseSaveFilter}
+        title="Save Smart Filter"
+        description="Save your current filter settings for quick access"
+        as="form"
+        onSubmit={handleSubmitQuickFilter}
+        footer={
+          <>
+            <Button type="button" variant="outline" onClick={handleCloseSaveFilter}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="accent">
+              Save Filter
+            </Button>
+          </>
+        }
+      >
+        <SaveFilterForm
+          name={quickFilterName}
+          description={quickFilterDescription}
+          error={quickFilterError}
+          onNameChange={setQuickFilterName}
+          onDescriptionChange={setQuickFilterDescription}
+        />
+      </Modal>
     </div>
   );
 };
