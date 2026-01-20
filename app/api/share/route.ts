@@ -38,13 +38,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url), { status: 303 });
   }
 }
-
-/**
- * GET handler - redirect to share page (for bookmarked share URLs)
- */
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const redirectUrl = new URL("/share", request.url);
-  redirectUrl.search = searchParams.toString();
-  return NextResponse.redirect(redirectUrl, { status: 303 });
-}
