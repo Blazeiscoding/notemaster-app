@@ -267,6 +267,54 @@ export const useNoteApp = () => {
     setShowSidebar,
   ]);
 
+  // Create note from PWA share target
+  const createNoteFromShare = useCallback((title: string, content: string) => {
+    setActiveSection("notes");
+    hapticLight();
+    const now = new Date().toISOString();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    const newNote: NotePayload = {
+      id: generateId(),
+      userId: ownerId,
+      notebookId: null,
+      title,
+      content,
+      tags: ["shared"],
+      checklist: [],
+      attachments: [],
+      type: "note",
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+      trashed: false,
+      dueAt: null,
+    };
+    setCurrentNote(newNote);
+    setShowSidebar(false);
+  }, [isAuthenticated, userId, setCurrentNote, setActiveSection, setShowSidebar]);
+
+  // Check for shared note from PWA share target on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    try {
+      const sharedNoteRaw = sessionStorage.getItem("notemaster-shared-note");
+      if (sharedNoteRaw) {
+        sessionStorage.removeItem("notemaster-shared-note");
+        const sharedNote = JSON.parse(sharedNoteRaw) as { title: string; content: string };
+        if (sharedNote.title || sharedNote.content) {
+          // Small delay to ensure app is fully loaded
+          setTimeout(() => {
+            createNoteFromShare(sharedNote.title || "Shared Note", sharedNote.content || "");
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to process shared note:", error);
+    }
+  }, [createNoteFromShare]);
+
   const saveCurrentNote = useCallback(async () => {
     if (!currentNote) {
       return;
