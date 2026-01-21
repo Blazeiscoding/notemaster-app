@@ -447,6 +447,7 @@ const NoteApp = () => {
 
       {/* Mobile Bottom Navigation - visible only on mobile */}
       <div className="lg:hidden">
+        <MobileFloatingButton onCreateNote={createNote} />
         <MobileBottomNav
           activeSection={activeSection}
           sectionCounts={sectionCounts}

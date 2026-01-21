@@ -3,8 +3,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-
-type SectionKey = "notes" | "archive" | "bin";
+import type { SectionKey } from "@/types/note";
 
 type SectionFiltersProps = {
   activeSection: SectionKey;

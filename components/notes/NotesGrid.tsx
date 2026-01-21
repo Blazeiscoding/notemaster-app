@@ -6,11 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import NoteCard from "./NoteCard";
-import NoteCardSkeleton from "./NoteCardSkeleton";
 import { useVirtualizedGrid } from "./useVirtualizedGrid";
-import type { NotePayload } from "@/types/note";
-
-type SectionKey = "notes" | "archive" | "bin";
+import type { NotePayload, SectionKey } from "@/types/note";
 
 type NotesGridProps = {
   notes: NotePayload[];

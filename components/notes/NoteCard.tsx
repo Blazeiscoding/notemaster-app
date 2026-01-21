@@ -26,10 +26,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { NotePayload } from "@/types/note";
+import type { NotePayload, SectionKey } from "@/types/note";
 import { useSwipe } from "./hooks/useSwipe";
-
-type SectionKey = "notes" | "archive" | "bin";
 
 type NoteCardProps = {
   note: NotePayload;
