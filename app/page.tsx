@@ -444,6 +444,16 @@ const NoteApp = () => {
           onDescriptionChange={setQuickFilterDescription}
         />
       </Modal>
+
+      {/* Mobile Bottom Navigation - visible only on mobile */}
+      <div className="lg:hidden">
+        <MobileBottomNav
+          activeSection={activeSection}
+          sectionCounts={sectionCounts}
+          onSelectSection={setActiveSection}
+          onOpenSidebar={handleOpenSidebar}
+        />
+      </div>
     </div>
   );
 };
