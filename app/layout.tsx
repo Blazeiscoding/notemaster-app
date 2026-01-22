@@ -9,11 +9,13 @@ import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -51,7 +53,6 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
-        <Analytics />
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
@@ -59,6 +60,7 @@ export default function RootLayout({
             {children}
             <Toaster position="top-right" richColors />
           </ErrorBoundary>
+          <Analytics />
         </body>
       </html>
     </ClerkProvider>

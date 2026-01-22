@@ -467,7 +467,11 @@ export function successResponse<T>(
 
   return NextResponse.json(response, {
     status,
-    headers: { ...rateLimitHeaders, ...(requestId && { "X-Request-Id": requestId }) },
+    headers: { 
+      ...rateLimitHeaders, 
+      ...(requestId && { "X-Request-Id": requestId }),
+      "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+    },
   });
 }
 

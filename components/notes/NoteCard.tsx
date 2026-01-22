@@ -22,7 +22,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -231,7 +230,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
               <CardTitle className="text-base font-semibold leading-snug line-clamp-2 flex-1">
                 {note.title || "Untitled note"}
               </CardTitle>
-              <TooltipProvider delayDuration={300}>
+              <>
                 <div className="flex items-center gap-1">
                   {isNotesSection && (
                     <>
@@ -374,7 +373,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                     </>
                   )}
                 </div>
-              </TooltipProvider>
+              </>
             </div>
             <CardDescription className="flex items-center gap-2 text-xs">
               <Clock className="size-3" />
