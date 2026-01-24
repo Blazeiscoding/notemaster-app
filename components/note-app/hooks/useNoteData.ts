@@ -8,6 +8,10 @@ import {
   saveNotebooks as saveNotebooksToDB,
   migrateFromLocalStorage,
   isIndexedDBAvailable,
+  getUserNotes,
+  getUserNotebooks,
+  saveUserNotes,
+  saveUserNotebooks,
 } from "@/lib/indexeddb";
 
 type ServerActions = {
@@ -18,7 +22,8 @@ type ServerActions = {
 export function useNoteData(
   isAuthenticated: boolean,
   storageKey: string,
-  serverActions: ServerActions
+  serverActions: ServerActions,
+  userId?: string | null
 ) {
   const { fetchNotesFromServer, fetchNotebooksFromServer } = serverActions;
   const [notes, setNotes] = useState<NotePayload[]>([]);
@@ -27,6 +32,7 @@ export function useNoteData(
   const [error, setError] = useState<string | null>(null);
   const [useIndexedDB, setUseIndexedDB] = useState(true);
   const initialLoadComplete = useRef(false);
+  const isRevalidating = useRef(false);
 
   // Check IndexedDB availability on mount
   useEffect(() => {
@@ -42,14 +48,48 @@ export function useNoteData(
     setIsLoading(true);
     setError(null);
     try {
-      if (isAuthenticated) {
-        // Authenticated users: fetch from server
+      if (isAuthenticated && userId) {
+        // Stale-while-revalidate for authenticated users
+        // Step 1: Load cached data immediately (if available)
+        if (useIndexedDB && !initialLoadComplete.current) {
+          try {
+            const [cachedNotes, cachedNotebooks] = await Promise.all([
+              getUserNotes(userId),
+              getUserNotebooks(userId),
+            ]);
+            
+            if (cachedNotes.length > 0 || cachedNotebooks.length > 0) {
+              // Show cached data immediately
+              setNotes(cachedNotes);
+              setNotebooks(cachedNotebooks);
+              setIsLoading(false);
+              isRevalidating.current = true;
+            }
+          } catch {
+            // Cache read failed, continue to fetch from server
+          }
+        }
+
+        // Step 2: Fetch fresh data from server (in background if we showed cache)
         const [remoteNotes, remoteNotebooks] = await Promise.all([
           fetchNotesFromServer(),
           fetchNotebooksFromServer(),
         ]);
         setNotes(remoteNotes);
         setNotebooks(remoteNotebooks);
+
+        // Step 3: Update cache with fresh data
+        if (useIndexedDB) {
+          try {
+            await Promise.all([
+              saveUserNotes(userId, remoteNotes),
+              saveUserNotebooks(userId, remoteNotebooks),
+            ]);
+          } catch {
+            // Cache write failed, not critical
+          }
+        }
+        isRevalidating.current = false;
       } else if (typeof window !== "undefined") {
         // Guest users: load from IndexedDB (with localStorage migration)
         if (useIndexedDB) {
@@ -104,6 +144,7 @@ export function useNoteData(
     }
   }, [
     isAuthenticated,
+    userId,
     storageKey,
     fetchNotesFromServer,
     fetchNotebooksFromServer,
@@ -177,3 +218,4 @@ export function useNoteData(
     retry: loadNotesAndNotebooks,
   };
 }
+
