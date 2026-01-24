@@ -31,6 +31,7 @@ import { useSwipe } from "./hooks/useSwipe";
 type NoteCardProps = {
   note: NotePayload;
   activeSection: SectionKey;
+  index?: number;
   onOpen: (note: NotePayload) => void;
   onPin: (id: string) => void;
   onArchive: (id: string) => void;
@@ -44,6 +45,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
   ({
     note,
     activeSection,
+    index = 0,
     onOpen,
     onPin,
     onArchive,
@@ -199,12 +201,15 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
 
         <Card
           className={cn(
-            "group relative border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 overflow-hidden",
+            "group relative border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-md transition-all duration-300 overflow-hidden",
+            "opacity-0 animate-in fade-in slide-in-from-bottom-2 fill-mode-forwards",
             isNotesSection &&
               "hover:-translate-y-1 hover:shadow-[var(--glass-shadow)] hover:border-primary/30 cursor-pointer",
             isDragging && "cursor-grabbing scale-[0.98]"
           )}
           style={{
+            animationDelay: `${Math.min(index * 50, 300)}ms`,
+            animationDuration: "300ms",
             transform: `translateX(${translateX}px)${isDragging ? " scale(0.98)" : ""}`,
             transition: isDragging
               ? "none"
