@@ -1,6 +1,7 @@
 {
   "name": "NoteMaster",
   "short_name": "NoteMaster",
+  "description": "A modern, secure note-taking app with offline support",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0B1220",
@@ -8,7 +9,21 @@
   "icons": [
     { "src": "/android-chrome-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
     { "src": "/android-chrome-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+  ],
+  "share_target": {
+    "action": "/api/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "media",
+          "accept": ["image/*", "text/*"]
+        }
+      ]
+    }
+  }
 }
-
-

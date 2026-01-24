@@ -14,6 +14,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-middleware"
+import { emitNoteEvent } from "@/lib/note-events"
 
 export const GET = withAuth(
   async ({ userId, rateLimitHeaders, requestId }) => {
@@ -78,6 +79,10 @@ export const POST = withAuthAndJson(
     })
 
     logger.info("Note created", { noteId: created.id });
+    
+    // Emit real-time event for other connected clients
+    emitNoteEvent(userId, "note:created", created.id, serializeNote(created));
+    
     return successResponse(serializeNote(created), 201, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "notes-post" }

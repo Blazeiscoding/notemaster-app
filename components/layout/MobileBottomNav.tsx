@@ -5,13 +5,12 @@ import { Archive, Filter, StickyNote, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { hapticLight } from "@/lib/haptics";
-
-type NoteAppSection = "notes" | "archive" | "bin";
+import type { SectionKey } from "@/types/note";
 
 type MobileBottomNavProps = {
-  activeSection: NoteAppSection;
-  sectionCounts: Record<NoteAppSection, number>;
-  onSelectSection: (section: NoteAppSection) => void;
+  activeSection: SectionKey;
+  sectionCounts: Record<SectionKey, number>;
+  onSelectSection: (section: SectionKey) => void;
   onOpenSidebar: () => void;
 };
 
@@ -22,7 +21,7 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenSidebar,
 }) => {
   const navItems: Array<{
-    key: NoteAppSection;
+    key: SectionKey;
     label: string;
     icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
     count: number;
@@ -36,7 +35,7 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   );
 
   const handleSelect = React.useCallback(
-    (section: NoteAppSection) => {
+    (section: SectionKey) => {
       hapticLight();
       onSelectSection(section);
     },

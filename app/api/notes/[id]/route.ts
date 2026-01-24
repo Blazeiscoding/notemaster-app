@@ -14,6 +14,7 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-middleware";
+import { emitNoteEvent } from "@/lib/note-events";
 
 type ParamsPromise = Promise<{ id: string }>;
 
@@ -124,6 +125,10 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       });
 
       logger.info("Note updated", { noteId: id });
+      
+      // Emit real-time event for other connected clients
+      emitNoteEvent(userId, "note:updated", id, serializeNote(updated));
+      
       return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId);
     } catch (error) {
       logger.error("Note update failed: transaction error", error, { noteId: id });
@@ -145,6 +150,10 @@ export const DELETE = withAuthAndParams<ParamsPromise>(
     await prisma.note.delete({ where: { id } });
 
     logger.info("Note deleted", { noteId: id });
+    
+    // Emit real-time event for other connected clients
+    emitNoteEvent(userId, "note:deleted", id);
+    
     return successResponse({ deleted: true }, 200, rateLimitHeaders, requestId);
   },
   { rateLimitSuffix: "notes-delete" }

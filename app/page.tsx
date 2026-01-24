@@ -344,7 +344,7 @@ const NoteApp = () => {
             onDeleteNotebook={handleDeleteNotebook}
           />
 
-          <main className="space-y-6 pb-14 sm:pb-0">
+          <main className="space-y-6">
             {currentNote ? (
               <NoteEditor
                 note={currentNote}
@@ -399,60 +399,39 @@ const NoteApp = () => {
           </main>
         </div>
       </div>
-      {currentNote === null && (
-        <div className="sm:hidden">
-          <MobileBottomNav
-            activeSection={activeSection}
-            sectionCounts={sectionCounts}
-            onSelectSection={setActiveSection}
-            onOpenSidebar={handleOpenSidebar}
-          />
-        </div>
-      )}
+
+      {/* Theme Picker Modal */}
       <Modal
         open={showThemePanel}
         onClose={handleCloseThemePanel}
-        title="Choose theme"
-        description="Preview palettes and click one to apply instantly."
-        maxWidth="lg"
-        footer={
-          <Button variant="outline" size="sm" onClick={handleCloseThemePanel}>
-            Done
-          </Button>
-        }
+        title="Choose Theme"
+        description="Select your preferred accent color palette"
       >
-        <div className="mt-4">
-          <AccentPicker
-            palettes={accentPalettes}
-            activePaletteId={accent.id}
-            previewPaletteId={accentPreview?.id ?? null}
-            onPreview={handlePreviewAccent}
-            onCancelPreview={handleCancelAccentPreview}
-            onApply={handleApplyAccent}
-          />
-        </div>
+        <AccentPicker
+          palettes={accentPalettes}
+          activePaletteId={accent.id}
+          previewPaletteId={accentPreview?.id}
+          onPreview={handlePreviewAccent}
+          onCancelPreview={handleCancelAccentPreview}
+          onApply={handleApplyAccent}
+        />
       </Modal>
 
+      {/* Save Smart Filter Modal */}
       <Modal
         open={showSaveFilterDialog}
         onClose={handleCloseSaveFilter}
-        title="Save current filter"
-        description="Name your saved search so you can reuse it later."
-        maxWidth="md"
+        title="Save Smart Filter"
+        description="Save your current filter settings for quick access"
         as="form"
         onSubmit={handleSubmitQuickFilter}
         footer={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCloseSaveFilter}
-            >
+            <Button type="button" variant="outline" onClick={handleCloseSaveFilter}>
               Cancel
             </Button>
-            <Button type="submit" size="sm" disabled={!canSaveSmartFilter}>
-              Save filter
+            <Button type="submit" variant="accent">
+              Save Filter
             </Button>
           </>
         }
@@ -465,9 +444,17 @@ const NoteApp = () => {
           onDescriptionChange={setQuickFilterDescription}
         />
       </Modal>
-      {currentNote === null && (
+
+      {/* Mobile Bottom Navigation - visible only on mobile */}
+      <div className="lg:hidden">
         <MobileFloatingButton onCreateNote={createNote} />
-      )}
+        <MobileBottomNav
+          activeSection={activeSection}
+          sectionCounts={sectionCounts}
+          onSelectSection={setActiveSection}
+          onOpenSidebar={handleOpenSidebar}
+        />
+      </div>
     </div>
   );
 };

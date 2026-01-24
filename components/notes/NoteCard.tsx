@@ -25,10 +25,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { NotePayload } from "@/types/note";
+import type { NotePayload, SectionKey } from "@/types/note";
 import { useSwipe } from "./hooks/useSwipe";
-
-type SectionKey = "notes" | "archive" | "bin";
 
 type NoteCardProps = {
   note: NotePayload;
@@ -233,6 +231,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                 {note.title || "Untitled note"}
               </CardTitle>
               <>
+                <div className="flex items-center gap-1">
                   {isNotesSection && (
                     <>
                       <Tooltip>
@@ -373,7 +372,8 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                       </Tooltip>
                     </>
                   )}
-                </>
+                </div>
+              </>
             </div>
             <CardDescription className="flex items-center gap-2 text-xs">
               <Clock className="size-3" />

@@ -69,3 +69,5 @@ export type AccentPalette = {
   background: string
   texture?: string | null
 }
+
+export type SectionKey = "notes" | "archive" | "bin"

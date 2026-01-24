@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { toast } from "sonner";
 import type { NotebookPayload } from "@/types/note";

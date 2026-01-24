@@ -21,6 +21,7 @@ import { generateId } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
 import { apiRequest } from "@/lib/api-client";
+import { useSSE } from "@/lib/use-sse";
 
 type NoteAppSection = "notes" | "archive" | "bin";
 
@@ -219,6 +220,40 @@ export const useNoteApp = () => {
     }
   );
 
+  // Real-time updates via SSE (only when authenticated)
+  useSSE(
+    {
+      onNoteCreated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
+        if (!data) return;
+        // Only add if not already in list (to avoid duplicates from own actions)
+        setNotes((prev) => {
+          if (prev.some((n) => n.id === noteId)) return prev;
+          return [data as NotePayload, ...prev];
+        });
+      }, [setNotes]),
+      
+      onNoteUpdated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
+        if (!data) return;
+        setNotes((prev) => {
+          const index = prev.findIndex((n) => n.id === noteId);
+          if (index === -1) return prev;
+          const next = [...prev];
+          next[index] = { ...next[index], ...data };
+          return next;
+        });
+      }, [setNotes]),
+      
+      onNoteDeleted: useCallback((noteId: string) => {
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        // Close editor if the deleted note was being edited
+        if (currentNote?.id === noteId) {
+          setCurrentNote(null);
+        }
+      }, [setNotes, currentNote, setCurrentNote]),
+    },
+    { enabled: isAuthenticated }
+  );
+
   // Close editor when switching away from notes section
   useEffect(() => {
     if (activeSection !== "notes" && currentNote) {
@@ -266,6 +301,54 @@ export const useNoteApp = () => {
     setActiveSection,
     setShowSidebar,
   ]);
+
+  // Create note from PWA share target
+  const createNoteFromShare = useCallback((title: string, content: string) => {
+    setActiveSection("notes");
+    hapticLight();
+    const now = new Date().toISOString();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    const newNote: NotePayload = {
+      id: generateId(),
+      userId: ownerId,
+      notebookId: null,
+      title,
+      content,
+      tags: ["shared"],
+      checklist: [],
+      attachments: [],
+      type: "note",
+      createdAt: now,
+      updatedAt: now,
+      pinned: false,
+      archived: false,
+      trashed: false,
+      dueAt: null,
+    };
+    setCurrentNote(newNote);
+    setShowSidebar(false);
+  }, [isAuthenticated, userId, setCurrentNote, setActiveSection, setShowSidebar]);
+
+  // Check for shared note from PWA share target on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    
+    try {
+      const sharedNoteRaw = sessionStorage.getItem("notemaster-shared-note");
+      if (sharedNoteRaw) {
+        sessionStorage.removeItem("notemaster-shared-note");
+        const sharedNote = JSON.parse(sharedNoteRaw) as { title: string; content: string };
+        if (sharedNote.title || sharedNote.content) {
+          // Small delay to ensure app is fully loaded
+          setTimeout(() => {
+            createNoteFromShare(sharedNote.title || "Shared Note", sharedNote.content || "");
+          }, 500);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to process shared note:", error);
+    }
+  }, [createNoteFromShare]);
 
   const saveCurrentNote = useCallback(async () => {
     if (!currentNote) {
