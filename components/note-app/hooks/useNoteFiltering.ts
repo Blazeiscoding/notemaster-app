@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useDeferredValue } from "react";
 import type { NotePayload } from "@/types/note";
 import type { SmartFilterCriteria } from "@/components/note-app/types";
 
@@ -17,50 +17,53 @@ export function useNoteFiltering(
   sortBy: "updated" | "created" | "title",
   customOrder: string[]
 ) {
+  // Defer filtering to keep UI responsive during rapid updates (e.g., typing in search)
+  const deferredNotes = useDeferredValue(notes);
+  const deferredCriteria = useDeferredValue(resolvedCriteria);
   // Calculate timestamp only when needed for due date filtering
   const timestamp = useMemo(() => {
-    if (resolvedCriteria.dueWithinDays) {
+    if (deferredCriteria.dueWithinDays) {
       return getCurrentTimestamp();
     }
     return 0;
-  }, [resolvedCriteria.dueWithinDays]);
+  }, [deferredCriteria.dueWithinDays]);
 
   const filteredNotes = useMemo(() => {
-    const now = resolvedCriteria.dueWithinDays ? timestamp : 0;
-    return notes.filter((note) => {
-      const matchesSearch = resolvedCriteria.search
+    const now = deferredCriteria.dueWithinDays ? timestamp : 0;
+    return deferredNotes.filter((note) => {
+      const matchesSearch = deferredCriteria.search
         ? note.title
             .toLowerCase()
-            .includes(resolvedCriteria.search.toLowerCase()) ||
+            .includes(deferredCriteria.search.toLowerCase()) ||
           note.content
             .toLowerCase()
-            .includes(resolvedCriteria.search.toLowerCase())
+            .includes(deferredCriteria.search.toLowerCase())
         : true;
 
-      const matchesPrimaryTag = resolvedCriteria.tag
-        ? note.tags.includes(resolvedCriteria.tag)
+      const matchesPrimaryTag = deferredCriteria.tag
+        ? note.tags.includes(deferredCriteria.tag)
         : true;
-      const matchesExtraTags = resolvedCriteria.tags
-        ? resolvedCriteria.tags.every((tag) => note.tags.includes(tag))
+      const matchesExtraTags = deferredCriteria.tags
+        ? deferredCriteria.tags.every((tag) => note.tags.includes(tag))
         : true;
 
       const matchesPinned =
-        typeof resolvedCriteria.pinned === "boolean"
-          ? note.pinned === resolvedCriteria.pinned
+        typeof deferredCriteria.pinned === "boolean"
+          ? note.pinned === deferredCriteria.pinned
           : true;
 
-      const matchesDue = resolvedCriteria.dueWithinDays
+      const matchesDue = deferredCriteria.dueWithinDays
         ? note.dueAt
           ? (Date.parse(note.dueAt) - now) / (1000 * 60 * 60 * 24) <=
-            resolvedCriteria.dueWithinDays
+            deferredCriteria.dueWithinDays
           : false
         : true;
 
-      const matchesNotebook = resolvedCriteria.notebookId
-        ? note.notebookId === resolvedCriteria.notebookId
+      const matchesNotebook = deferredCriteria.notebookId
+        ? note.notebookId === deferredCriteria.notebookId
         : true;
 
-      const section = resolvedCriteria.section ?? "notes";
+      const section = deferredCriteria.section ?? "notes";
       const matchesSection =
         section === "notes"
           ? !note.archived && !note.trashed
@@ -78,17 +81,17 @@ export function useNoteFiltering(
         matchesSection
       );
     });
-  }, [notes, resolvedCriteria, timestamp]);
+  }, [deferredNotes, deferredCriteria, timestamp]);
 
   const allTags = useMemo(
-    () => [...new Set(notes.flatMap((note) => note.tags))],
-    [notes]
+    () => [...new Set(deferredNotes.flatMap((note) => note.tags))],
+    [deferredNotes]
   );
 
   const sortedNotes = useMemo(() => {
     const ordered = [...filteredNotes].sort((a, b) => {
-      const section = resolvedCriteria.section ?? activeSection;
-      const sortPreference = resolvedCriteria.sortBy ?? sortBy;
+      const section = deferredCriteria.section ?? activeSection;
+      const sortPreference = deferredCriteria.sortBy ?? sortBy;
 
       if (section === "notes") {
         const pinnedDiff = Number(b.pinned) - Number(a.pinned);
@@ -122,18 +125,18 @@ export function useNoteFiltering(
     activeSection,
     customOrder,
     filteredNotes,
-    resolvedCriteria.section,
-    resolvedCriteria.sortBy,
+    deferredCriteria.section,
+    deferredCriteria.sortBy,
     sortBy,
   ]);
 
   const sectionCounts = useMemo(
     () => ({
-      notes: notes.filter((note) => !note.archived && !note.trashed).length,
-      archive: notes.filter((note) => note.archived && !note.trashed).length,
-      bin: notes.filter((note) => note.trashed).length,
+      notes: deferredNotes.filter((note) => !note.archived && !note.trashed).length,
+      archive: deferredNotes.filter((note) => note.archived && !note.trashed).length,
+      bin: deferredNotes.filter((note) => note.trashed).length,
     }),
-    [notes]
+    [deferredNotes]
   );
 
   return {
