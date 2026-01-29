@@ -136,11 +136,12 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                     ref={rowVirtualizer.measureElement}
                     className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4"
                   >
-                    {row.map((note) => (
+                    {row.map((note, colIndex) => (
                       <NoteCard
                         key={note.id}
                         note={note}
                         activeSection={activeSection}
+                        index={virtualRow.index * columnsCount + colIndex}
                         onOpen={onOpenNote}
                         onPin={onPin}
                         onArchive={onArchive}
@@ -169,11 +170,12 @@ const NotesGrid: React.FC<NotesGridProps> = ({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {notes.map((note) => (
+        {notes.map((note, index) => (
           <NoteCard
             key={note.id}
             note={note}
             activeSection={activeSection}
+            index={index}
             onOpen={onOpenNote}
             onPin={onPin}
             onArchive={onArchive}

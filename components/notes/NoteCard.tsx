@@ -31,6 +31,7 @@ import { useSwipe } from "./hooks/useSwipe";
 type NoteCardProps = {
   note: NotePayload;
   activeSection: SectionKey;
+  index?: number;
   onOpen: (note: NotePayload) => void;
   onPin: (id: string) => void;
   onArchive: (id: string) => void;
@@ -44,6 +45,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
   ({
     note,
     activeSection,
+    index = 0,
     onOpen,
     onPin,
     onArchive,
