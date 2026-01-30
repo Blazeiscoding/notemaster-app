@@ -1,150 +1,184 @@
 # NoteMaster 📝
 
-A modern, secure, and feature-rich note-taking application built with Next.js 16, featuring end-to-end encryption, offline support, hierarchical notebooks, and a beautiful user interface.
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![Bun](https://img.shields.io/badge/Runtime-Bun-f472b6?style=flat-square&logo=bun)](https://bun.sh/)
+[![TypeScript](https://img.shields.io/badge/Language-TypeScript-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Styling-Tailwind_CSS_4-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+[![Prisma](https://img.shields.io/badge/ORM-Prisma-darkblue?style=flat-square&logo=prisma)](https://prisma.io/)
+[![Clerk](https://img.shields.io/badge/Auth-Clerk-6c47ff?style=flat-square&logo=clerk)](https://clerk.com/)
+
+A modern, secure, and feature-rich note-taking application built with **Next.js 16**. NoteMaster features **end-to-end encryption**, **offline-first capabilities**, hierarchical notebooks, and a premium user interface.
 
 ![NoteMaster App](./public/note-empty.svg)
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Architecture & Tech Stack](#-architecture--tech-stack)
+- [Getting Started](#-getting-started)
+- [Encryption](#-encryption-details)
+- [Project Structure](#-project-structure)
+- [Database Schema](#-database-schema)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
 
 ## ✨ Features
 
 ### 🔐 Security & Privacy
+- **End-to-End Encryption**: Uses **AES-256-GCM** to ensure your notes are encrypted before they leave your device.
+- **Privacy First**: Even the database administrator cannot read your notes.
+- **Secure Authentication**: Powered by Clerk.
 
-- **End-to-end encryption** using AES-256-GCM algorithm
-- All notes encrypted at rest in the database
-- Secure authentication via Clerk
-- Environment-based encryption keys
+### ⚡ Performance & Offline Support
+- **Offline-First**: Integrated with **IndexedDB** for instant load times and offline access.
+- **PWA Ready**: Installable on iOS, Android, and Desktop as a native-like app.
+- **Optimistic UI**: Instant interactions with background synchronization.
 
-### 📱 Progressive Web App
+### 📝 Powerful Note Management
+- **Rich Text Editor**: Powered by Tiptap with support for images, code blocks, and formatting.
+- **Hierarchical Notebooks**: Organize deeply with nested notebooks.
+- **Smart Tools**: Checklists, tags, pinning, archiving, and trash recovery.
+- **Version History**: Track changes and restore previous versions of your notes.
+- **Attachments**: Secure file uploads via **ImageKit**.
+- **Reminders**: Never miss a deadline with due dates.
 
-- Install on any device (iOS, Android, Desktop)
-- Works offline with localStorage fallback for guests
-- Native app-like experience
-- Responsive design for all screen sizes
+### 🎨 Premium User Experience
+- **Customizable Themes**: Choose from multiple accent colors and dark/light modes.
+- **Fluid Animations**: Smooth transitions and micro-interactions.
+- **Advanced Search**: Real-time search with "Smart Filters" to save complex queries.
+- **Keyboard Shortcuts**: Designed for power users (`Ctrl/Cmd + N`, etc.).
 
-### 📋 Note Management
+---
 
-- **Rich note-taking** with title, content, and tags
-- **Checklist support** for task management
-- **Pin important notes** for quick access
-- **Archive notes** to keep workspace organized
-- **Trash bin** with restore capability
-- **Note revisions** - View and restore previous versions
-- **File attachments** support
-- **Reminders** with due dates
-- Real-time search across titles and content
-- **Smart filters** - Save and reuse complex search queries
-- **Calendar view** - Visualize notes by date
+## 🏗️ Architecture & Tech Stack
 
-### 📚 Notebook Organization
+NoteMaster leverages a modern stack designed for performance and reliability.
 
-- **Hierarchical notebooks** - Organize notes in nested folders
-- **Custom notebook colors** for visual organization
-- **Quick notebook creation** from note editor
-- **Notebook filtering** - View notes by notebook
-- Drag-and-drop notebook organization
+### Core Stack
+- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
+- **Language**: [TypeScript](https://www.typescriptlang.org/)
+- **Database**: PostgreSQL (via [Neon](https://neon.tech/) or any provider)
+- **ORM**: [Prisma](https://prisma.io/)
+- **Runtime**: [Bun](https://bun.sh/)
 
-### 🎨 User Experience
+### Frontend & UI
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+- **Components**: [Radix UI](https://www.radix-ui.com/) primitives
+- **Editor**: [Tiptap](https://tiptap.dev/)
+- **Icons**: [Lucide](https://lucide.dev/)
+- **Notifications**: [Sonner](https://sonner.emilkowal.ski/)
+- **Virtualization**: @tanstack/react-virtual
 
-- **Customizable accent colors** - Choose from multiple theme palettes
-- **Dark mode** support with system preference detection
-- Beautiful animations and transitions
-- Sorting options (Last updated, Date created, Title)
-- Tag-based filtering and organization
-- **Smart filters** - Advanced search with saved queries
-- Empty state illustrations
-- Mobile-optimized sidebar with floating action button
-- **Keyboard shortcuts** for power users
+### Infrastructure & Services
+- **Authentication**: [Clerk](https://clerk.com/)
+- **Storage**: [ImageKit](https://imagekit.io/) (for media/attachments)
+- **Analytics**: [Vercel Analytics](https://vercel.com/analytics)
+- **Local Storage**: IDB (IndexedDB wrapper) & LocalStorage for guest mode
 
-### 💾 Data Management
+### 🔒 Encryption Flow
 
-- **Export notes** to JSON format
-- **Import notes** from JSON files
-- Automatic backup through PostgreSQL
-- Optimistic UI updates for instant feedback
+```mermaid
+graph TD
+    User([User]) -->|Input| Client[Client App]
+    subgraph Client Side
+        Client -->|Plain Text| Encrypt{AES-256-GCM}
+        Encrypt -->|Encrypted Content| API_Call[API Request]
+    end
+    API_Call -->|Encrypted Data| Network[Internet]
+    subgraph Server Side
+        Network --> API[Next.js API Routes]
+        API -->|Encrypted Data| DB[(PostgreSQL)]
+    end
+    
+    DB -->|Encrypted Data| API
+    API -->|Encrypted Data| Client
+    subgraph Decryption
+        Client -->|Encrypted Content| Decrypt{AES-256-GCM}
+        Decrypt -->|Plain Text| UI[User Interface]
+    end
+```
 
-### 👥 Multi-User Support
-
-- Guest mode with localStorage
-- Authenticated users with database sync
-- User-specific note isolation
-- Seamless migration from guest to authenticated
-
-## ⌨️ Keyboard Shortcuts
-
-- `Ctrl/Cmd + N` - Create new note
-- `Ctrl/Cmd + S` - Save current note
-- `Ctrl/Cmd + K` - Focus search bar
-- `Esc` - Close note editor
-- `Ctrl/Cmd + /` - Show keyboard shortcuts help
+---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-
-- Bun 1.0+ (or Node.js 18+)
-- PostgreSQL database
-- Clerk account for authentication
+- **Bun 1.0+** (Recommended) or Node.js 18+
+- **PostgreSQL Database** URL
+- **Clerk Account** (Publishable Key & Secret Key)
+- **ImageKit Account** (Optional, for attachment support)
 
 ### Installation
 
 1. **Clone the repository**
-
    ```bash
    git clone https://github.com/blazeiscoding/notemaster-app.git
    cd notemaster
    ```
 
 2. **Install dependencies**
-
    ```bash
    bun install
    ```
 
-3. **Set up environment variables**
-
+3. **Environment Setup**
    Create a `.env.local` file in the root directory:
-
    ```env
    # Database
-   DATABASE_URL="postgresql://user:password@localhost:5432/notemaster"
+   DATABASE_URL="postgresql://user:password@host:5432/notemaster"
 
-   # Encryption (generate a strong random key)
+   # Security (Generate a strong 32-byte hex string)
    NOTES_ENCRYPTION_KEY="your-super-secret-encryption-key-here"
 
-   # Clerk Authentication
+   # Clerk Auth
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_..."
    CLERK_SECRET_KEY="sk_test_..."
    NEXT_PUBLIC_CLERK_SIGN_IN_URL="/sign-in"
    NEXT_PUBLIC_CLERK_SIGN_UP_URL="/sign-up"
+   
+   # ImageKit (Optional)
+   NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT="..."
+   NEXT_PUBLIC_IMAGEKIT_PUBLIC_KEY="..."
+   IMAGEKIT_PRIVATE_KEY="..."
    ```
 
-4. **Set up the database**
-
+4. **Initialize Database**
    ```bash
    bun run db:generate
    bun run db:migrate
    ```
 
-5. **Run the development server**
-
+5. **Run Development Server**
    ```bash
    bun dev
    ```
 
-6. **Open your browser**
+Open [http://localhost:3000](http://localhost:3000) to view the app.
 
-   Navigate to [http://localhost:3000](http://localhost:3000)
+---
 
 ## 🔑 Generating an Encryption Key
 
-For production, generate a strong encryption key:
+It is **critical** to use a secure encryption key. Run the following command to generate one:
 
 ```bash
 bun -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-**⚠️ Important:** Never change the encryption key after data is encrypted, or you'll lose access to existing notes!
+> [!CAUTION]
+> **Never change the encryption key** after you have started creating notes. Doing so will make all existing encrypted data permanently unreadable.
+
+---
 
 ## 📊 Database Schema
+
+<details>
+<summary>Click to view Prisma Schema</summary>
 
 ```prisma
 model Note {
@@ -179,230 +213,77 @@ model Notebook {
   children  Notebook[] @relation("NotebookHierarchy")
   notes     Note[]
 }
-
-model NoteRevision {
-  id          String   @id @default(uuid())
-  noteId      String
-  title       String
-  content     String
-  tags        String[] @default([])
-  checklist   Json
-  attachments Json
-  pinned      Boolean  @default(false)
-  archived    Boolean  @default(false)
-  trashed     Boolean  @default(false)
-  dueAt       DateTime?
-  createdAt   DateTime @default(now())
-  note        Note     @relation(...)
-}
 ```
+</details>
+
+---
 
 ## 🏗️ Project Structure
 
 ```text
 notemaster/
-├── app/
-│   ├── api/
-│   │   ├── health/         # Health check endpoint
-│   │   ├── notes/          # Note CRUD operations & revisions
-│   │   └── notebooks/      # Notebook CRUD operations
-│   ├── sign-in/            # Clerk sign-in page
-│   ├── sign-up/            # Clerk sign-up page
-│   ├── globals.css         # Global styles with Tailwind
-│   ├── layout.tsx          # Root layout with Clerk provider
-│   └── page.tsx            # Main app component (optimized)
-├── components/
-│   ├── layout/             # Layout components (Header, Sidebar, etc.)
-│   ├── notes/              # Note-related components
-│   ├── notebooks/          # Notebook components
-│   ├── sidebar/            # Sidebar components
-│   ├── note-app/           # App-specific components & hooks
-│   │   ├── hooks/         # Custom React hooks
-│   │   ├── LoadingSkeleton.tsx
-│   │   └── SaveFilterForm.tsx
-│   └── ui/                 # Reusable UI components (Modal, Button, etc.)
-├── lib/
-│   ├── encryption.ts       # AES-256-GCM encryption utilities
-│   ├── prisma.ts           # Prisma client singleton
-│   ├── api-client.ts       # API client utilities
-│   ├── validation.ts       # Data validation
-│   └── utils.ts            # Utility functions
-├── prisma/
-│   ├── migrations/         # Database migrations
-│   └── schema.prisma       # Database schema
-├── public/
-│   ├── manifest.json       # PWA manifest
-│   └── *.svg               # Icons and illustrations
-├── scripts/
-│   └── backfill-encryption.ts  # Encrypt existing data
-└── types/
-    └── note.ts             # TypeScript type definitions
+├── app/                  # Next.js App Router pages
+│   ├── api/             # API Routes (Notes, Notebooks, Auth)
+│   ├── (auth)/          # Auth grouped routes
+│   └── globals.css      # Tailwind imports
+├── components/           # React Components
+│   ├── layout/          # Shell, Sidebar, Header
+│   ├── note-app/        # Core business logic components
+│   ├── notes/           # Note cards, editors, lists
+│   └── ui/              # Reusable UI primitives (Buttons, Modals)
+├── lib/                  # Utilities
+│   ├── encryption.ts    # AES-256-GCM logic
+│   ├── prisma.ts        # Database client
+│   └── use-idb.ts       # IndexedDB hooks
+├── prisma/              # Database schema & migrations
+└── public/              # Static assets & PWA manifest
 ```
 
-## 🔒 Encryption Details
-
-NoteMaster uses **AES-256-GCM** encryption to protect your notes:
-
-- **Algorithm:** AES-256-GCM (Galois/Counter Mode)
-- **Key derivation:** SHA-256 hash of the encryption key
-- **IV length:** 12 bytes (randomly generated per encryption)
-- **Auth tag length:** 16 bytes
-- **Encrypted fields:** title, content, tags, checklist items
-
-### Encryption Flow
-
-1. User creates/updates a note
-2. Data is encrypted client-side before sending to API
-3. Encrypted data is stored in PostgreSQL
-4. On retrieval, data is decrypted server-side
-5. Plain text is sent to authenticated user only
-
-## 🛠️ Development
-
-### Available Scripts
-
-```bash
-# Development
-bun dev              # Start dev server
-bun run build        # Build for production
-bun start            # Start production server
-
-# Database
-bun run db:generate  # Generate Prisma client
-bun run db:migrate   # Run migrations
-bun run db:push      # Push schema changes
-bun run db:studio    # Open Prisma Studio
-
-# Encryption
-bun run backfill     # Encrypt existing unencrypted data
-```
-
-### Tech Stack
-
-- **Runtime:** Bun
-- **Framework:** Next.js 16 (App Router)
-- **Language:** TypeScript
-- **Database:** PostgreSQL with Prisma ORM
-- **Authentication:** Clerk
-- **Styling:** Tailwind CSS 4
-- **UI Components:** Radix UI primitives
-- **Rich Text Editor:** Tiptap
-- **Encryption:** Node.js crypto module
-- **PWA:** next-pwa
-- **Virtualization:** @tanstack/react-virtual
-- **Notifications:** Sonner
-
-### Code Quality & Performance
-
-- **Optimized components** - Reusable Modal, LoadingSkeleton, and form components
-- **Code splitting** - Dynamic imports for better performance
-- **Memoized callbacks** - Optimized re-renders with React.useCallback
-- **Virtual scrolling** - Efficient rendering of large note lists
-- **Type safety** - Full TypeScript coverage
-
-## 🚢 Deployment
-
-### Deploy to Vercel
-
-1. Push your code to GitHub
-2. Import project to Vercel
-3. Add environment variables:
-   - `DATABASE_URL`
-   - `NOTES_ENCRYPTION_KEY`
-   - All Clerk variables
-4. Deploy!
-
-### Deploy to Other Platforms
-
-Ensure your platform supports:
-
-- Bun 1.0+ or Node.js 18+
-- PostgreSQL database
-- Environment variables
+---
 
 ## 🔧 Troubleshooting
 
-### Encrypted data showing after login
+### Common Issues
 
-**Cause:** Encryption key mismatch
+<details>
+<summary><strong>Encrypted text showing instead of content?</strong></summary>
 
-**Solution:**
+**Cause:** Your `NOTES_ENCRYPTION_KEY` does not match the key used to encrypt the data.
+**Fix:** Ensure the key in `.env.local` matches the one used during note creation. If you lost the key, the data is unrecoverable.
+</details>
 
-1. Verify `NOTES_ENCRYPTION_KEY` is set correctly
-2. Ensure the same key is used in all environments
-3. Check server logs for decryption errors
+<details>
+<summary><strong>Notes not syncing/loading?</strong></summary>
 
-### Notes not syncing
+**Cause:** Database connection or API issues.
+**Fix:** Check your network tab. If you see CORS or 500 errors, verify your Clerk and Database credentials.
+</details>
 
-**Cause:** Authentication or API issues
-
-**Solution:**
-
-1. Check Clerk configuration
-2. Verify API routes are accessible
-3. Check browser console for errors
-
-### PWA not installing
-
-**Cause:** HTTPS required or manifest issues
-
-**Solution:**
-
-1. Ensure site is served over HTTPS
-2. Verify `manifest.json` is accessible
-3. Check browser PWA requirements
-
-## 🎯 Recent Improvements
-
-### Code Optimization (Latest)
-
-- ✅ **Reusable Modal Component** - Extracted common modal pattern for theme picker and save filter dialogs
-- ✅ **Component Extraction** - Separated LoadingSkeleton, SaveFilterForm, and MobileFloatingButton into reusable components
-- ✅ **Performance Optimization** - Memoized callbacks to reduce unnecessary re-renders
-- ✅ **Code Organization** - Improved project structure and component separation
-
-### Features Added
-
-- 📚 **Notebooks** - Hierarchical organization system
-- 📝 **Note Revisions** - View and restore previous versions
-- 📎 **File Attachments** - Attach files to notes
-- ⏰ **Reminders** - Set due dates for notes
-- 🔍 **Smart Filters** - Save and reuse complex search queries
-- 📅 **Calendar View** - Visualize notes by date
-- 🎨 **Custom Themes** - Multiple accent color palettes
-- ⌨️ **Keyboard Shortcuts** - Power user productivity features
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are welcome!
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 3. Commit your changes (`git commit -m 'Add amazing feature'`)
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-### Code Style
-
-- Use TypeScript for all new code
-- Follow existing component patterns
-- Extract reusable components when appropriate
-- Add proper TypeScript types
-- Use React hooks and memoization for performance
+---
 
 ## 📝 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
-
-- Built with [Next.js](https://nextjs.org/)
-- Runtime powered by [Bun](https://bun.sh/)
-- Authentication by [Clerk](https://clerk.com/)
-- UI components from [Radix UI](https://www.radix-ui.com/)
-- Icons from [Lucide](https://lucide.dev/)
-- Styled with [Tailwind CSS](https://tailwindcss.com/)
-
 ---
 
-Made with ❤️ by Nikhil Rathore
+## 🙏 Acknowledgments
+
+Built with ❤️ by **Nikhil Rathore**.
+
+Special thanks to:
+- [Next.js](https://nextjs.org/) team for the amazing framework
+- [Sonner](https://sonner.emilkowal.ski/) for the beautiful toasts
+- [Shadcn UI](https://ui.shadcn.com/) philosophy for component design
