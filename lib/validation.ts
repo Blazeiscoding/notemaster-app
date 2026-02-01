@@ -83,21 +83,6 @@ export function sanitizeColor(input: unknown): string {
   return trimmed;
 }
 
-export function sanitizeDate(input: unknown): Date | null {
-  if (input === null || input === undefined || input === "") {
-    return null;
-  }
-  
-  if (typeof input === "string") {
-    const date = new Date(input);
-    if (isNaN(date.getTime())) {
-      throw new Error("Invalid date format");
-    }
-    return date;
-  }
-  
-  throw new Error("Invalid input type: expected string or null");
-}
 
 export function validateNotePayload(payload: unknown): {
   id: string;

@@ -40,10 +40,7 @@ function formatLogEntry(entry: LogEntry): string {
   return JSON.stringify(entry);
 }
 
-/**
- * Log an info message
- */
-export function logInfo(message: string, context?: LogContext): void {
+function logInfo(message: string, context?: LogContext): void {
   const entry: LogEntry = {
     level: "info",
     message,
@@ -54,15 +51,11 @@ export function logInfo(message: string, context?: LogContext): void {
   if (process.env.NODE_ENV === "development") {
     console.log(formatLogEntry(entry));
   } else {
-    // In production, you might want to send to a logging service
     console.log(formatLogEntry(entry));
   }
 }
 
-/**
- * Log a warning message
- */
-export function logWarn(message: string, context?: LogContext): void {
+function logWarn(message: string, context?: LogContext): void {
   const entry: LogEntry = {
     level: "warn",
     message,
@@ -73,10 +66,7 @@ export function logWarn(message: string, context?: LogContext): void {
   console.warn(formatLogEntry(entry));
 }
 
-/**
- * Log an error with optional error object
- */
-export function logError(
+function logError(
   message: string,
   error?: Error | unknown,
   context?: LogContext
@@ -103,17 +93,12 @@ export function logError(
 
   console.error(formatLogEntry(entry));
 
-  // In production, send to error tracking service (e.g., Sentry)
   if (process.env.NODE_ENV === "production" && process.env.SENTRY_DSN) {
     // Sentry integration would go here
-    // Example: Sentry.captureException(error, { extra: context });
   }
 }
 
-/**
- * Log a debug message (only in development)
- */
-export function logDebug(message: string, context?: LogContext): void {
+function logDebug(message: string, context?: LogContext): void {
   if (process.env.NODE_ENV === "development") {
     const entry: LogEntry = {
       level: "debug",

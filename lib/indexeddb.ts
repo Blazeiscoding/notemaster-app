@@ -117,12 +117,12 @@ export async function getAllNotes(): Promise<NotePayload[]> {
   return allNotes;
 }
 
-export async function getNote(id: string): Promise<NotePayload | undefined> {
+async function getNote(id: string): Promise<NotePayload | undefined> {
   const db = await getDB();
   return db.get("notes", id);
 }
 
-export async function saveNote(note: NotePayload): Promise<void> {
+async function saveNote(note: NotePayload): Promise<void> {
   const db = await getDB();
   const noteWithMeta = {
     ...note,
@@ -144,12 +144,12 @@ export async function saveNotes(notes: NotePayload[]): Promise<void> {
   ]);
 }
 
-export async function deleteNote(id: string): Promise<void> {
+async function deleteNote(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("notes", id);
 }
 
-export async function clearAllNotes(userId: string): Promise<void> {
+async function clearAllNotes(userId: string): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("notes", "readwrite");
   const index = tx.store.index("by-userId");
@@ -228,7 +228,7 @@ export async function getAllNotebooks(): Promise<NotebookPayload[]> {
   return db.getAll("notebooks");
 }
 
-export async function saveNotebook(notebook: NotebookPayload): Promise<void> {
+async function saveNotebook(notebook: NotebookPayload): Promise<void> {
   const db = await getDB();
   await db.put("notebooks", { ...notebook, _localUpdatedAt: Date.now() });
 }
@@ -248,7 +248,7 @@ export async function saveNotebooks(
   ]);
 }
 
-export async function deleteNotebook(id: string): Promise<void> {
+async function deleteNotebook(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("notebooks", id);
 }
@@ -289,7 +289,7 @@ export async function updatePendingSyncRetry(id: string): Promise<void> {
   }
 }
 
-export async function clearPendingSync(): Promise<void> {
+async function clearPendingSync(): Promise<void> {
   const db = await getDB();
   await db.clear("pendingSync");
 }
@@ -362,13 +362,13 @@ export async function removeRecentSearch(id: string): Promise<void> {
 // Meta / Settings
 // =====================
 
-export async function getMeta<T>(key: string): Promise<T | undefined> {
+async function getMeta<T>(key: string): Promise<T | undefined> {
   const db = await getDB();
   const result = await db.get("meta", key);
   return result?.value as T | undefined;
 }
 
-export async function setMeta<T>(key: string, value: T): Promise<void> {
+async function setMeta<T>(key: string, value: T): Promise<void> {
   const db = await getDB();
   await db.put("meta", { key, value });
 }
@@ -443,15 +443,4 @@ export async function isIndexedDBAvailable(): Promise<boolean> {
   }
 }
 
-export async function getDatabaseSize(): Promise<{
-  notes: number;
-  notebooks: number;
-  pendingSync: number;
-}> {
-  const db = await getDB();
-  return {
-    notes: await db.count("notes"),
-    notebooks: await db.count("notebooks"),
-    pendingSync: await db.count("pendingSync"),
-  };
-}
+

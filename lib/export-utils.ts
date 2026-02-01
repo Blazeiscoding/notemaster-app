@@ -35,21 +35,7 @@ export function exportNoteToMarkdown(note: NotePayload): string {
   return markdown;
 }
 
-export function exportNotesToMarkdown(notes: NotePayload[]): string {
-  return notes.map(exportNoteToMarkdown).join("\n\n");
-}
 
-export function downloadMarkdown(content: string, filename: string): void {
-  const blob = new Blob([content], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 export async function exportNoteToPDF(note: NotePayload): Promise<void> {
   const pdf = new jsPDF();
@@ -141,56 +127,7 @@ export async function exportNoteToPDF(note: NotePayload): Promise<void> {
   pdf.save(`${note.title || "note"}.pdf`);
 }
 
-export async function exportNotesToPDF(notes: NotePayload[]): Promise<void> {
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 20;
-  const maxWidth = pageWidth - 2 * margin;
 
-  let y = margin;
-
-  pdf.setFontSize(16);
-  pdf.setFont("helvetica", "bold");
-  pdf.text("Notes Export", margin, y);
-  y += 15;
-
-  notes.forEach((note, index) => {
-    if (y > pageHeight - 50 && index > 0) {
-      pdf.addPage();
-      y = margin;
-    }
-
-    // Title
-    pdf.setFontSize(14);
-    pdf.setFont("helvetica", "bold");
-    const title = note.title || "Untitled Note";
-    const titleLines = pdf.splitTextToSize(title, maxWidth);
-    pdf.text(titleLines, margin, y);
-    y += titleLines.length * 7 + 5;
-
-    // Content preview
-    if (note.content) {
-      pdf.setFontSize(10);
-      pdf.setFont("helvetica", "normal");
-      const preview = note.content.substring(0, 200);
-      const contentLines = pdf.splitTextToSize(preview, maxWidth);
-      
-      contentLines.forEach((line: string) => {
-        if (y > pageHeight - margin) {
-          pdf.addPage();
-          y = margin;
-        }
-        pdf.text(line, margin, y);
-        y += 5;
-      });
-    }
-
-    y += 10;
-  });
-
-  pdf.save("notes-export.pdf");
-}
 
 export function printNote(note: NotePayload): void {
   const printWindow = window.open("", "_blank");

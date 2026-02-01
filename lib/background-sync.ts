@@ -16,10 +16,7 @@ const MAX_RETRIES = 5;
 // Exponential backoff base delay (ms)
 const BASE_DELAY = 1000;
 
-/**
- * Register for background sync if supported
- */
-export async function registerBackgroundSync(): Promise<boolean> {
+async function registerBackgroundSync(): Promise<boolean> {
   if (typeof window === "undefined") return false;
   
   try {
@@ -42,19 +39,14 @@ export function isOnline(): boolean {
   return navigator.onLine;
 }
 
-/**
- * Queue a sync operation for later processing
- */
-export async function queueSyncOperation(
+async function queueSyncOperation(
   operation: Omit<SyncOperation, "id" | "timestamp" | "retries">
 ): Promise<void> {
   await addToPendingSync(operation);
   
-  // Try to sync immediately if online
   if (isOnline()) {
     await processSyncQueue();
   } else {
-    // Register for background sync when we come back online
     await registerBackgroundSync();
   }
 }
@@ -191,17 +183,11 @@ async function processNotebookOperation(
   }
 }
 
-/**
- * Calculate exponential backoff delay
- */
-export function getBackoffDelay(retries: number): number {
-  return Math.min(BASE_DELAY * Math.pow(2, retries), 30000); // Max 30 seconds
+function getBackoffDelay(retries: number): number {
+  return Math.min(BASE_DELAY * Math.pow(2, retries), 30000);
 }
 
-/**
- * Setup online/offline event listeners
- */
-export function setupConnectivityListeners(
+function setupConnectivityListeners(
   onOnline: () => void,
   onOffline: () => void
 ): () => void {
