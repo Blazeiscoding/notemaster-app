@@ -34,21 +34,7 @@ export function exportNoteToMarkdown(note: NotePayload): string {
   return markdown;
 }
 
-export function exportNotesToMarkdown(notes: NotePayload[]): string {
-  return notes.map(exportNoteToMarkdown).join("\n\n");
-}
 
-export function downloadMarkdown(content: string, filename: string): void {
-  const blob = new Blob([content], { type: "text/markdown" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 export async function exportNoteToPDF(note: NotePayload): Promise<void> {
   const { default: jsPDF } = await import("jspdf");
@@ -149,46 +135,79 @@ export async function exportNotesToPDF(notes: NotePayload[]): Promise<void> {
   const margin = 20;
   const maxWidth = pageWidth - 2 * margin;
 
-  let y = margin;
+  let isFirstNote = true;
 
-  pdf.setFontSize(16);
-  pdf.setFont("helvetica", "bold");
-  pdf.text("Notes Export", margin, y);
-  y += 15;
-
-  notes.forEach((note, index) => {
-    if (y > pageHeight - 50 && index > 0) {
+  for (const note of notes) {
+    if (!isFirstNote) {
       pdf.addPage();
-      y = margin;
     }
+    isFirstNote = false;
+
+    let y = margin;
 
     // Title
-    pdf.setFontSize(14);
+    pdf.setFontSize(18);
     pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(0, 0, 0);
     const title = note.title || "Untitled Note";
     const titleLines = pdf.splitTextToSize(title, maxWidth);
     pdf.text(titleLines, margin, y);
-    y += titleLines.length * 7 + 5;
+    y += titleLines.length * 8 + 10;
 
-    // Content preview
+    // Content
     if (note.content) {
-      pdf.setFontSize(10);
+      pdf.setFontSize(12);
       pdf.setFont("helvetica", "normal");
-      const preview = note.content.substring(0, 200);
-      const contentLines = pdf.splitTextToSize(preview, maxWidth);
-      
+      const contentLines = pdf.splitTextToSize(note.content, maxWidth);
+
       contentLines.forEach((line: string) => {
         if (y > pageHeight - margin) {
           pdf.addPage();
           y = margin;
         }
         pdf.text(line, margin, y);
-        y += 5;
+        y += 7;
       });
+      y += 10;
     }
 
-    y += 10;
-  });
+    // Checklist
+    if (note.checklist.length > 0) {
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Checklist", margin, y);
+      y += 10;
+
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "normal");
+      note.checklist.forEach((item) => {
+        if (y > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+        const checkbox = item.checked ? "☑" : "☐";
+        pdf.text(`${checkbox} ${item.text}`, margin + 5, y);
+        y += 7;
+      });
+      y += 10;
+    }
+
+    // Tags
+    if (note.tags.length > 0) {
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "italic");
+      const tagsText = note.tags.map((tag) => `#${tag}`).join(" ");
+      const tagLines = pdf.splitTextToSize(tagsText, maxWidth);
+      tagLines.forEach((line: string) => {
+        if (y > pageHeight - margin) {
+          pdf.addPage();
+          y = margin;
+        }
+        pdf.text(line, margin, y);
+        y += 7;
+      });
+    }
+  }
 
   pdf.save("notes-export.pdf");
 }

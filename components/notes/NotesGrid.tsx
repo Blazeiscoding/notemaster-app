@@ -141,6 +141,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                         key={note.id}
                         note={note}
                         activeSection={activeSection}
+                        index={virtualRow.index * columnsCount + colIndex}
                         onOpen={onOpenNote}
                         onPin={onPin}
                         onArchive={onArchive}
@@ -148,7 +149,6 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                         onUnarchive={onUnarchive}
                         onRestoreFromBin={onRestoreFromBin}
                         onDeleteForever={onDeleteForever}
-                        index={virtualRow.index * columnsCount + colIndex}
                       />
                     ))}
                     {/* Fill remaining columns in the last row */}
@@ -175,6 +175,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
             key={note.id}
             note={note}
             activeSection={activeSection}
+            index={index}
             onOpen={onOpenNote}
             onPin={onPin}
             onArchive={onArchive}
@@ -182,7 +183,6 @@ const NotesGrid: React.FC<NotesGridProps> = ({
             onUnarchive={onUnarchive}
             onRestoreFromBin={onRestoreFromBin}
             onDeleteForever={onDeleteForever}
-            index={index}
           />
         ))}
       </div>

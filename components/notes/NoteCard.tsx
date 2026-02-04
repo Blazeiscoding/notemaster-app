@@ -31,6 +31,8 @@ import { useSwipe } from "./hooks/useSwipe";
 type NoteCardProps = {
   note: NotePayload;
   activeSection: SectionKey;
+  /** Index in the grid for priority loading optimization */
+  index?: number;
   onOpen: (note: NotePayload) => void;
   onPin: (id: string) => void;
   onArchive: (id: string) => void;
@@ -38,14 +40,13 @@ type NoteCardProps = {
   onUnarchive: (id: string) => void;
   onRestoreFromBin: (id: string) => void;
   onDeleteForever: (id: string) => void;
-  /** Index in the grid for priority loading optimization */
-  index?: number;
 };
 
 const NoteCard: React.FC<NoteCardProps> = React.memo(
   ({
     note,
     activeSection,
+    index = 0,
     onOpen,
     onPin,
     onArchive,
@@ -53,7 +54,6 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     onUnarchive,
     onRestoreFromBin,
     onDeleteForever,
-    index = 0,
   }) => {
     // Prioritize loading for first 6 cards (2 rows of 3)
     const isPriorityImage = index < 6;

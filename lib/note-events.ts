@@ -3,7 +3,7 @@ import type { NotePayload, NotebookPayload } from "@/types/note";
 // Event types for real-time updates
 export type NoteEventType = "note:created" | "note:updated" | "note:deleted";
 export type NotebookEventType = "notebook:created" | "notebook:updated" | "notebook:deleted";
-export type EventType = NoteEventType | NotebookEventType | "heartbeat";
+type EventType = NoteEventType | NotebookEventType | "heartbeat";
 
 export interface NoteEvent {
   type: NoteEventType;
@@ -49,10 +49,7 @@ export function subscribeToEvents(userId: string, listener: EventListener): () =
   };
 }
 
-/**
- * Broadcast an event to all listeners for a user
- */
-export function broadcastEvent(userId: string, event: SSEEvent): void {
+function broadcastEvent(userId: string, event: SSEEvent): void {
   const userListeners = listeners.get(userId);
   if (userListeners) {
     userListeners.forEach((listener) => {
@@ -82,37 +79,4 @@ export function emitNoteEvent(
   });
 }
 
-/**
- * Emit a notebook event
- */
-export function emitNotebookEvent(
-  userId: string,
-  type: NotebookEventType,
-  notebookId: string,
-  data?: Partial<NotebookPayload>
-): void {
-  broadcastEvent(userId, {
-    type,
-    notebookId,
-    data,
-    timestamp: Date.now(),
-  });
-}
 
-/**
- * Get the number of active listeners for a user
- */
-export function getListenerCount(userId: string): number {
-  return listeners.get(userId)?.size ?? 0;
-}
-
-/**
- * Get total number of active connections
- */
-export function getTotalConnections(): number {
-  let total = 0;
-  listeners.forEach((set) => {
-    total += set.size;
-  });
-  return total;
-}

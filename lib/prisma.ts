@@ -14,7 +14,7 @@ function createPrismaClient() {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  const pool = new Pool({ 
+  const pool = new Pool({
     connectionString,
     max: 10,                        // Limit connections for serverless
     idleTimeoutMillis: 30000,       // Close idle connections after 30s

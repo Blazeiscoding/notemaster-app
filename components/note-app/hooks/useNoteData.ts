@@ -8,12 +8,14 @@ import {
   saveNotebooks as saveNotebooksToDB,
   migrateFromLocalStorage,
   isIndexedDBAvailable,
-  getMeta,
-  setMeta,
+  getUserNotes,
+  getUserNotebooks,
+  saveUserNotes,
+  saveUserNotebooks,
 } from "@/lib/indexeddb";
 
 // Cache keys for stale-while-revalidate pattern
-const CACHE_TIMESTAMP_KEY = "last-server-fetch";
+const CACHE_TIMESTAMP_PREFIX = "last-server-fetch-";
 const STALE_TIME = 5 * 60 * 1000; // 5 minutes - data older than this triggers background refresh
 
 type ServerActions = {
@@ -24,7 +26,8 @@ type ServerActions = {
 export function useNoteData(
   isAuthenticated: boolean,
   storageKey: string,
-  serverActions: ServerActions
+  serverActions: ServerActions,
+  userId?: string | null
 ) {
   const { fetchNotesFromServer, fetchNotebooksFromServer } = serverActions;
   const [notes, setNotes] = useState<NotePayload[]>([]);
@@ -33,6 +36,7 @@ export function useNoteData(
   const [error, setError] = useState<string | null>(null);
   const [useIndexedDB, setUseIndexedDB] = useState(true);
   const initialLoadComplete = useRef(false);
+  const isRevalidating = useRef(false);
 
   // Check IndexedDB availability on mount
   useEffect(() => {
@@ -42,6 +46,18 @@ export function useNoteData(
         console.warn("IndexedDB not available, falling back to localStorage");
       }
     });
+  }, []);
+
+  // Get cache timestamp from localStorage (simple and reliable)
+  const getCacheTimestamp = useCallback((uid: string): number | null => {
+    if (typeof window === "undefined") return null;
+    const ts = localStorage.getItem(`${CACHE_TIMESTAMP_PREFIX}${uid}`);
+    return ts ? parseInt(ts, 10) : null;
+  }, []);
+
+  const setCacheTimestamp = useCallback((uid: string) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(`${CACHE_TIMESTAMP_PREFIX}${uid}`, Date.now().toString());
   }, []);
 
   // Background fetch from server (for stale-while-revalidate)
@@ -55,61 +71,67 @@ export function useNoteData(
     ]);
     
     // Cache the fresh data to IndexedDB for next time
-    if (useIndexedDB) {
+    if (useIndexedDB && userId) {
       await Promise.all([
-        saveNotesToDB(remoteNotes),
-        saveNotebooksToDB(remoteNotebooks),
-        setMeta(CACHE_TIMESTAMP_KEY, Date.now()),
+        saveUserNotes(userId, remoteNotes),
+        saveUserNotebooks(userId, remoteNotebooks),
       ]);
+      setCacheTimestamp(userId);
     }
     
     return { notes: remoteNotes, notebooks: remoteNotebooks };
-  }, [fetchNotesFromServer, fetchNotebooksFromServer, useIndexedDB]);
+  }, [fetchNotesFromServer, fetchNotebooksFromServer, useIndexedDB, userId, setCacheTimestamp]);
 
   const loadNotesAndNotebooks = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      if (isAuthenticated) {
+      if (isAuthenticated && userId) {
         // Stale-while-revalidate pattern for authenticated users:
         // 1. Show cached data immediately if available
-        // 2. Fetch fresh data in background
+        // 2. Fetch fresh data in background if cache is stale
         // 3. Update UI when fresh data arrives
         
         let hasCachedData = false;
         
-        if (useIndexedDB) {
-          // Try to load cached data first for instant display
-          const [cachedNotes, cachedNotebooks, lastFetch] = await Promise.all([
-            getAllNotes(),
-            getAllNotebooks(),
-            getMeta<number>(CACHE_TIMESTAMP_KEY),
-          ]);
-          
-          if (cachedNotes.length > 0 || cachedNotebooks.length > 0) {
-            // Show cached data immediately
-            setNotes(cachedNotes);
-            setNotebooks(cachedNotebooks);
-            hasCachedData = true;
-            initialLoadComplete.current = true;
+        if (useIndexedDB && !initialLoadComplete.current) {
+          try {
+            const [cachedNotes, cachedNotebooks] = await Promise.all([
+              getUserNotes(userId),
+              getUserNotebooks(userId),
+            ]);
             
-            // Check if cache is stale
-            const isStale = !lastFetch || (Date.now() - lastFetch) > STALE_TIME;
-            
-            if (isStale) {
-              // Fetch fresh data in background (don't show loading state)
-              setIsLoading(false);
-              fetchFromServer()
-                .then(({ notes: freshNotes, notebooks: freshNotebooks }) => {
-                  setNotes(freshNotes);
-                  setNotebooks(freshNotebooks);
-                })
-                .catch((err) => {
-                  console.error("Background refresh failed:", err);
-                  // Silent fail - we already have cached data
-                });
-              return;
+            if (cachedNotes.length > 0 || cachedNotebooks.length > 0) {
+              // Show cached data immediately
+              setNotes(cachedNotes);
+              setNotebooks(cachedNotebooks);
+              hasCachedData = true;
+              
+              // Check if cache is stale
+              const lastFetch = getCacheTimestamp(userId);
+              const isStale = !lastFetch || (Date.now() - lastFetch) > STALE_TIME;
+              
+              if (isStale) {
+                // Fetch fresh data in background (don't show loading state)
+                setIsLoading(false);
+                isRevalidating.current = true;
+                fetchFromServer()
+                  .then(({ notes: freshNotes, notebooks: freshNotebooks }) => {
+                    setNotes(freshNotes);
+                    setNotebooks(freshNotebooks);
+                    isRevalidating.current = false;
+                  })
+                  .catch((err) => {
+                    console.error("Background refresh failed:", err);
+                    isRevalidating.current = false;
+                    // Silent fail - we already have cached data
+                  });
+                initialLoadComplete.current = true;
+                return;
+              }
             }
+          } catch {
+            // Cache read failed, continue to fetch from server
           }
         }
         
@@ -173,9 +195,11 @@ export function useNoteData(
     }
   }, [
     isAuthenticated,
+    userId,
     storageKey,
     fetchFromServer,
     useIndexedDB,
+    getCacheTimestamp,
   ]);
 
   useEffect(() => {
@@ -196,10 +220,11 @@ export function useNoteData(
         if (typeof window === "undefined") return;
 
         if (useIndexedDB) {
-          await saveNotesToDB(notes);
-          // Update cache timestamp for authenticated users
-          if (isAuthenticated) {
-            await setMeta(CACHE_TIMESTAMP_KEY, Date.now());
+          if (isAuthenticated && userId) {
+            await saveUserNotes(userId, notes);
+            setCacheTimestamp(userId);
+          } else {
+            await saveNotesToDB(notes);
           }
         } else if (!isAuthenticated && window.localStorage) {
           // localStorage fallback only for guests
@@ -214,7 +239,7 @@ export function useNoteData(
     };
 
     persistNotes();
-  }, [notes, isLoading, isAuthenticated, storageKey, useIndexedDB]);
+  }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB, setCacheTimestamp]);
 
   // Persist notebooks to local storage/IndexedDB
   useEffect(() => {
@@ -228,7 +253,11 @@ export function useNoteData(
         if (typeof window === "undefined") return;
 
         if (useIndexedDB) {
-          await saveNotebooksToDB(notebooks);
+          if (isAuthenticated && userId) {
+            await saveUserNotebooks(userId, notebooks);
+          } else {
+            await saveNotebooksToDB(notebooks);
+          }
         } else if (!isAuthenticated && window.localStorage) {
           // localStorage fallback only for guests
           window.localStorage.setItem(
@@ -245,7 +274,7 @@ export function useNoteData(
     };
 
     persistNotebooks();
-  }, [notebooks, isAuthenticated, storageKey, useIndexedDB, isLoading]);
+  }, [notebooks, isAuthenticated, userId, storageKey, useIndexedDB, isLoading]);
 
   // Force refresh function that bypasses cache
   const forceRefresh = useCallback(async () => {

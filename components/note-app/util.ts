@@ -97,14 +97,7 @@ export const buildNotebookOptions = (tree: NotebookTreeNode[]) => {
   return options;
 };
 
-export const formatDateTimeForInput = (value: string | null) => {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const offset = date.getTimezoneOffset();
-  const local = new Date(date.getTime() - offset * 60_000);
-  return local.toISOString().slice(0, 16);
-};
+
 
 export const parseInputToIso = (value: string): string | null => {
   if (!value) return null;

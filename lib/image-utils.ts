@@ -147,19 +147,7 @@ export async function compressImage(
   });
 }
 
-/**
- * Compresses multiple image files in parallel.
- *
- * @param files - Array of files to compress
- * @param options - Compression options
- * @returns Promise resolving to array of compressed files
- */
-export async function compressImages(
-  files: File[],
-  options: CompressOptions = {}
-): Promise<File[]> {
-  return Promise.all(files.map((file) => compressImage(file, options)));
-}
+
 
 /**
  * Gets the file extension for a MIME type.
@@ -186,35 +174,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/**
- * Estimates image dimensions without fully loading the image.
- * Useful for quick validation before upload.
- */
-export function getImageDimensions(
-  file: File
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("Not an image file"));
-      return;
-    }
 
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve({ width: img.width, height: img.height });
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to load image"));
-    };
-
-    img.src = url;
-  });
-}
 
 /**
  * Checks if a file needs compression based on size and type.

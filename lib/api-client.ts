@@ -5,11 +5,7 @@
 
 import type { ApiResponse } from "./api-middleware";
 
-/**
- * Extract data from standardized API response
- * Throws error if response is not successful
- */
-export async function handleApiResponse<T>(
+async function handleApiResponse<T>(
   response: Response
 ): Promise<T> {
   const data = (await response.json()) as ApiResponse<T>;

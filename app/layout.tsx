@@ -3,6 +3,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import "./globals.css";
 
@@ -65,10 +66,12 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >
-          <ErrorBoundary>
-            {children}
-            <Toaster position="top-right" richColors />
-          </ErrorBoundary>
+          <TooltipProvider delayDuration={300}>
+            <ErrorBoundary>
+              {children}
+              <Toaster position="top-right" richColors />
+            </ErrorBoundary>
+          </TooltipProvider>
           <Analytics />
         </body>
       </html>

@@ -158,7 +158,7 @@ export const useNoteApp = () => {
     fetchNotebooksFromServer: fetchNotebooksFromServer as () => Promise<
       NotebookPayload[]
     >,
-  });
+  }, userId);
 
   // Notebooks management
   const notebooksHook = useNotebooks(
