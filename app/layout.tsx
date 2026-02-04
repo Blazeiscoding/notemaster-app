@@ -39,6 +39,10 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
     shortcut: "/favicon.ico",
   },
+  other: {
+    // DNS prefetch for external services
+    "dns-prefetch": "//ik.imagekit.io",
+  },
 };
 
 export const viewport: Viewport = {
@@ -53,6 +57,11 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en">
+        <head>
+          {/* Preconnect to ImageKit for faster image loading */}
+          <link rel="preconnect" href="https://ik.imagekit.io" />
+          <link rel="dns-prefetch" href="https://ik.imagekit.io" />
+        </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         >

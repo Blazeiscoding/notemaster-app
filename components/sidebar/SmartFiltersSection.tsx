@@ -1,182 +1,126 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Filter, Trash2 } from "lucide-react";
-import type { SmartFilter, SmartFilterCriteria } from "@/components/note-app/types";
+import React, { useCallback, useMemo } from "react";
+import { Filter, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import type {
+  SmartFilter,
+  SmartFilterCriteria,
+} from "@/components/note-app/types";
 
-export type SmartFiltersSectionProps = {
+type SmartFiltersSectionProps = {
   smartFilters: SmartFilter[];
   activeSmartFilterId: string | null;
   canSaveSmartFilter: boolean;
   currentCriteria: SmartFilterCriteria;
-  onAdd: (input: { name: string; description?: string; criteria?: SmartFilterCriteria }) => boolean;
+  onAdd: (input: { name: string; description?: string }) => boolean;
   onApply: (id: string | null) => void;
   onRemove: (id: string) => void;
 };
 
-const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = ({
-  smartFilters,
-  activeSmartFilterId,
-  canSaveSmartFilter,
-  currentCriteria,
-  onAdd,
-  onApply,
-  onRemove,
-}) => {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+const SmartFiltersSection: React.FC<SmartFiltersSectionProps> = React.memo(
+  ({
+    smartFilters,
+    activeSmartFilterId,
+    canSaveSmartFilter,
+    currentCriteria,
+    onAdd,
+    onApply,
+    onRemove,
+  }) => {
+    const handleApply = useCallback(
+      (id: string | null) => () => {
+        onApply(id);
+      },
+      [onApply]
+    );
 
-  const criteriaChips = useMemo(() => {
-    const chips: string[] = [];
+    const handleRemove = useCallback(
+      (id: string) => (e: React.MouseEvent) => {
+        e.stopPropagation();
+        onRemove(id);
+      },
+      [onRemove]
+    );
 
-    if (currentCriteria.search) {
-      chips.push(`Search: "${currentCriteria.search}"`);
-    }
-    if (currentCriteria.tag) {
-      chips.push(`#${currentCriteria.tag}`);
-    }
-    if (currentCriteria.tags?.length) {
-      chips.push(...currentCriteria.tags.map((tag) => `+${tag}`));
-    }
-    if (typeof currentCriteria.pinned === "boolean") {
-      chips.push(currentCriteria.pinned ? "Pinned" : "Not pinned");
-    }
-    if (typeof currentCriteria.dueWithinDays === "number") {
-      chips.push(`Due ≤ ${currentCriteria.dueWithinDays}d`);
-    }
-
-    return chips;
-  }, [currentCriteria]);
-
-  const handleSave = () => {
-    if (!name.trim()) return;
-    const success = onAdd({
-      name,
-      description: description.trim() || undefined,
-    });
-    if (success) {
-      setName("");
-      setDescription("");
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          <Filter className="size-4" />
-          Smart filters
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onApply(null)}
-          disabled={!activeSmartFilterId}
-          className="text-(--interactive-accent) hover:text-(--interactive-accent-strong)"
-        >
-          Clear
-        </Button>
-      </div>
-
-      {criteriaChips.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {criteriaChips.map((chip) => (
-            <Badge 
-              key={chip} 
-              variant="outline" 
-              className="text-xs border-(--interactive-accent)/30 text-(--interactive-accent)"
-            >
-              {chip}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-2">
-        {smartFilters.map((filter) => {
-          const isActive = filter.id === activeSmartFilterId;
+    const filterButtons = useMemo(
+      () =>
+        smartFilters.map((filter) => {
+          const isActive = activeSmartFilterId === filter.id;
           return (
             <div
               key={filter.id}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-3 py-2 transition",
+                "group flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-all duration-150 cursor-pointer",
                 isActive
-                  ? "border-(--interactive-accent) bg-(--interactive-accent-soft)"
-                  : "hover:border-(--interactive-accent)/40"
+                  ? "bg-(--interactive-accent) text-(--interactive-accent-contrast) shadow-sm"
+                  : "bg-muted/50 hover:bg-muted text-foreground"
               )}
-              data-active={isActive}
+              onClick={handleApply(filter.id)}
             >
-              <button
-                type="button"
-                onClick={() => onApply(filter.id)}
-                className="flex flex-1 flex-col items-start text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--interactive-accent) rounded"
-              >
-                <span className={cn(
-                  "text-sm font-semibold",
-                  isActive ? "text-(--interactive-accent)" : ""
-                )}>
-                  {filter.name}
-                </span>
-                {filter.description ? (
-                  <span className="text-xs text-muted-foreground">{filter.description}</span>
-                ) : (
-                  filter.isDefault && (
-                    <span className="text-xs text-muted-foreground">Default filter</span>
-                  )
+              <Filter className="size-3.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{filter.name}</div>
+                {filter.description && (
+                  <div
+                    className={cn(
+                      "text-xs truncate",
+                      isActive
+                        ? "text-(--interactive-accent-contrast)/70"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {filter.description}
+                  </div>
                 )}
-              </button>
-              {!filter.isDefault && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => onRemove(filter.id)}
-                  title="Delete smart filter"
-                >
-                  <Trash2 className="size-4" />
-                </Button>
-              )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleRemove(filter.id)}
+                className={cn(
+                  "opacity-0 group-hover:opacity-100 transition-opacity",
+                  isActive
+                    ? "text-(--interactive-accent-contrast)/70 hover:text-(--interactive-accent-contrast)"
+                    : "text-muted-foreground hover:text-destructive"
+                )}
+              >
+                <Trash2 className="size-3" />
+              </Button>
             </div>
           );
-        })}
-      </div>
+        }),
+      [smartFilters, activeSmartFilterId, handleApply, handleRemove]
+    );
 
-      <div className="space-y-2 rounded-lg border p-3">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Save current view
-        </div>
-        <Input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Filter name"
-          aria-label="Smart filter name"
-        />
-        <Input
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          placeholder="Description (optional)"
-          aria-label="Smart filter description"
-        />
-        <Button
-          size="sm"
-          variant="accent"
-          onClick={handleSave}
-          disabled={!canSaveSmartFilter || !name.trim()}
-          className="shadow-sm shadow-(--interactive-accent)/20"
-        >
-          Save smart filter
-        </Button>
-        {!canSaveSmartFilter && (
-          <p className="text-xs text-muted-foreground">
-            Adjust your search, tags, or section to create a unique filter.
-          </p>
+    if (smartFilters.length === 0) {
+      return (
+        <p className="text-xs text-muted-foreground text-center py-2">
+          No saved filters yet. Use the search and filters above, then save
+          your combination.
+        </p>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {activeSmartFilterId && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleApply(null)}
+            className="w-full text-xs"
+          >
+            Clear active filter
+          </Button>
         )}
+        <div className="space-y-1.5">{filterButtons}</div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+SmartFiltersSection.displayName = "SmartFiltersSection";
 
 export default SmartFiltersSection;

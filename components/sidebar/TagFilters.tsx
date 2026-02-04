@@ -1,7 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useMemo } from "react";
+import { Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type TagFiltersProps = {
@@ -13,71 +15,105 @@ type TagFiltersProps = {
   onClear: () => void;
 };
 
-const TagFilters: React.FC<TagFiltersProps> = ({
-  tags,
-  activeTag,
-  notesCountByTag,
-  totalNotes,
-  onSelect,
-  onClear,
-}) => {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-          Tags
-        </div>
-        {tags.length > 0 && (
-          <button
-            className="text-xs text-(--interactive-accent) underline-offset-4 hover:underline transition-colors"
-            onClick={onClear}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={activeTag === "all" ? "accent" : "outline"}
-          size="sm"
-          className={activeTag === "all" ? "shadow-sm shadow-(--interactive-accent)/20" : ""}
-          onClick={() => onSelect("all")}
-        >
-          All
-          <span className={cn(
-            "ml-2 rounded-full px-2 py-0.5 text-xs",
-            activeTag === "all"
-              ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
-              : "bg-background text-muted-foreground"
-          )}>
-            {totalNotes}
+const TagFilters: React.FC<TagFiltersProps> = React.memo(
+  ({ tags, activeTag, notesCountByTag, totalNotes, onSelect, onClear }) => {
+    const sortedTags = useMemo(
+      () =>
+        [...tags].sort((a, b) => {
+          const countA = notesCountByTag[a] ?? 0;
+          const countB = notesCountByTag[b] ?? 0;
+          return countB - countA;
+        }),
+      [tags, notesCountByTag]
+    );
+
+    const handleTagClick = useCallback(
+      (tag: string) => () => {
+        onSelect(tag);
+      },
+      [onSelect]
+    );
+
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Tag className="size-3" />
+            Tags
           </span>
-        </Button>
-        {tags.map((tag) => (
-          <Button
-            key={tag}
-            variant={activeTag === tag ? "accent" : "outline"}
-            size="sm"
-            className={activeTag === tag ? "shadow-sm shadow-(--interactive-accent)/20" : ""}
-            onClick={() => onSelect(tag)}
+          {activeTag !== "all" && (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onClear}
+              className="h-5 w-5"
+            >
+              <X className="size-3" />
+            </Button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {/* All tags button */}
+          <Badge
+            variant={activeTag === "all" ? "default" : "outline"}
+            className={cn(
+              "cursor-pointer transition-all duration-150",
+              activeTag === "all"
+                ? "bg-(--interactive-accent) text-(--interactive-accent-contrast) shadow-sm"
+                : "border-(--interactive-accent)/30 text-(--interactive-accent) hover:bg-(--interactive-accent-soft) hover:border-(--interactive-accent)/50"
+            )}
+            onClick={handleTagClick("all")}
           >
-            #{tag}
-            <span className={cn(
-              "ml-2 rounded-full px-2 py-0.5 text-xs",
-              activeTag === tag
-                ? "bg-[var(--interactive-accent-contrast)]/20 text-[var(--interactive-accent-contrast)]"
-                : "bg-background text-muted-foreground"
-            )}>
-              {notesCountByTag[tag] ?? 0}
+            All
+            <span
+              className={cn(
+                "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                activeTag === "all"
+                  ? "bg-(--interactive-accent-contrast)/20"
+                  : "bg-muted"
+              )}
+            >
+              {totalNotes}
             </span>
-          </Button>
-        ))}
-        {tags.length === 0 && (
-          <p className="text-sm text-muted-foreground">No tags yet</p>
-        )}
+          </Badge>
+          {tags.length === 0 && (
+            <span className="text-xs text-muted-foreground py-1">No tags yet</span>
+          )}
+          {sortedTags.map((tag) => {
+            const isActive = activeTag === tag;
+            const count = notesCountByTag[tag] ?? 0;
+            return (
+              <Badge
+                key={tag}
+                variant={isActive ? "default" : "outline"}
+                className={cn(
+                  "cursor-pointer transition-all duration-150",
+                  isActive
+                    ? "bg-(--interactive-accent) text-(--interactive-accent-contrast) shadow-sm"
+                    : "border-(--interactive-accent)/30 text-(--interactive-accent) hover:bg-(--interactive-accent-soft) hover:border-(--interactive-accent)/50"
+                )}
+                onClick={handleTagClick(tag)}
+              >
+                #{tag}
+                <span
+                  className={cn(
+                    "ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                    isActive
+                      ? "bg-(--interactive-accent-contrast)/20"
+                      : "bg-muted"
+                  )}
+                >
+                  {count}
+                </span>
+              </Badge>
+            );
+          })}
+        </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+TagFilters.displayName = "TagFilters";
 
 export default TagFilters;
