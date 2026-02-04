@@ -1,12 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { useTheme } from "./useTheme";
 import { usePWA } from "./usePWA";
 import { useAccent } from "./useAccent";
-import { useSmartFilters } from "./useSmartFilters";
 import { useNotes } from "./useNotes";
-import { useNotebooks } from "./useNotebooks";
 import { useCurrentNote } from "./useCurrentNote";
 import { useNoteRevisions } from "./useNoteRevisions";
 import { useNoteData } from "./useNoteData";
@@ -16,6 +14,7 @@ import type {
   NotePayload,
   NoteRevisionPayload,
   NotebookPayload,
+  NotebookTreeNode,
 } from "@/types/note";
 import { generateId } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
@@ -160,41 +159,18 @@ export const useNoteApp = () => {
     >,
   }, userId);
 
-  // Notebooks management
-  const notebooksHook = useNotebooks(
-    {
-      notebooks,
-      setNotebooks,
-      notes: notes as Array<{ notebookId: string | null }>,
-      setNotes: setNotes as React.Dispatch<
-        React.SetStateAction<Array<{ notebookId: string | null }>>
-      >,
-    },
-    isAuthenticated,
-    userId,
-    storageKey,
-    {
-      createNotebookOnServer,
-      deleteNotebookOnServer,
-      updateNotebookOnServer,
-    }
-  );
-
-  // Smart filters
-  const smartFiltersHook = useSmartFilters(
-    activeSection,
-    sortBy,
-    searchQuery,
-    filterTag,
-    notebooksHook.activeNotebookId
-  );
-
   // Note filtering and sorting
+  const filterCriteria = useMemo(() => ({
+    section: activeSection,
+    search: searchQuery,
+    tag: filterTag,
+    sortBy,
+    notebookId: "all",
+  }), [activeSection, searchQuery, filterTag, sortBy]);
+
   const { sortedNotes, allTags, sectionCounts } = useNoteFiltering(
     notes,
-    smartFiltersHook.currentSmartFilterCriteria,
-    activeSection,
-    sortBy,
+    filterCriteria,
     customOrder
   );
 
@@ -274,10 +250,7 @@ export const useNoteApp = () => {
     const newNote: NotePayload = {
       id: generateId(),
       userId: ownerId,
-      notebookId:
-        notebooksHook.activeNotebookId === "all"
-          ? null
-          : notebooksHook.activeNotebookId,
+      notebookId: null,
       title: "",
       content: "",
       tags: [],
@@ -296,7 +269,6 @@ export const useNoteApp = () => {
   }, [
     isAuthenticated,
     userId,
-    notebooksHook.activeNotebookId,
     setCurrentNote,
     setActiveSection,
     setShowSidebar,
@@ -475,14 +447,6 @@ export const useNoteApp = () => {
     handleCancelAccentPreview,
     accentPalettes,
     handleSelectAccent,
-    smartFilters: smartFiltersHook.smartFilters,
-    activeSmartFilterId: smartFiltersHook.activeSmartFilterId,
-    currentSmartFilterCriteria: smartFiltersHook.currentSmartFilterCriteria,
-    canSaveSmartFilter: smartFiltersHook.canSaveSmartFilter,
-    addSmartFilter: smartFiltersHook.addSmartFilter,
-    updateSmartFilter: smartFiltersHook.updateSmartFilter,
-    removeSmartFilter: smartFiltersHook.removeSmartFilter,
-    applySmartFilter: smartFiltersHook.applySmartFilter,
     customOrder,
     setCustomOrder,
     canInstall,
@@ -519,22 +483,11 @@ export const useNoteApp = () => {
     deleteForever: notesHook.deleteForever,
     exportNotes: notesHook.exportNotes,
     importNotes: notesHook.importNotes,
-    notebooks: notebooksHook.notebooks,
-    notebookTree: notebooksHook.notebookTree,
-    notebooksById: notebooksHook.notebooksById,
-    notebookOptions: notebooksHook.notebookOptions,
-    newNotebookName: notebooksHook.newNotebookName,
-    setNewNotebookName: notebooksHook.setNewNotebookName,
-    newNotebookParent: notebooksHook.newNotebookParent,
-    setNewNotebookParent: notebooksHook.setNewNotebookParent,
-    isCreatingNotebook: notebooksHook.isCreatingNotebook,
-    handleCreateNotebook: notebooksHook.handleCreateNotebook,
-    handleCreateNotebookChild: notebooksHook.handleCreateNotebookChild,
-    handleRenameNotebook: notebooksHook.handleRenameNotebook,
-    handleMoveNotebook: notebooksHook.handleMoveNotebook,
-    activeNotebookId: notebooksHook.activeNotebookId,
-    handleSelectNotebookFilter: notebooksHook.handleSelectNotebookFilter,
-    handleDeleteNotebook: notebooksHook.handleDeleteNotebook,
+    // Notebooks - provide minimal defaults since UI was removed
+    notebooks,
+    notebookTree: [] as NotebookTreeNode[],
+    notebooksById: new Map<string, NotebookPayload>(),
+    notebookOptions: [] as Array<{ id: string; label: string }>,
     revisions: revisionsHook.revisions,
     isRevisionOpen: revisionsHook.isRevisionOpen,
     isLoadingRevisions: revisionsHook.isLoadingRevisions,

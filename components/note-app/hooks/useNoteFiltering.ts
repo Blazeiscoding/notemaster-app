@@ -1,8 +1,15 @@
 import { useMemo, useDeferredValue } from "react";
 import type { NotePayload } from "@/types/note";
-import type { SmartFilterCriteria } from "@/components/note-app/types";
 
 type NoteAppSection = "notes" | "archive" | "bin";
+
+type FilterCriteria = {
+  section: NoteAppSection;
+  search: string;
+  tag: string;
+  sortBy: "updated" | "created" | "title";
+  notebookId: string;
+};
 
 // Helper function defined outside component to avoid "impure function" lint error
 // This is a workaround for React's strict linting rules
@@ -12,24 +19,14 @@ function getCurrentTimestamp(): number {
 
 export function useNoteFiltering(
   notes: NotePayload[],
-  resolvedCriteria: SmartFilterCriteria,
-  activeSection: NoteAppSection,
-  sortBy: "updated" | "created" | "title",
+  criteria: FilterCriteria,
   customOrder: string[]
 ) {
   // Defer filtering to keep UI responsive during rapid updates (e.g., typing in search)
   const deferredNotes = useDeferredValue(notes);
-  const deferredCriteria = useDeferredValue(resolvedCriteria);
-  // Calculate timestamp only when needed for due date filtering
-  const timestamp = useMemo(() => {
-    if (deferredCriteria.dueWithinDays) {
-      return getCurrentTimestamp();
-    }
-    return 0;
-  }, [deferredCriteria.dueWithinDays]);
+  const deferredCriteria = useDeferredValue(criteria);
 
   const filteredNotes = useMemo(() => {
-    const now = deferredCriteria.dueWithinDays ? timestamp : 0;
     return deferredNotes.filter((note) => {
       const matchesSearch = deferredCriteria.search
         ? note.title
@@ -40,30 +37,15 @@ export function useNoteFiltering(
             .includes(deferredCriteria.search.toLowerCase())
         : true;
 
-      const matchesPrimaryTag = deferredCriteria.tag
+      const matchesTag = deferredCriteria.tag && deferredCriteria.tag !== "all"
         ? note.tags.includes(deferredCriteria.tag)
         : true;
-      const matchesExtraTags = deferredCriteria.tags
-        ? deferredCriteria.tags.every((tag) => note.tags.includes(tag))
-        : true;
 
-      const matchesPinned =
-        typeof deferredCriteria.pinned === "boolean"
-          ? note.pinned === deferredCriteria.pinned
-          : true;
-
-      const matchesDue = deferredCriteria.dueWithinDays
-        ? note.dueAt
-          ? (Date.parse(note.dueAt) - now) / (1000 * 60 * 60 * 24) <=
-            deferredCriteria.dueWithinDays
-          : false
-        : true;
-
-      const matchesNotebook = deferredCriteria.notebookId
+      const matchesNotebook = deferredCriteria.notebookId && deferredCriteria.notebookId !== "all"
         ? note.notebookId === deferredCriteria.notebookId
         : true;
 
-      const section = deferredCriteria.section ?? "notes";
+      const section = deferredCriteria.section;
       const matchesSection =
         section === "notes"
           ? !note.archived && !note.trashed
@@ -73,15 +55,12 @@ export function useNoteFiltering(
 
       return (
         matchesSearch &&
-        matchesPrimaryTag &&
-        matchesExtraTags &&
-        matchesPinned &&
-        matchesDue &&
+        matchesTag &&
         matchesNotebook &&
         matchesSection
       );
     });
-  }, [deferredNotes, deferredCriteria, timestamp]);
+  }, [deferredNotes, deferredCriteria]);
 
   const allTags = useMemo(
     () => [...new Set(deferredNotes.flatMap((note) => note.tags))],
@@ -90,8 +69,8 @@ export function useNoteFiltering(
 
   const sortedNotes = useMemo(() => {
     const ordered = [...filteredNotes].sort((a, b) => {
-      const section = deferredCriteria.section ?? activeSection;
-      const sortPreference = deferredCriteria.sortBy ?? sortBy;
+      const section = deferredCriteria.section;
+      const sortPreference = deferredCriteria.sortBy;
 
       if (section === "notes") {
         const pinnedDiff = Number(b.pinned) - Number(a.pinned);
@@ -122,12 +101,10 @@ export function useNoteFiltering(
     withWeights.sort((a, b) => a.weight - b.weight);
     return withWeights.map((entry) => entry.note);
   }, [
-    activeSection,
     customOrder,
     filteredNotes,
     deferredCriteria.section,
     deferredCriteria.sortBy,
-    sortBy,
   ]);
 
   const sectionCounts = useMemo(
@@ -146,3 +123,4 @@ export function useNoteFiltering(
     sectionCounts,
   };
 }
+

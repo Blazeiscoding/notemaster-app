@@ -21,8 +21,6 @@ export type AppHeaderProps = {
   isDark: boolean;
   toggleTheme: () => void;
   onOpenThemePicker: () => void;
-  onSaveSmartFilter: () => void;
-  canSaveSmartFilter: boolean;
   onNewNote: () => void;
   onToggleSidebar: () => void;
   canInstall: boolean;
@@ -36,8 +34,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   isDark,
   toggleTheme,
   onOpenThemePicker,
-  onSaveSmartFilter,
-  canSaveSmartFilter,
   onNewNote,
   onToggleSidebar,
   canInstall,
@@ -136,18 +132,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           <Palette className="size-5" />
         </Button>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onSaveSmartFilter}
-          disabled={!canSaveSmartFilter}
-          title="Save Smart Filter"
-          className={
-            canSaveSmartFilter ? "text-primary" : "text-muted-foreground/50"
-          }
-        >
-          <Save className="size-5" />
-        </Button>
+
 
         <Button
           onClick={onNewNote}

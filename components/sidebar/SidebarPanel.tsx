@@ -3,67 +3,16 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import {
-  ChevronDown,
-  Download,
-  Palette as PaletteIcon,
-  Upload,
-} from "lucide-react";
 
 import type {
-  AccentPalette,
-  NotebookPayload,
-  NotebookTreeNode,
   NotePayload,
 } from "@/types/note";
 import SearchBar from "./SearchBar";
 import SectionFilters from "./SectionFilters";
 import TagFilters from "./TagFilters";
-import NotebookList from "@/components/notebooks/NotebookList";
 import { cn } from "@/lib/utils";
-import SmartFiltersSection from "./SmartFiltersSection";
-import type {
-  SmartFilter,
-  SmartFilterCriteria,
-} from "@/components/note-app/types";
 
-const SIDEBAR_PANEL_STATE_KEY = "notemaster:sidebar-panel-state";
 
-type CollapsibleState = {
-  smartFiltersOpen: boolean;
-  notebooksOpen: boolean;
-};
-
-const DEFAULT_PANEL_STATE: CollapsibleState = {
-  smartFiltersOpen: true,
-  notebooksOpen: true,
-};
-
-const readPanelStateFromStorage = (): CollapsibleState => {
-  if (typeof window === "undefined") {
-    return DEFAULT_PANEL_STATE;
-  }
-  try {
-    const raw = window.localStorage?.getItem(SIDEBAR_PANEL_STATE_KEY);
-    if (!raw) {
-      return DEFAULT_PANEL_STATE;
-    }
-    const parsed = JSON.parse(raw) as Partial<CollapsibleState>;
-    return {
-      smartFiltersOpen:
-        typeof parsed.smartFiltersOpen === "boolean"
-          ? parsed.smartFiltersOpen
-          : DEFAULT_PANEL_STATE.smartFiltersOpen,
-      notebooksOpen:
-        typeof parsed.notebooksOpen === "boolean"
-          ? parsed.notebooksOpen
-          : DEFAULT_PANEL_STATE.notebooksOpen,
-    };
-  } catch (error) {
-    console.error("Failed to read sidebar state", error);
-    return DEFAULT_PANEL_STATE;
-  }
-};
 
 type SortKey = "updated" | "created" | "title";
 
@@ -82,37 +31,6 @@ type SidebarPanelProps = {
   notes: NotePayload[];
   onTagSelect: (tag: string) => void;
   onClearTags: () => void;
-
-  smartFilters: SmartFilter[];
-  activeSmartFilterId: string | null;
-  canSaveSmartFilter: boolean;
-  currentSmartFilterCriteria: SmartFilterCriteria;
-  onAddSmartFilter: (input: { name: string; description?: string }) => boolean;
-  onApplySmartFilter: (id: string | null) => void;
-  onRemoveSmartFilter: (id: string) => void;
-  onExport: () => void;
-  onImport: (file: File) => void;
-  notebooks: NotebookPayload[];
-  notebookTree: NotebookTreeNode[];
-  newNotebookName: string;
-  newNotebookParent: string | null;
-  isCreatingNotebook: boolean;
-  onNotebookNameChange: (value: string) => void;
-  onNotebookParentChange: (value: string | null) => void;
-  onCreateNotebook: () => void;
-  onQuickAddNotebook: (
-    parentId: string | null,
-    name: string
-  ) => Promise<boolean> | boolean;
-  onRenameNotebook: (id: string, name: string) => Promise<boolean> | boolean;
-  onMoveNotebook: (
-    id: string,
-    targetParentId: string | null,
-    targetIndex: number
-  ) => Promise<boolean> | boolean;
-  activeNotebookId: string;
-  onSelectNotebookFilter: (id: string) => void;
-  onDeleteNotebook: (id: string) => void;
 };
 
 const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
@@ -130,30 +48,6 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
   notes,
   onTagSelect,
   onClearTags,
-
-  smartFilters,
-  activeSmartFilterId,
-  canSaveSmartFilter,
-  currentSmartFilterCriteria,
-  onAddSmartFilter,
-  onApplySmartFilter,
-  onRemoveSmartFilter,
-  onExport,
-  onImport,
-  notebooks,
-  notebookTree,
-  newNotebookName,
-  newNotebookParent,
-  isCreatingNotebook,
-  onNotebookNameChange,
-  onNotebookParentChange,
-  onCreateNotebook,
-  onQuickAddNotebook,
-  onRenameNotebook,
-  onMoveNotebook,
-  activeNotebookId,
-  onSelectNotebookFilter,
-  onDeleteNotebook,
 }) => {
   const notesCountByTag = React.useMemo(() => {
     const counts: Record<string, number> = {};
@@ -165,27 +59,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
     return counts;
   }, [notes]);
 
-  const [panelState, setPanelState] = React.useState<CollapsibleState>(
-    readPanelStateFromStorage
-  );
 
-  React.useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage?.setItem(
-        SIDEBAR_PANEL_STATE_KEY,
-        JSON.stringify(panelState)
-      );
-    } catch (error) {
-      console.error("Failed to persist sidebar state", error);
-    }
-  }, [panelState]);
-
-  const toggleSection = (section: keyof CollapsibleState) => {
-    setPanelState((prev) => ({ ...prev, [section]: !prev[section] }));
-  };
-
-  const { smartFiltersOpen, notebooksOpen } = panelState;
 
   return (
     <aside
@@ -248,100 +122,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
         onClear={onClearTags}
       />
 
-      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
-        <button
-          type="button"
-          onClick={() => toggleSection("smartFiltersOpen")}
-          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
-        >
-          <span>Smart filters</span>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform duration-200",
-              smartFiltersOpen ? "rotate-0" : "-rotate-90"
-            )}
-          />
-        </button>
-        {smartFiltersOpen && (
-          <div className="pt-3">
-            <SmartFiltersSection
-              smartFilters={smartFilters}
-              activeSmartFilterId={activeSmartFilterId}
-              canSaveSmartFilter={canSaveSmartFilter}
-              currentCriteria={currentSmartFilterCriteria}
-              onAdd={onAddSmartFilter}
-              onApply={onApplySmartFilter}
-              onRemove={onRemoveSmartFilter}
-            />
-          </div>
-        )}
-      </div>
 
-      <div className="rounded-xl border border-white/15 bg-white/8 p-3 transition-colors hover:bg-white/12 text-foreground">
-        <button
-          type="button"
-          onClick={() => toggleSection("notebooksOpen")}
-          className="flex w-full items-center justify-between text-sm font-semibold text-(--interactive-accent) transition-all hover:text-(--interactive-accent-strong)"
-        >
-          <span>Notebooks</span>
-          <ChevronDown
-            className={cn(
-              "size-4 text-muted-foreground transition-transform duration-200",
-              notebooksOpen ? "rotate-0" : "-rotate-90"
-            )}
-          />
-        </button>
-        {notebooksOpen && (
-          <div className="pt-3">
-            <NotebookList
-              notebooks={notebooks}
-              notebookTree={notebookTree}
-              activeNotebookId={activeNotebookId}
-              newNotebookName={newNotebookName}
-              newNotebookParent={newNotebookParent}
-              isCreatingNotebook={isCreatingNotebook}
-              totalNotesCount={notes.length}
-              onNotebookNameChange={onNotebookNameChange}
-              onNotebookParentChange={onNotebookParentChange}
-              onCreateNotebook={onCreateNotebook}
-              onSelectNotebookFilter={onSelectNotebookFilter}
-              onDeleteNotebook={onDeleteNotebook}
-              onQuickAddNotebook={onQuickAddNotebook}
-              onRenameNotebook={onRenameNotebook}
-              onMoveNotebook={onMoveNotebook}
-            />
-          </div>
-        )}
-      </div>
-
-
-
-      <div className="space-y-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onExport}
-          className="w-full justify-between"
-        >
-          <span>Export notes</span>
-          <Download className="size-4" />
-        </Button>
-        <label className="w-full">
-          <input
-            type="file"
-            accept="application/json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onImport(file);
-            }}
-            className="hidden"
-          />
-          <span className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground">
-            Import notes
-            <Upload className="size-4" />
-          </span>
-        </label>
-      </div>
     </aside>
   );
 });

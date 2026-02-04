@@ -11,7 +11,6 @@ import SidebarPanel from "@/components/sidebar/SidebarPanel";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { LoadingSkeleton } from "@/components/note-app/LoadingSkeleton";
-import { SaveFilterForm } from "@/components/note-app/SaveFilterForm";
 import { OfflineIndicator } from "@/components/ui/OfflineIndicator";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
@@ -69,13 +68,6 @@ const NoteApp = () => {
     handleCancelAccentPreview,
     accentPalettes,
     handleSelectAccent,
-    smartFilters,
-    activeSmartFilterId,
-    currentSmartFilterCriteria,
-    canSaveSmartFilter,
-    addSmartFilter,
-    applySmartFilter,
-    removeSmartFilter,
     canInstall,
     installApp,
     showIosInstallTip,
@@ -106,36 +98,13 @@ const NoteApp = () => {
     trashNote,
     restoreFromBin,
     deleteForever,
-    exportNotes,
-    importNotes,
-    notebooks,
-    notebookTree,
     notebooksById,
     notebookOptions,
-    newNotebookName,
-    setNewNotebookName,
-    newNotebookParent,
-    setNewNotebookParent,
-    isCreatingNotebook,
-    handleCreateNotebook,
-    handleCreateNotebookChild,
-    handleRenameNotebook,
-    handleMoveNotebook,
-    activeNotebookId,
-    handleSelectNotebookFilter,
-    handleDeleteNotebook,
     handleOpenRevisions,
   } = state;
 
   const [showThemePanel, setShowThemePanel] = React.useState(false);
-  const [showSaveFilterDialog, setShowSaveFilterDialog] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"grid" | "calendar">("grid");
-  const [quickFilterName, setQuickFilterName] = React.useState("");
-  const [quickFilterDescription, setQuickFilterDescription] =
-    React.useState("");
-  const [quickFilterError, setQuickFilterError] = React.useState<string | null>(
-    null
-  );
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // Keyboard shortcuts
@@ -150,60 +119,7 @@ const NoteApp = () => {
     isSaving: isSavingNote,
   });
 
-  const computeDefaultFilterName = React.useCallback(() => {
-    const base = "Smart filter";
-    const existing = new Set(
-      smartFilters.map((filter) => filter.name.toLowerCase())
-    );
-    if (!existing.has(base.toLowerCase())) return base;
-    let suffix = 2;
-    let candidate = `${base} ${suffix}`;
-    while (existing.has(candidate.toLowerCase())) {
-      suffix += 1;
-      candidate = `${base} ${suffix}`;
-    }
-    return candidate;
-  }, [smartFilters]);
 
-  const handleOpenSaveFilter = React.useCallback(() => {
-    setQuickFilterError(null);
-    setQuickFilterDescription("");
-    setQuickFilterName(computeDefaultFilterName());
-    setShowSaveFilterDialog(true);
-  }, [computeDefaultFilterName]);
-
-  const handleCloseSaveFilter = React.useCallback(() => {
-    setShowSaveFilterDialog(false);
-    setQuickFilterError(null);
-    setQuickFilterDescription("");
-    setQuickFilterName("");
-  }, []);
-
-  const handleSubmitQuickFilter = React.useCallback(
-    (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault();
-      const trimmed = quickFilterName.trim();
-      if (!trimmed) {
-        setQuickFilterError("Give your filter a name.");
-        return;
-      }
-      const success = addSmartFilter({
-        name: trimmed,
-        description: quickFilterDescription.trim() || undefined,
-      });
-      if (!success) {
-        setQuickFilterError("Unable to save filter. Try a different name.");
-        return;
-      }
-      handleCloseSaveFilter();
-    },
-    [
-      addSmartFilter,
-      handleCloseSaveFilter,
-      quickFilterDescription,
-      quickFilterName,
-    ]
-  );
 
   const handleCloseThemePanel = React.useCallback(() => {
     handleCancelAccentPreview();
@@ -235,11 +151,7 @@ const NoteApp = () => {
     () => setFilterTag("all"),
     [setFilterTag]
   );
-  const handleAddSmartFilter = React.useCallback(
-    ({ name, description }: { name: string; description?: string }) =>
-      addSmartFilter({ name, description }),
-    [addSmartFilter]
-  );
+
   const handleOpenRevisionsCallback = React.useCallback(
     () => currentNote && handleOpenRevisions(currentNote.id),
     [currentNote, handleOpenRevisions]
@@ -282,8 +194,6 @@ const NoteApp = () => {
           isDark={darkMode}
           toggleTheme={handleToggleTheme}
           onOpenThemePicker={handleOpenThemePicker}
-          onSaveSmartFilter={handleOpenSaveFilter}
-          canSaveSmartFilter={canSaveSmartFilter}
           onNewNote={createNote}
           onToggleSidebar={handleToggleSidebar}
           canInstall={canInstall}
@@ -318,30 +228,6 @@ const NoteApp = () => {
             notes={notes}
             onTagSelect={setFilterTag}
             onClearTags={handleClearTags}
-
-            smartFilters={smartFilters}
-            activeSmartFilterId={activeSmartFilterId}
-            canSaveSmartFilter={canSaveSmartFilter}
-            currentSmartFilterCriteria={currentSmartFilterCriteria}
-            onAddSmartFilter={handleAddSmartFilter}
-            onApplySmartFilter={applySmartFilter}
-            onRemoveSmartFilter={removeSmartFilter}
-            onExport={exportNotes}
-            onImport={importNotes}
-            notebooks={notebooks}
-            notebookTree={notebookTree}
-            newNotebookName={newNotebookName}
-            newNotebookParent={newNotebookParent}
-            isCreatingNotebook={isCreatingNotebook}
-            onNotebookNameChange={setNewNotebookName}
-            onNotebookParentChange={setNewNotebookParent}
-            onCreateNotebook={handleCreateNotebook}
-            onQuickAddNotebook={handleCreateNotebookChild}
-            onRenameNotebook={handleRenameNotebook}
-            onMoveNotebook={handleMoveNotebook}
-            activeNotebookId={activeNotebookId}
-            onSelectNotebookFilter={handleSelectNotebookFilter}
-            onDeleteNotebook={handleDeleteNotebook}
           />
 
           <main className="space-y-6">
@@ -418,32 +304,7 @@ const NoteApp = () => {
       </Modal>
 
       {/* Save Smart Filter Modal */}
-      <Modal
-        open={showSaveFilterDialog}
-        onClose={handleCloseSaveFilter}
-        title="Save Smart Filter"
-        description="Save your current filter settings for quick access"
-        as="form"
-        onSubmit={handleSubmitQuickFilter}
-        footer={
-          <>
-            <Button type="button" variant="outline" onClick={handleCloseSaveFilter}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="accent">
-              Save Filter
-            </Button>
-          </>
-        }
-      >
-        <SaveFilterForm
-          name={quickFilterName}
-          description={quickFilterDescription}
-          error={quickFilterError}
-          onNameChange={setQuickFilterName}
-          onDescriptionChange={setQuickFilterDescription}
-        />
-      </Modal>
+
 
       {/* Mobile Bottom Navigation - visible only on mobile */}
       <div className="lg:hidden">
