@@ -38,6 +38,8 @@ type NoteCardProps = {
   onUnarchive: (id: string) => void;
   onRestoreFromBin: (id: string) => void;
   onDeleteForever: (id: string) => void;
+  /** Index in the grid for priority loading optimization */
+  index?: number;
 };
 
 const NoteCard: React.FC<NoteCardProps> = React.memo(
@@ -51,7 +53,10 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     onUnarchive,
     onRestoreFromBin,
     onDeleteForever,
+    index = 0,
   }) => {
+    // Prioritize loading for first 6 cards (2 rows of 3)
+    const isPriorityImage = index < 6;
     const isNotesSection = activeSection === "notes";
     const isArchiveSection = activeSection === "archive";
     const isBinSection = activeSection === "bin";
@@ -110,6 +115,37 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
 
       onOpen(note);
     }, [isNotesSection, note, onOpen, didSwipeRef]);
+
+    // Memoized click handlers to prevent recreation on each render
+    const handlePinClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onPin(note.id);
+    }, [note.id, onPin]);
+
+    const handleArchiveClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onArchive(note.id);
+    }, [note.id, onArchive]);
+
+    const handleTrashClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onTrash(note.id);
+    }, [note.id, onTrash]);
+
+    const handleUnarchiveClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onUnarchive(note.id);
+    }, [note.id, onUnarchive]);
+
+    const handleRestoreClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onRestoreFromBin(note.id);
+    }, [note.id, onRestoreFromBin]);
+
+    const handleDeleteForeverClick = useCallback((event: React.MouseEvent) => {
+      event.stopPropagation();
+      onDeleteForever(note.id);
+    }, [note.id, onDeleteForever]);
 
     const swipeActions = useMemo(() => {
       if (isNotesSection) {
@@ -199,9 +235,9 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
 
         <Card
           className={cn(
-            "group relative border border-[var(--glass-border)] bg-[var(--glass-bg)] backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 overflow-hidden",
+            "group relative border border-(--glass-border) bg-(--glass-bg) backdrop-blur-md transition-all duration-300 animate-in fade-in slide-in-from-bottom-2 overflow-hidden",
             isNotesSection &&
-              "hover:-translate-y-1 hover:shadow-[var(--glass-shadow)] hover:border-primary/30 cursor-pointer",
+              "hover:-translate-y-1 hover:shadow-(--glass-shadow) hover:border-primary/30 cursor-pointer",
             isDragging && "cursor-grabbing scale-[0.98]"
           )}
           style={{
@@ -239,10 +275,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onPin(note.id);
-                            }}
+                            onClick={handlePinClick}
                             className={cn(
                               "text-muted-foreground transition hover:text-(--interactive-accent)",
                               note.pinned && "text-(--interactive-accent)"
@@ -260,10 +293,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onArchive(note.id);
-                            }}
+                            onClick={handleArchiveClick}
                           >
                             <Archive className="size-4" />
                           </Button>
@@ -277,10 +307,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onTrash(note.id);
-                            }}
+                            onClick={handleTrashClick}
                             className="text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
@@ -299,10 +326,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onUnarchive(note.id);
-                            }}
+                            onClick={handleUnarchiveClick}
                             className="text-muted-foreground hover:text-(--interactive-accent)"
                           >
                             <ArchiveRestore className="size-4" />
@@ -317,10 +341,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onTrash(note.id);
-                            }}
+                            onClick={handleTrashClick}
                             className="text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
@@ -339,10 +360,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onRestoreFromBin(note.id);
-                            }}
+                            onClick={handleRestoreClick}
                             className="text-muted-foreground hover:text-(--interactive-accent)"
                           >
                             <Undo2 className="size-4" />
@@ -357,10 +375,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                           <Button
                             variant="ghost"
                             size="icon-sm"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              onDeleteForever(note.id);
-                            }}
+                            onClick={handleDeleteForeverClick}
                             className="text-muted-foreground hover:text-destructive"
                           >
                             <Trash2 className="size-4" />
@@ -392,6 +407,8 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                  priority={isPriorityImage}
+                  loading={isPriorityImage ? undefined : "lazy"}
                 />
               </div>
             )}

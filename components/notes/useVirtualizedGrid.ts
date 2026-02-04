@@ -6,11 +6,15 @@ import type { NotePayload } from "@/types/note";
 
 const VIRTUAL_SCROLL_THRESHOLD = 50;
 
+// Memoized breakpoint values to avoid recalculation
+const BREAKPOINT_XL = 1280;
+const BREAKPOINT_SM = 640;
+
 const getColumnsCount = (): number => {
   if (typeof window === "undefined") return 3;
   const width = window.innerWidth;
-  if (width >= 1280) return 3; // xl
-  if (width >= 640) return 2; // sm
+  if (width >= BREAKPOINT_XL) return 3; // xl
+  if (width >= BREAKPOINT_SM) return 2; // sm
   return 1; // mobile
 };
 
@@ -20,13 +24,20 @@ export function useVirtualizedGrid(notes: NotePayload[]) {
   const parentRef = useRef<HTMLDivElement>(null);
   const [columnsCount, setColumnsCount] = useState(() => getColumnsCount());
 
-  // Update columns on window resize
+  // Update columns on window resize with debounce for performance
   useEffect(() => {
+    let resizeTimer: ReturnType<typeof setTimeout>;
     const handleResize = () => {
-      setColumnsCount(getColumnsCount());
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        setColumnsCount(getColumnsCount());
+      }, 100); // Debounce resize events
     };
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      clearTimeout(resizeTimer);
+    };
   }, []);
 
   const shouldVirtualize = notes.length > VIRTUAL_SCROLL_THRESHOLD;
@@ -44,8 +55,8 @@ export function useVirtualizedGrid(notes: NotePayload[]) {
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 320, // Estimated height of a note card row
-    overscan: 2, // Render 2 extra rows for smoother scrolling
+    estimateSize: () => 280, // Optimized estimated height of a note card row
+    overscan: 3, // Render 3 extra rows for smoother scrolling
     enabled: shouldVirtualize,
   });
 

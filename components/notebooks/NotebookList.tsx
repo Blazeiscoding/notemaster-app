@@ -32,7 +32,7 @@ type NotebookListProps = {
 
 const NOTEBOOK_DRAG_DATA = "application/x-notebook-id";
 
-const NotebookList: React.FC<NotebookListProps> = ({
+const NotebookList: React.FC<NotebookListProps> = React.memo(({
   notebooks,
   notebookTree,
   activeNotebookId,
@@ -165,6 +165,8 @@ const NotebookList: React.FC<NotebookListProps> = ({
       </div>
     </section>
   );
-};
+});
+
+NotebookList.displayName = "NotebookList";
 
 export default NotebookList;

@@ -20,7 +20,26 @@ type ParamsPromise = Promise<{ id: string }>;
 
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
   async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
-    const existing = await prisma.note.findUnique({ where: { id } });
+    const existing = await prisma.note.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        userId: true,
+        notebookId: true,
+        title: true,
+        content: true,
+        tags: true,
+        checklist: true,
+        attachments: true,
+        type: true,
+        pinned: true,
+        archived: true,
+        trashed: true,
+        dueAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
 
     if (!existing || existing.userId !== userId) {
       logger.warn("Note update failed: note not found", { noteId: id });
@@ -140,7 +159,10 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
 
 export const DELETE = withAuthAndParams<ParamsPromise>(
   async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
-    const existing = await prisma.note.findUnique({ where: { id } });
+    const existing = await prisma.note.findUnique({
+      where: { id },
+      select: { id: true, userId: true },
+    });
 
     if (!existing || existing.userId !== userId) {
       logger.warn("Note deletion failed: note not found", { noteId: id });

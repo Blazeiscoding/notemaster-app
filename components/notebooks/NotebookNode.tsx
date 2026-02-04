@@ -26,7 +26,7 @@ export type NotebookNodeProps = {
   depth?: number;
 };
 
-const NotebookNode: React.FC<NotebookNodeProps> = ({
+const NotebookNode: React.FC<NotebookNodeProps> = React.memo(({
   node,
   activeId,
   index,
@@ -254,6 +254,8 @@ const NotebookNode: React.FC<NotebookNodeProps> = ({
       )}
     </div>
   );
-};
+});
+
+NotebookNode.displayName = "NotebookNode";
 
 export default NotebookNode;

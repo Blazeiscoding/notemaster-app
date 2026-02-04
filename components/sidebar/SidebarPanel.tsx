@@ -115,7 +115,7 @@ type SidebarPanelProps = {
   onDeleteNotebook: (id: string) => void;
 };
 
-const SidebarPanel: React.FC<SidebarPanelProps> = ({
+const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
   show,
   sortBy,
   onSortChange,
@@ -344,6 +344,8 @@ const SidebarPanel: React.FC<SidebarPanelProps> = ({
       </div>
     </aside>
   );
-};
+});
+
+SidebarPanel.displayName = "SidebarPanel";
 
 export default SidebarPanel;

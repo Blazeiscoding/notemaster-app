@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useMemo } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -22,8 +22,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common);
+// Create lowlight instance - lazy loaded
+let lowlightInstance: ReturnType<typeof createLowlight> | null = null;
+const getLowlight = () => {
+  if (!lowlightInstance) {
+    lowlightInstance = createLowlight(common);
+  }
+  return lowlightInstance;
+};
 
 // Supported languages for the dropdown
 const LANGUAGES = [
@@ -163,7 +169,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           "before:content-[attr(data-placeholder)] before:text-muted-foreground/30 before:float-left before:pointer-events-none",
       }),
       CodeBlockLowlight.configure({
-        lowlight,
+        lowlight: getLowlight(),
         defaultLanguage: "plaintext",
         HTMLAttributes: {
           class: "not-prose",
@@ -210,11 +216,23 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     [handleImageSelect]
   );
 
+  // Track editor state changes for toolbar updates
+  // The editor instance itself is stable, but we derive state from it
+  const isInCodeBlock = editor?.isActive("codeBlock") ?? false;
+  const toolbarConfig = {
+    heading1Active: editor?.isActive("heading", { level: 1 }) ?? false,
+    heading2Active: editor?.isActive("heading", { level: 2 }) ?? false,
+    boldActive: editor?.isActive("bold") ?? false,
+    italicActive: editor?.isActive("italic") ?? false,
+    bulletListActive: editor?.isActive("bulletList") ?? false,
+    orderedListActive: editor?.isActive("orderedList") ?? false,
+    blockquoteActive: editor?.isActive("blockquote") ?? false,
+    codeBlockLanguage: editor?.getAttributes("codeBlock").language || "plaintext",
+  };
+
   if (!editor) {
     return null;
   }
-
-  const isInCodeBlock = editor.isActive("codeBlock");
 
   return (
     <div className={cn("relative group", className)}>
@@ -237,7 +255,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           }
           className={cn(
             "h-8 w-8",
-            editor.isActive("heading", { level: 1 }) &&
+            toolbarConfig.heading1Active &&
               "bg-primary/10 text-primary"
           )}
           title="Heading 1"
@@ -252,7 +270,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           }
           className={cn(
             "h-8 w-8",
-            editor.isActive("heading", { level: 2 }) &&
+            toolbarConfig.heading2Active &&
               "bg-primary/10 text-primary"
           )}
           title="Heading 2"
@@ -266,7 +284,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={cn(
             "h-8 w-8",
-            editor.isActive("bold") && "bg-primary/10 text-primary"
+            toolbarConfig.boldActive && "bg-primary/10 text-primary"
           )}
           title="Bold"
         >
@@ -278,7 +296,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           onClick={() => editor.chain().focus().toggleItalic().run()}
           className={cn(
             "h-8 w-8",
-            editor.isActive("italic") && "bg-primary/10 text-primary"
+            toolbarConfig.italicActive && "bg-primary/10 text-primary"
           )}
           title="Italic"
         >
@@ -291,7 +309,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           onClick={() => editor.chain().focus().toggleBulletList().run()}
           className={cn(
             "h-8 w-8",
-            editor.isActive("bulletList") && "bg-primary/10 text-primary"
+            toolbarConfig.bulletListActive && "bg-primary/10 text-primary"
           )}
           title="Bullet List"
         >
@@ -303,7 +321,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
           className={cn(
             "h-8 w-8",
-            editor.isActive("orderedList") && "bg-primary/10 text-primary"
+            toolbarConfig.orderedListActive && "bg-primary/10 text-primary"
           )}
           title="Ordered List"
         >
@@ -315,7 +333,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           className={cn(
             "h-8 w-8",
-            editor.isActive("blockquote") && "bg-primary/10 text-primary"
+            toolbarConfig.blockquoteActive && "bg-primary/10 text-primary"
           )}
           title="Quote"
         >
@@ -355,7 +373,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             <div className="mx-1 h-4 w-px bg-border" />
             <select
               className="h-8 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-              value={editor.getAttributes("codeBlock").language || "plaintext"}
+              value={toolbarConfig.codeBlockLanguage}
               onChange={(e) => {
                 editor
                   .chain()

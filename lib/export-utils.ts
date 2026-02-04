@@ -1,5 +1,4 @@
 import type { NotePayload } from "@/types/note";
-import jsPDF from "jspdf";
 
 export function exportNoteToMarkdown(note: NotePayload): string {
   let markdown = `# ${note.title || "Untitled Note"}\n\n`;
@@ -52,6 +51,7 @@ export function downloadMarkdown(content: string, filename: string): void {
 }
 
 export async function exportNoteToPDF(note: NotePayload): Promise<void> {
+  const { default: jsPDF } = await import("jspdf");
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
@@ -142,6 +142,7 @@ export async function exportNoteToPDF(note: NotePayload): Promise<void> {
 }
 
 export async function exportNotesToPDF(notes: NotePayload[]): Promise<void> {
+  const { default: jsPDF } = await import("jspdf");
   const pdf = new jsPDF();
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();

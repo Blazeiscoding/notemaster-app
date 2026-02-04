@@ -112,6 +112,10 @@ const nextConfig: NextConfig = {
       "lucide-react",
       "@radix-ui/react-tooltip",
       "@radix-ui/react-slot",
+      "date-fns",
+      "@tiptap/react",
+      "@tiptap/starter-kit",
+      "sonner",
     ],
   },
 };

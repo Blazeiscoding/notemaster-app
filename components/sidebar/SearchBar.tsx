@@ -12,7 +12,7 @@ type SearchBarProps = {
   inputRef?: React.RefObject<HTMLInputElement | null>;
 };
 
-const SearchBar: React.FC<SearchBarProps> = ({
+const SearchBar: React.FC<SearchBarProps> = React.memo(({
   value,
   onChange,
   debounceMs = 300,
@@ -209,6 +209,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
       )}
     </div>
   );
-};
+});
+
+SearchBar.displayName = "SearchBar";
 
 export default SearchBar;

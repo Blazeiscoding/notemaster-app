@@ -136,7 +136,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                     ref={rowVirtualizer.measureElement}
                     className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4"
                   >
-                    {row.map((note) => (
+                    {row.map((note, colIndex) => (
                       <NoteCard
                         key={note.id}
                         note={note}
@@ -148,6 +148,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
                         onUnarchive={onUnarchive}
                         onRestoreFromBin={onRestoreFromBin}
                         onDeleteForever={onDeleteForever}
+                        index={virtualRow.index * columnsCount + colIndex}
                       />
                     ))}
                     {/* Fill remaining columns in the last row */}
@@ -169,7 +170,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
   return (
     <TooltipProvider delayDuration={300}>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {notes.map((note) => (
+        {notes.map((note, index) => (
           <NoteCard
             key={note.id}
             note={note}
@@ -181,6 +182,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
             onUnarchive={onUnarchive}
             onRestoreFromBin={onRestoreFromBin}
             onDeleteForever={onDeleteForever}
+            index={index}
           />
         ))}
       </div>

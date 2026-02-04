@@ -17,13 +17,68 @@ import {
 import { emitNoteEvent } from "@/lib/note-events"
 
 export const GET = withAuth(
-  async ({ userId, rateLimitHeaders, requestId }) => {
+  async ({ userId, rateLimitHeaders, requestId, request }) => {
+    // Parse pagination parameters from URL
+    const url = new URL(request.url)
+    const cursor = url.searchParams.get("cursor")
+    const limitParam = url.searchParams.get("limit")
+    const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : undefined
+
+    // Common select fields for note queries - optimized to only fetch needed fields
+    const noteSelect = {
+      id: true,
+      userId: true,
+      notebookId: true,
+      title: true,
+      content: true,
+      tags: true,
+      checklist: true,
+      attachments: true,
+      type: true,
+      pinned: true,
+      archived: true,
+      trashed: true,
+      dueAt: true,
+      createdAt: true,
+      updatedAt: true,
+    } as const
+
+    // If no limit specified, return all notes (backwards compatible)
+    if (!limit) {
+      const notes = await prisma.note.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+        select: noteSelect,
+      })
+      return successResponse(notes.map(serializeNote), 200, rateLimitHeaders, requestId)
+    }
+
+    // Paginated query with cursor-based pagination
     const notes = await prisma.note.findMany({
       where: { userId },
       orderBy: { updatedAt: "desc" },
+      take: limit + 1, // Fetch one extra to check if there are more
+      select: noteSelect,
+      ...(cursor && {
+        cursor: { id: cursor },
+        skip: 1, // Skip the cursor itself
+      }),
     })
 
-    return successResponse(notes.map(serializeNote), 200, rateLimitHeaders, requestId)
+    const hasMore = notes.length > limit
+    const data = hasMore ? notes.slice(0, limit) : notes
+    const nextCursor = hasMore ? data[data.length - 1]?.id : null
+
+    return successResponse(
+      {
+        notes: data.map(serializeNote),
+        nextCursor,
+        hasMore,
+      },
+      200,
+      rateLimitHeaders,
+      requestId
+    )
   },
   { rateLimitSuffix: "notes-get" }
 )

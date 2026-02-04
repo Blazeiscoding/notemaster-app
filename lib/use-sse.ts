@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import type { SSEEvent, NoteEvent, NotebookEvent } from "@/lib/note-events";
 
 export type SSEConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -37,6 +37,7 @@ export function useSSE(
 
   const [status, setStatus] = useState<SSEConnectionStatus>("disconnected");
   const [lastHeartbeat, setLastHeartbeat] = useState<number | null>(null);
+  const [isTabVisible, setIsTabVisible] = useState(true);
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,6 +47,26 @@ export function useSSE(
   useEffect(() => {
     handlersRef.current = handlers;
   }, [handlers]);
+
+  // Track page visibility to pause SSE when tab is hidden
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const handleVisibilityChange = () => {
+      setIsTabVisible(!document.hidden);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
+
+  // Effective enabled state: only connect if enabled AND tab is visible
+  const effectiveEnabled = useMemo(
+    () => enabled && isTabVisible,
+    [enabled, isTabVisible]
+  );
 
   // Process incoming event
   const handleEvent = useCallback((event: SSEEvent) => {
@@ -143,9 +164,9 @@ export function useSSE(
     connect();
   }, [connect, disconnect]);
 
-  // Connect/disconnect based on enabled flag
+  // Connect/disconnect based on effective enabled state (respects tab visibility)
   useEffect(() => {
-    if (enabled) {
+    if (effectiveEnabled) {
       connect();
     } else {
       disconnect();
@@ -154,11 +175,12 @@ export function useSSE(
     return () => {
       disconnect();
     };
-  }, [enabled, connect, disconnect]);
+  }, [effectiveEnabled, connect, disconnect]);
 
   return {
     status,
     lastHeartbeat,
+    isTabVisible,
     connect,
     disconnect,
     reconnect,
