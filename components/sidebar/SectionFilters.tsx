@@ -43,18 +43,23 @@ const SectionFilters: React.FC<SectionFiltersProps> = React.memo(
               size="sm"
               onClick={handleClick(key)}
               className={cn(
-                "flex-1 justify-start gap-2 transition-all duration-200",
-                isActive && "shadow-md shadow-(--interactive-accent)/20"
+                "w-full justify-start gap-3 rounded-lg px-3 py-2.5 h-auto transition-all duration-200",
+                isActive 
+                  ? "shadow-md shadow-(--interactive-accent)/25" 
+                  : "hover:bg-white/10 border border-transparent hover:border-white/10"
               )}
             >
-              <Icon className="size-4" />
-              <span className="flex-1 text-left">{label}</span>
+              <Icon className={cn(
+                "size-4 shrink-0",
+                isActive ? "text-current" : "text-muted-foreground"
+              )} />
+              <span className="flex-1 text-left font-medium">{label}</span>
               <span
                 className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-medium",
+                  "rounded-full px-2.5 py-0.5 text-xs font-semibold min-w-[1.75rem] text-center",
                   isActive
                     ? "bg-(--interactive-accent-contrast)/20 text-(--interactive-accent-contrast)"
-                    : "bg-muted text-muted-foreground"
+                    : "bg-[var(--interactive-accent)]/15 text-[var(--interactive-accent)]"
                 )}
               >
                 {count}
@@ -65,7 +70,7 @@ const SectionFilters: React.FC<SectionFiltersProps> = React.memo(
       [activeSection, counts, handleClick]
     );
 
-    return <div className="flex flex-col gap-1">{sectionButtons}</div>;
+    return <div className="flex flex-col gap-1.5">{sectionButtons}</div>;
   }
 );
 
