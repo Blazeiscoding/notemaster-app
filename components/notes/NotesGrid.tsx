@@ -4,7 +4,6 @@ import React from "react";
 import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { Plus } from "lucide-react";
 import NoteCard from "./NoteCard";
 import { useVirtualizedGrid } from "./useVirtualizedGrid";
@@ -103,90 +102,86 @@ const NotesGrid: React.FC<NotesGridProps> = ({
     const totalSize = rowVirtualizer.getTotalSize();
 
     return (
-      <TooltipProvider delayDuration={300}>
+      <div
+        ref={parentRef}
+        className="h-[600px] overflow-auto"
+        style={{ contain: "strict" }}
+      >
         <div
-          ref={parentRef}
-          className="h-[600px] overflow-auto"
-          style={{ contain: "strict" }}
+          style={{
+            height: `${totalSize}px`,
+            width: "100%",
+            position: "relative",
+          }}
         >
           <div
             style={{
-              height: `${totalSize}px`,
+              position: "absolute",
+              top: 0,
+              left: 0,
               width: "100%",
-              position: "relative",
+              transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
             }}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                transform: `translateY(${virtualItems[0]?.start ?? 0}px)`,
-              }}
-            >
-              {virtualItems.map((virtualRow) => {
-                const row = rows[virtualRow.index];
-                if (!row) return null;
+            {virtualItems.map((virtualRow) => {
+              const row = rows[virtualRow.index];
+              if (!row) return null;
 
-                return (
-                  <div
-                    key={virtualRow.key}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4"
-                  >
-                    {row.map((note, colIndex) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        activeSection={activeSection}
-                        index={virtualRow.index * columnsCount + colIndex}
-                        onOpen={onOpenNote}
-                        onPin={onPin}
-                        onArchive={onArchive}
-                        onTrash={onTrash}
-                        onUnarchive={onUnarchive}
-                        onRestoreFromBin={onRestoreFromBin}
-                        onDeleteForever={onDeleteForever}
-                      />
-                    ))}
-                    {/* Fill remaining columns in the last row */}
-                    {row.length < columnsCount &&
-                      Array.from({ length: columnsCount - row.length }).map(
-                        (_, i) => <div key={`spacer-${i}`} />
-                      )}
-                  </div>
-                );
-              })}
-            </div>
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-4"
+                >
+                  {row.map((note, colIndex) => (
+                    <NoteCard
+                      key={note.id}
+                      note={note}
+                      activeSection={activeSection}
+                      index={virtualRow.index * columnsCount + colIndex}
+                      onOpen={onOpenNote}
+                      onPin={onPin}
+                      onArchive={onArchive}
+                      onTrash={onTrash}
+                      onUnarchive={onUnarchive}
+                      onRestoreFromBin={onRestoreFromBin}
+                      onDeleteForever={onDeleteForever}
+                    />
+                  ))}
+                  {/* Fill remaining columns in the last row */}
+                  {row.length < columnsCount &&
+                    Array.from({ length: columnsCount - row.length }).map(
+                      (_, i) => <div key={`spacer-${i}`} />
+                    )}
+                </div>
+              );
+            })}
           </div>
         </div>
-      </TooltipProvider>
+      </div>
     );
   }
 
   // Regular grid for smaller lists
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {notes.map((note, index) => (
-          <NoteCard
-            key={note.id}
-            note={note}
-            activeSection={activeSection}
-            index={index}
-            onOpen={onOpenNote}
-            onPin={onPin}
-            onArchive={onArchive}
-            onTrash={onTrash}
-            onUnarchive={onUnarchive}
-            onRestoreFromBin={onRestoreFromBin}
-            onDeleteForever={onDeleteForever}
-          />
-        ))}
-      </div>
-    </TooltipProvider>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {notes.map((note, index) => (
+        <NoteCard
+          key={note.id}
+          note={note}
+          activeSection={activeSection}
+          index={index}
+          onOpen={onOpenNote}
+          onPin={onPin}
+          onArchive={onArchive}
+          onTrash={onTrash}
+          onUnarchive={onUnarchive}
+          onRestoreFromBin={onRestoreFromBin}
+          onDeleteForever={onDeleteForever}
+        />
+      ))}
+    </div>
   );
 };
 
