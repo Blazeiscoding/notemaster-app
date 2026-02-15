@@ -173,9 +173,18 @@
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
     font-family: var(--font-body);
-    background-image: var(--canvas-gradient);
-    background-attachment: fixed;
     min-height: 100vh;
+    position: relative;
+  }
+  /* Fixed background via pseudo-element for better scroll performance
+     (background-attachment: fixed forces repaints on every scroll frame) */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background-image: var(--canvas-gradient);
+    pointer-events: none;
   }
   h1,
   h2,
