@@ -206,16 +206,22 @@ export function useNoteData(
     loadNotesAndNotebooks();
   }, [loadNotesAndNotebooks]);
 
-  // Persist notes to local storage/IndexedDB
+  // Persist notes to local storage/IndexedDB (debounced to avoid excessive writes)
   // For guests: this is their primary storage
   // For authenticated users: this is cache for stale-while-revalidate
+  const notesPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Don't persist during initial load
     if (!initialLoadComplete.current || isLoading) {
       return;
     }
 
-    const persistNotes = async () => {
+    // Clear any pending persist
+    if (notesPersistTimer.current) {
+      clearTimeout(notesPersistTimer.current);
+    }
+
+    notesPersistTimer.current = setTimeout(async () => {
       try {
         if (typeof window === "undefined") return;
 
@@ -236,19 +242,29 @@ export function useNoteData(
           toast.error("Failed to save notes locally");
         }
       }
-    };
+    }, 500); // Debounce: batch writes within 500ms
 
-    persistNotes();
+    return () => {
+      if (notesPersistTimer.current) {
+        clearTimeout(notesPersistTimer.current);
+      }
+    };
   }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB, setCacheTimestamp]);
 
-  // Persist notebooks to local storage/IndexedDB
+  // Persist notebooks to local storage/IndexedDB (debounced)
+  const notebooksPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Don't persist during initial load
     if (!initialLoadComplete.current || isLoading) {
       return;
     }
 
-    const persistNotebooks = async () => {
+    // Clear any pending persist
+    if (notebooksPersistTimer.current) {
+      clearTimeout(notebooksPersistTimer.current);
+    }
+
+    notebooksPersistTimer.current = setTimeout(async () => {
       try {
         if (typeof window === "undefined") return;
 
@@ -271,9 +287,13 @@ export function useNoteData(
           toast.error("Failed to save notebooks locally");
         }
       }
-    };
+    }, 500); // Debounce: batch writes within 500ms
 
-    persistNotebooks();
+    return () => {
+      if (notebooksPersistTimer.current) {
+        clearTimeout(notebooksPersistTimer.current);
+      }
+    };
   }, [notebooks, isAuthenticated, userId, storageKey, useIndexedDB, isLoading]);
 
   // Force refresh function that bypasses cache
