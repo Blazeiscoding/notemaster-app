@@ -26,7 +26,7 @@ import {
 import Checklist from "./Checklist";
 import TagsInput from "./TagsInput";
 import AttachmentsList from "./AttachmentsList";
-import { exportNoteToMarkdown, exportNoteToPDF, printNote } from "@/lib/export-utils";
+import { exportNoteToMarkdown, printNote } from "@/lib/export-utils";
 import type {
   Attachment,
   NotePayload,
@@ -113,6 +113,8 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
   }, [note]);
 
   const handleExportPDF = useCallback(async () => {
+    // Dynamic import to avoid loading jspdf (~250KB) until needed
+    const { exportNoteToPDF } = await import("@/lib/export-utils");
     await exportNoteToPDF(note);
   }, [note]);
 
