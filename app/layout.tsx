@@ -1,6 +1,6 @@
 import { type Metadata, type Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Sora } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +16,13 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+});
+
+const sora = Sora({
+  variable: "--font-sora",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
   display: "swap",
 });
 
@@ -62,9 +69,19 @@ export default function RootLayout({
           {/* Preconnect to ImageKit for faster image loading */}
           <link rel="preconnect" href="https://ik.imagekit.io" />
           <link rel="dns-prefetch" href="https://ik.imagekit.io" />
+          {/* Non-blocking preload for Clash Display (not on Google Fonts) */}
+          <link
+            rel="preload"
+            href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+            as="style"
+          />
+          <link
+            rel="stylesheet"
+            href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+          />
         </head>
         <body
-          className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}
         >
           <TooltipProvider delayDuration={300}>
             <ErrorBoundary>
