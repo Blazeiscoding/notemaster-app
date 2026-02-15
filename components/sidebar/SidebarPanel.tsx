@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 
 import type {
-  NotePayload,
+  SectionKey,
 } from "@/types/note";
 import SearchBar from "./SearchBar";
 import SectionFilters from "./SectionFilters";
@@ -23,12 +23,13 @@ type SidebarPanelProps = {
   searchQuery: string;
   onSearchChange: (value: string) => void;
   searchInputRef?: React.RefObject<HTMLInputElement | null>;
-  activeSection: "notes" | "archive" | "bin";
-  sectionCounts: Record<"notes" | "archive" | "bin", number>;
-  onSectionChange: (section: "notes" | "archive" | "bin") => void;
+  activeSection: SectionKey;
+  sectionCounts: Record<SectionKey, number>;
+  onSectionChange: (section: SectionKey) => void;
   filterTag: string;
   tags: string[];
-  notes: NotePayload[];
+  totalNotesCount: number;
+  notesCountByTag: Record<string, number>;
   onTagSelect: (tag: string) => void;
   onClearTags: () => void;
 };
@@ -45,19 +46,11 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
   onSectionChange,
   filterTag,
   tags,
-  notes,
+  totalNotesCount,
+  notesCountByTag,
   onTagSelect,
   onClearTags,
 }) => {
-  const notesCountByTag = React.useMemo(() => {
-    const counts: Record<string, number> = {};
-    notes.forEach((note) => {
-      note.tags.forEach((tag) => {
-        counts[tag] = (counts[tag] ?? 0) + 1;
-      });
-    });
-    return counts;
-  }, [notes]);
 
 
 
@@ -91,7 +84,7 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
                 : "bg-background text-muted-foreground"
             )}
           >
-            {notes.length}
+            {totalNotesCount}
           </span>
         </Button>
         <Select
@@ -113,14 +106,14 @@ const SidebarPanel: React.FC<SidebarPanelProps> = React.memo(({
         onSelect={onSectionChange}
       />
 
-      <TagFilters
-        tags={tags}
-        activeTag={filterTag}
-        notesCountByTag={notesCountByTag}
-        totalNotes={notes.length}
-        onSelect={onTagSelect}
-        onClear={onClearTags}
-      />
+        <TagFilters
+          tags={tags}
+          activeTag={filterTag}
+          notesCountByTag={notesCountByTag}
+          totalNotes={totalNotesCount}
+          onSelect={onTagSelect}
+          onClear={onClearTags}
+        />
 
 
     </aside>

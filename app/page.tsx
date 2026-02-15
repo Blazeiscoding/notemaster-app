@@ -107,6 +107,17 @@ const NoteApp = () => {
   const [viewMode, setViewMode] = React.useState<"grid" | "calendar">("grid");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
+  // Pre-compute tag counts for SidebarPanel to avoid passing the full notes array
+  const notesCountByTag = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    notes.forEach((note) => {
+      note.tags.forEach((tag) => {
+        counts[tag] = (counts[tag] ?? 0) + 1;
+      });
+    });
+    return counts;
+  }, [notes]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onCreateNote: createNote,
@@ -225,7 +236,8 @@ const NoteApp = () => {
             onSectionChange={setActiveSection}
             filterTag={filterTag}
             tags={allTags}
-            notes={notes}
+            totalNotesCount={notes.length}
+            notesCountByTag={notesCountByTag}
             onTagSelect={setFilterTag}
             onClearTags={handleClearTags}
           />
