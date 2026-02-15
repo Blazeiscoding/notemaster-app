@@ -16,6 +16,25 @@ import {
 } from "@/lib/api-middleware"
 import { emitNoteEvent } from "@/lib/note-events"
 
+// Common select fields for note queries - optimized to only fetch needed fields
+const noteSelect = {
+  id: true,
+  userId: true,
+  notebookId: true,
+  title: true,
+  content: true,
+  tags: true,
+  checklist: true,
+  attachments: true,
+  type: true,
+  pinned: true,
+  archived: true,
+  trashed: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const
+
 export const GET = withAuth(
   async ({ userId, rateLimitHeaders, requestId, request }) => {
     // Parse pagination parameters from URL
@@ -23,25 +42,6 @@ export const GET = withAuth(
     const cursor = url.searchParams.get("cursor")
     const limitParam = url.searchParams.get("limit")
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : undefined
-
-    // Common select fields for note queries - optimized to only fetch needed fields
-    const noteSelect = {
-      id: true,
-      userId: true,
-      notebookId: true,
-      title: true,
-      content: true,
-      tags: true,
-      checklist: true,
-      attachments: true,
-      type: true,
-      pinned: true,
-      archived: true,
-      trashed: true,
-      dueAt: true,
-      createdAt: true,
-      updatedAt: true,
-    } as const
 
     // If no limit specified, return all notes (backwards compatible)
     if (!limit) {
@@ -131,6 +131,7 @@ export const POST = withAuthAndJson(
 
     const created = await prisma.note.create({
       data: noteData,
+      select: noteSelect,
     })
 
     logger.info("Note created", { noteId: created.id });
