@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import {
   Check,
   Clock,
@@ -70,7 +70,7 @@ type NoteEditorProps = {
   onFilesSelected: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
 
-const NoteEditor: React.FC<NoteEditorProps> = ({
+const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
   note,
   isSaving,
   canViewHistory,
@@ -101,7 +101,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     ? notebooksById.get(note.notebookId)?.name ?? "Notebook"
     : "Inbox";
 
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = useCallback(() => {
     const markdown = exportNoteToMarkdown(note);
     const blob = new Blob([markdown], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
@@ -110,15 +110,25 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     link.download = `${note.title || "note"}.md`;
     link.click();
     URL.revokeObjectURL(url);
-  };
+  }, [note]);
 
-  const handleExportPDF = async () => {
+  const handleExportPDF = useCallback(async () => {
     await exportNoteToPDF(note);
-  };
+  }, [note]);
 
-  const handlePrint = () => {
+  const handlePrint = useCallback(() => {
     printNote(note);
-  };
+  }, [note]);
+
+  // Memoize word and character counts to avoid expensive regex operations on every render
+  const { wordCount, charCount } = useMemo(() => {
+    const strippedContent = note.content.replace(/<[^>]*>/g, '');
+    const trimmed = strippedContent.trim();
+    return {
+      wordCount: trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0,
+      charCount: strippedContent.length,
+    };
+  }, [note.content]);
 
   return (
     <Card className="border-none bg-background/50 backdrop-blur-sm shadow-none sm:border sm:border-[var(--glass-border)] sm:bg-[var(--glass-bg)] sm:shadow-[var(--glass-shadow)] animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -238,11 +248,9 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           />
           <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground/60 font-medium">
             <span>
-              {note.content.trim()
-                ? `${note.content.replace(/<[^>]*>/g, '').trim().split(/\s+/).filter(Boolean).length} words`
-                : "0 words"}
+              {wordCount} words
             </span>
-            <span>{note.content.replace(/<[^>]*>/g, '').length} characters</span>
+            <span>{charCount} characters</span>
           </div>
         </div>
 
@@ -271,6 +279,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
+
+NoteEditor.displayName = "NoteEditor";
 
 export default NoteEditor;
