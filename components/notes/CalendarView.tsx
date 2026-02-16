@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   format,
   startOfMonth,
@@ -27,9 +27,9 @@ type CalendarViewProps = {
 const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
 
-  const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
-  const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
-  const jumpToToday = () => setCurrentMonth(new Date());
+  const nextMonth = useCallback(() => setCurrentMonth((m) => addMonths(m, 1)), []);
+  const prevMonth = useCallback(() => setCurrentMonth((m) => subMonths(m, 1)), []);
+  const jumpToToday = useCallback(() => setCurrentMonth(new Date()), []);
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(monthStart);
@@ -43,15 +43,22 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
 
   const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const getNotesForDay = (day: Date) => {
-    return notes.filter((note) => {
-      // Show notes on their creation date
+  // Pre-build a date-to-notes map for O(1) lookups per cell instead of O(n)
+  const notesByDate = useMemo(() => {
+    const map = new Map<string, NotePayload[]>();
+    for (const note of notes) {
       if (note.createdAt) {
-        return isSameDay(new Date(note.createdAt), day);
+        const key = format(new Date(note.createdAt), "yyyy-MM-dd");
+        const arr = map.get(key);
+        if (arr) {
+          arr.push(note);
+        } else {
+          map.set(key, [note]);
+        }
       }
-      return false;
-    });
-  };
+    }
+    return map;
+  }, [notes]);
 
   return (
     <div className="flex h-full flex-col space-y-4 animate-in fade-in duration-500">
@@ -81,7 +88,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
           </div>
         ))}
         {calendarDays.map((day, dayIdx) => {
-          const dayNotes = getNotesForDay(day);
+          const dayNotes = notesByDate.get(format(day, "yyyy-MM-dd")) ?? [];
           const isCurrentMonth = isSameMonth(day, monthStart);
           const isDayToday = isToday(day);
 
@@ -129,4 +136,4 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
   );
 };
 
-export default CalendarView;
+export default React.memo(CalendarView);

@@ -118,6 +118,12 @@ const NoteApp = () => {
     return counts;
   }, [notes]);
 
+  // Memoize history visibility check to avoid linear scan on every render
+  const canViewHistory = React.useMemo(
+    () => isAuthenticated && notes.some((n) => n.id === currentNote?.id),
+    [isAuthenticated, notes, currentNote?.id]
+  );
+
   // Keyboard shortcuts
   useKeyboardShortcuts({
     onCreateNote: createNote,
@@ -247,10 +253,7 @@ const NoteApp = () => {
               <NoteEditor
                 note={currentNote}
                 isSaving={isSavingNote}
-                canViewHistory={
-                  isAuthenticated &&
-                  notes.some((noteItem) => noteItem.id === currentNote.id)
-                }
+                canViewHistory={canViewHistory}
                 historyTitle={
                   isAuthenticated
                     ? "View revision history"

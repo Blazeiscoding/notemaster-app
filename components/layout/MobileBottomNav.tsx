@@ -101,4 +101,4 @@ const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   );
 };
 
-export default MobileBottomNav;
+export default React.memo(MobileBottomNav);

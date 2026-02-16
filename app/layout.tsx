@@ -75,10 +75,20 @@ export default function RootLayout({
             href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
             as="style"
           />
+          {/* Non-blocking font load: render as print, swap to all on load */}
           <link
             rel="stylesheet"
             href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+            media="print"
+            // @ts-expect-error -- onLoad is valid on link elements in browsers
+            onLoad="this.media='all'"
           />
+          <noscript>
+            <link
+              rel="stylesheet"
+              href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+            />
+          </noscript>
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}

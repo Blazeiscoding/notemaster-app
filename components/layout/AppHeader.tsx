@@ -41,17 +41,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   viewMode,
   onViewModeChange,
 }) => {
-  // Helper to get greeting based on time of day in user's timezone
-  const getGreeting = () => {
-    // Get current hour in user's local timezone
-    // new Date() automatically uses the browser's timezone (user's timezone)
-    const now = new Date();
-    const hours = now.getHours(); // This already uses the user's timezone
-
+  // Memoize greeting — only recalculates when component remounts
+  const greeting = React.useMemo(() => {
+    const hours = new Date().getHours();
     if (hours < 12) return "Good morning";
     if (hours < 18) return "Good afternoon";
     return "Good evening";
-  };
+  }, []);
 
   return (
     <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -75,7 +71,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
             </h1>
           </div>
           <p className="text-sm text-muted-foreground font-medium">
-            {getGreeting()}, {userFirstName || "Guest"}
+            {greeting}, {userFirstName || "Guest"}
           </p>
         </div>
       </div>
@@ -163,4 +159,4 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   );
 };
 
-export default AppHeader;
+export default React.memo(AppHeader);

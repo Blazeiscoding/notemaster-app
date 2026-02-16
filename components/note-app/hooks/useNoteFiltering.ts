@@ -107,12 +107,18 @@ export function useNoteFiltering(
     deferredCriteria.sortBy,
   ]);
 
+  // Single-pass reduce instead of 3 separate filter calls
   const sectionCounts = useMemo(
-    () => ({
-      notes: deferredNotes.filter((note) => !note.archived && !note.trashed).length,
-      archive: deferredNotes.filter((note) => note.archived && !note.trashed).length,
-      bin: deferredNotes.filter((note) => note.trashed).length,
-    }),
+    () =>
+      deferredNotes.reduce(
+        (acc, note) => {
+          if (note.trashed) acc.bin++;
+          else if (note.archived) acc.archive++;
+          else acc.notes++;
+          return acc;
+        },
+        { notes: 0, archive: 0, bin: 0 }
+      ),
     [deferredNotes]
   );
 

@@ -29,20 +29,22 @@ export function useNotes(
 
   const togglePin = useCallback(
     async (id: string) => {
-      const existing = notes.find((n) => n.id === id);
-      if (!existing) return;
+      let existing: NotePayload | undefined;
+      let optimistic: NotePayload | undefined;
 
+      setNotes((prev) => {
+        existing = prev.find((n) => n.id === id);
+        if (!existing) return prev;
+        optimistic = {
+          ...existing,
+          pinned: !existing.pinned,
+          updatedAt: new Date().toISOString(),
+        };
+        return prev.map((note) => (note.id === id ? optimistic! : note));
+      });
+
+      if (!existing || !optimistic) return;
       hapticLight();
-
-      const optimistic: NotePayload = {
-        ...existing,
-        pinned: !existing.pinned,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setNotes((prev) =>
-        prev.map((note) => (note.id === id ? optimistic : note))
-      );
 
       if (isAuthenticated) {
         try {
@@ -55,8 +57,9 @@ export function useNotes(
           toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
         } catch (error) {
           console.error("Failed to toggle pin", error);
+          const rollback = existing;
           setNotes((prev) =>
-            prev.map((note) => (note.id === id ? existing : note))
+            prev.map((note) => (note.id === id ? rollback : note))
           );
           toast.error("Failed to update note. Please try again.");
         }
@@ -64,26 +67,27 @@ export function useNotes(
         toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
       }
     },
-    [notes, isAuthenticated, updateNoteOnServer, setNotes]
+    [isAuthenticated, updateNoteOnServer, setNotes]
   );
 
   const archiveNote = useCallback(
     async (id: string) => {
-      const existing = notes.find((n) => n.id === id);
+      let existing: NotePayload | undefined;
+
+      setNotes((prev) => {
+        existing = prev.find((n) => n.id === id);
+        if (!existing) return prev;
+        const optimistic: NotePayload = {
+          ...existing,
+          archived: true,
+          pinned: false,
+          updatedAt: new Date().toISOString(),
+        };
+        return prev.map((note) => (note.id === id ? optimistic : note));
+      });
+
       if (!existing) return;
-
       hapticMedium();
-
-      const optimistic: NotePayload = {
-        ...existing,
-        archived: true,
-        pinned: false,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setNotes((prev) =>
-        prev.map((note) => (note.id === id ? optimistic : note))
-      );
 
       if (isAuthenticated) {
         try {
@@ -97,8 +101,9 @@ export function useNotes(
           toast.success("Note archived");
         } catch (error) {
           console.error("Failed to archive note", error);
+          const rollback = existing;
           setNotes((prev) =>
-            prev.map((note) => (note.id === id ? existing : note))
+            prev.map((note) => (note.id === id ? rollback : note))
           );
           toast.error("Failed to archive note. Please try again.");
         }
@@ -106,25 +111,26 @@ export function useNotes(
         toast.success("Note archived");
       }
     },
-    [notes, isAuthenticated, updateNoteOnServer, setNotes]
+    [isAuthenticated, updateNoteOnServer, setNotes]
   );
 
   const unarchiveNote = useCallback(
     async (id: string) => {
-      const existing = notes.find((n) => n.id === id);
+      let existing: NotePayload | undefined;
+
+      setNotes((prev) => {
+        existing = prev.find((n) => n.id === id);
+        if (!existing) return prev;
+        const optimistic: NotePayload = {
+          ...existing,
+          archived: false,
+          updatedAt: new Date().toISOString(),
+        };
+        return prev.map((note) => (note.id === id ? optimistic : note));
+      });
+
       if (!existing) return;
-
       hapticMedium();
-
-      const optimistic: NotePayload = {
-        ...existing,
-        archived: false,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setNotes((prev) =>
-        prev.map((note) => (note.id === id ? optimistic : note))
-      );
 
       if (isAuthenticated) {
         try {
@@ -137,8 +143,9 @@ export function useNotes(
           toast.success("Note restored");
         } catch (error) {
           console.error("Failed to unarchive note", error);
+          const rollback = existing;
           setNotes((prev) =>
-            prev.map((note) => (note.id === id ? existing : note))
+            prev.map((note) => (note.id === id ? rollback : note))
           );
           toast.error("Failed to unarchive note. Please try again.");
         }
@@ -146,29 +153,30 @@ export function useNotes(
         toast.success("Note restored");
       }
     },
-    [notes, isAuthenticated, updateNoteOnServer, setNotes]
+    [isAuthenticated, updateNoteOnServer, setNotes]
   );
 
   const trashNote = useCallback(
     async (id: string) => {
-      const existing = notes.find((n) => n.id === id);
-      if (!existing) return;
+      let existing: NotePayload | undefined;
 
+      setNotes((prev) => {
+        existing = prev.find((n) => n.id === id);
+        if (!existing) return prev;
+        const optimistic: NotePayload = {
+          ...existing,
+          trashed: true,
+          archived: false,
+          pinned: false,
+          updatedAt: new Date().toISOString(),
+        };
+        return prev.map((note) => (note.id === id ? optimistic : note));
+      });
+
+      if (!existing) return;
       hapticMedium();
 
-      const optimistic: NotePayload = {
-        ...existing,
-        trashed: true,
-        archived: false,
-        pinned: false,
-        updatedAt: new Date().toISOString(),
-      };
-
       const wasCurrent = currentNote?.id === id;
-
-      setNotes((prev) =>
-        prev.map((note) => (note.id === id ? optimistic : note))
-      );
       if (wasCurrent) setCurrentNote(null);
 
       if (isAuthenticated) {
@@ -184,36 +192,38 @@ export function useNotes(
           toast.success("Note moved to bin");
         } catch (error) {
           console.error("Failed to move note to bin", error);
+          const rollback = existing;
           setNotes((prev) =>
-            prev.map((note) => (note.id === id ? existing : note))
+            prev.map((note) => (note.id === id ? rollback : note))
           );
-          if (wasCurrent) setCurrentNote(existing);
+          if (wasCurrent) setCurrentNote(rollback);
           toast.error("Failed to move note to bin. Please try again.");
         }
       } else {
         toast.success("Note moved to bin");
       }
     },
-    [notes, currentNote, isAuthenticated, updateNoteOnServer, setNotes, setCurrentNote]
+    [currentNote, isAuthenticated, updateNoteOnServer, setNotes, setCurrentNote]
   );
 
   const restoreFromBin = useCallback(
     async (id: string) => {
-      const existing = notes.find((n) => n.id === id);
+      let existing: NotePayload | undefined;
+
+      setNotes((prev) => {
+        existing = prev.find((n) => n.id === id);
+        if (!existing) return prev;
+        const optimistic: NotePayload = {
+          ...existing,
+          trashed: false,
+          archived: false,
+          updatedAt: new Date().toISOString(),
+        };
+        return prev.map((note) => (note.id === id ? optimistic : note));
+      });
+
       if (!existing) return;
-
       hapticSuccess();
-
-      const optimistic: NotePayload = {
-        ...existing,
-        trashed: false,
-        archived: false,
-        updatedAt: new Date().toISOString(),
-      };
-
-      setNotes((prev) =>
-        prev.map((note) => (note.id === id ? optimistic : note))
-      );
 
       if (isAuthenticated) {
         try {
@@ -227,8 +237,9 @@ export function useNotes(
           toast.success("Note restored");
         } catch (error) {
           console.error("Failed to restore note", error);
+          const rollback = existing;
           setNotes((prev) =>
-            prev.map((note) => (note.id === id ? existing : note))
+            prev.map((note) => (note.id === id ? rollback : note))
           );
           toast.error("Failed to restore note. Please try again.");
         }
@@ -236,19 +247,25 @@ export function useNotes(
         toast.success("Note restored");
       }
     },
-    [notes, isAuthenticated, updateNoteOnServer, setNotes]
+    [isAuthenticated, updateNoteOnServer, setNotes]
   );
 
   const deleteForever = useCallback(
     async (id: string) => {
-      const index = notes.findIndex((n) => n.id === id);
-      if (index === -1) return;
-      const existing = notes[index];
-      const wasCurrent = currentNote?.id === id;
+      let existing: NotePayload | undefined;
+      let existingIndex = -1;
 
+      setNotes((prev) => {
+        existingIndex = prev.findIndex((n) => n.id === id);
+        if (existingIndex === -1) return prev;
+        existing = prev[existingIndex];
+        return prev.filter((n) => n.id !== id);
+      });
+
+      if (!existing || existingIndex === -1) return;
       hapticError();
 
-      setNotes((prev) => prev.filter((n) => n.id !== id));
+      const wasCurrent = currentNote?.id === id;
       if (wasCurrent) setCurrentNote(null);
 
       if (isAuthenticated) {
@@ -257,19 +274,21 @@ export function useNotes(
           toast.success("Note deleted permanently");
         } catch (error) {
           console.error("Failed to delete note", error);
+          const rollback = existing;
+          const rollbackIndex = existingIndex;
           setNotes((prev) => {
             const next = [...prev];
-            next.splice(index, 0, existing);
+            next.splice(rollbackIndex, 0, rollback);
             return next;
           });
-          if (wasCurrent) setCurrentNote(existing);
+          if (wasCurrent) setCurrentNote(rollback);
           toast.error("Failed to delete note. Please try again.");
         }
       } else {
         toast.success("Note deleted permanently");
       }
     },
-    [notes, currentNote, isAuthenticated, deleteNoteOnServer, setNotes, setCurrentNote]
+    [currentNote, isAuthenticated, deleteNoteOnServer, setNotes, setCurrentNote]
   );
 
   const exportNotes = useCallback(() => {
