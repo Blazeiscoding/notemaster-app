@@ -184,6 +184,18 @@ export const useNoteApp = () => {
     }
   );
 
+  // Memoize notebook lookups to avoid creating new Map/Array on every render
+  const notebooksById = useMemo(() => {
+    const map = new Map<string, NotebookPayload>();
+    for (const nb of notebooks) map.set(nb.id, nb);
+    return map;
+  }, [notebooks]);
+
+  const notebookOptions = useMemo(() =>
+    notebooks.map((nb) => ({ id: nb.id, label: nb.name })),
+    [notebooks]
+  );
+
   // Current note editing
   const currentNoteHook = useCurrentNote({ currentNote, setCurrentNote });
 
@@ -483,11 +495,11 @@ export const useNoteApp = () => {
     deleteForever: notesHook.deleteForever,
     exportNotes: notesHook.exportNotes,
     importNotes: notesHook.importNotes,
-    // Notebooks - provide minimal defaults since UI was removed
+    // Notebooks
     notebooks,
     notebookTree: [] as NotebookTreeNode[],
-    notebooksById: new Map<string, NotebookPayload>(),
-    notebookOptions: [] as Array<{ id: string; label: string }>,
+    notebooksById,
+    notebookOptions,
     revisions: revisionsHook.revisions,
     isRevisionOpen: revisionsHook.isRevisionOpen,
     isLoadingRevisions: revisionsHook.isLoadingRevisions,

@@ -264,4 +264,9 @@
       box-shadow: 0 0 0 12px rgba(103, 132, 255, 0);
     }
   }
+  /* Skip layout/paint for off-screen cards — big win for long lists */
+  .cv-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 220px;
+  }
 }

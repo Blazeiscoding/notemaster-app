@@ -209,7 +209,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     }, [note.attachments]);
 
     return (
-      <div className="relative">
+      <div className="relative cv-auto">
         <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-4">
           <div
             className={cn(

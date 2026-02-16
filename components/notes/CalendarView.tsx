@@ -24,6 +24,9 @@ type CalendarViewProps = {
   onOpenNote: (note: NotePayload) => void;
 };
 
+// Static — hoist outside component to avoid re-allocation every render
+const WEEK_DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
 const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
 
@@ -31,17 +34,15 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
   const prevMonth = useCallback(() => setCurrentMonth((m) => subMonths(m, 1)), []);
   const jumpToToday = useCallback(() => setCurrentMonth(new Date()), []);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(monthStart);
-  const startDate = startOfWeek(monthStart, { weekStartsOn: 0 }); // Sunday
-  const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 }); // Sunday
+  // Memoize calendar grid — only recalculate when the month changes
+  const { monthStart, calendarDays } = useMemo(() => {
+    const ms = startOfMonth(currentMonth);
+    const me = endOfMonth(ms);
+    const sd = startOfWeek(ms, { weekStartsOn: 0 });
+    const ed = endOfWeek(me, { weekStartsOn: 0 });
+    return { monthStart: ms, calendarDays: eachDayOfInterval({ start: sd, end: ed }) };
+  }, [currentMonth]);
 
-  const calendarDays = eachDayOfInterval({
-    start: startDate,
-    end: endDate,
-  });
-
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Pre-build a date-to-notes map for O(1) lookups per cell instead of O(n)
   const notesByDate = useMemo(() => {
@@ -82,7 +83,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
       </div>
 
       <div className="grid grid-cols-7 gap-px rounded-lg border bg-muted text-center text-sm font-semibold leading-6 shadow-sm overflow-hidden">
-        {weekDays.map((day) => (
+        {WEEK_DAYS.map((day) => (
           <div key={day} className="bg-background py-2 text-muted-foreground">
             {day}
           </div>

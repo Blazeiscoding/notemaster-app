@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
+import dynamic from "next/dynamic";
 import {
   Check,
   Clock,
@@ -15,7 +16,12 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import RichTextEditor from "@/components/ui/RichTextEditor";
+
+// Dynamic import: TipTap + lowlight are heavy — only load when editor is open
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/RichTextEditor"),
+  { ssr: false, loading: () => <div className="min-h-[300px] animate-pulse rounded-lg bg-muted" /> }
+);
 import { Select } from "@/components/ui/select";
 import {
   Card,
@@ -101,6 +107,12 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
     ? notebooksById.get(note.notebookId)?.name ?? "Notebook"
     : "Inbox";
 
+  // Memoize formatted date — toLocaleString with options is non-trivial
+  const formattedUpdatedAt = useMemo(
+    () => new Date(note.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+    [note.updatedAt]
+  );
+
   const handleExportMarkdown = useCallback(() => {
     const markdown = exportNoteToMarkdown(note);
     const blob = new Blob([markdown], { type: "text/markdown" });
@@ -145,7 +157,7 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
           <CardDescription className="flex flex-wrap items-center gap-4 text-sm">
             <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
               <Clock className="size-3.5" />
-              Edited {new Date(note.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+              Edited {formattedUpdatedAt}
             </span>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
               <Folder className="size-3.5" />

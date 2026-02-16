@@ -69,6 +69,9 @@ export default function RootLayout({
           {/* Preconnect to ImageKit for faster image loading */}
           <link rel="preconnect" href="https://ik.imagekit.io" />
           <link rel="dns-prefetch" href="https://ik.imagekit.io" />
+          {/* Preconnect to Fontshare for faster Clash Display loading */}
+          <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
+          <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
           {/* Non-blocking preload for Clash Display (not on Google Fonts) */}
           <link
             rel="preload"
