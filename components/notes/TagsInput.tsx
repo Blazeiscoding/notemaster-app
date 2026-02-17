@@ -23,10 +23,15 @@ const TagsInput: React.FC<TagsInputProps> = ({ tags, onAddTag, onRemoveTag }) =>
           <Badge
             key={tag}
             variant="outline"
-            className="flex items-center gap-1 bg-background"
+            className="flex items-center gap-1 border-(--interactive-accent)/30 bg-(--interactive-accent-soft) text-(--interactive-accent) transition-colors hover:border-(--interactive-accent)/50"
           >
             #{tag}
-            <button onClick={() => onRemoveTag(tag)}>
+            <button
+              type="button"
+              aria-label={`Remove ${tag} tag`}
+              className="rounded-full p-0.5 text-(--interactive-accent) transition-colors hover:bg-(--interactive-accent)/15"
+              onClick={() => onRemoveTag(tag)}
+            >
               <X className="size-3" />
             </button>
           </Badge>
