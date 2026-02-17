@@ -19,6 +19,11 @@
     "jsx": "react-jsx",
     "incremental": true,
     "tsBuildInfoFile": ".next/cache/.tsbuildinfo",
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ],
     "baseUrl": ".",
     "plugins": [
       {
