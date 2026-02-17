@@ -11,12 +11,6 @@ type FilterCriteria = {
   notebookId: string;
 };
 
-// Helper function defined outside component to avoid "impure function" lint error
-// This is a workaround for React's strict linting rules
-function getCurrentTimestamp(): number {
-  return Date.now();
-}
-
 export function useNoteFiltering(
   notes: NotePayload[],
   criteria: FilterCriteria,
@@ -26,26 +20,37 @@ export function useNoteFiltering(
   const deferredNotes = useDeferredValue(notes);
   const deferredCriteria = useDeferredValue(criteria);
 
-  const filteredNotes = useMemo(() => {
-    return deferredNotes.filter((note) => {
-      const matchesSearch = deferredCriteria.search
-        ? note.title
-            .toLowerCase()
-            .includes(deferredCriteria.search.toLowerCase()) ||
-          note.content
-            .toLowerCase()
-            .includes(deferredCriteria.search.toLowerCase())
-        : true;
+  const { filteredNotes, allTags, sectionCounts } = useMemo(() => {
+    const normalizedSearch = deferredCriteria.search.trim().toLowerCase();
+    const hasSearch = normalizedSearch.length > 0;
+    const hasTagFilter =
+      deferredCriteria.tag.length > 0 && deferredCriteria.tag !== "all";
+    const hasNotebookFilter =
+      deferredCriteria.notebookId.length > 0 &&
+      deferredCriteria.notebookId !== "all";
 
-      const matchesTag = deferredCriteria.tag && deferredCriteria.tag !== "all"
-        ? note.tags.includes(deferredCriteria.tag)
-        : true;
+    const tags = new Set<string>();
+    const section = deferredCriteria.section;
+    const counts: Record<NoteAppSection, number> = {
+      notes: 0,
+      archive: 0,
+      bin: 0,
+    };
+    const filtered: NotePayload[] = [];
 
-      const matchesNotebook = deferredCriteria.notebookId && deferredCriteria.notebookId !== "all"
-        ? note.notebookId === deferredCriteria.notebookId
-        : true;
+    for (const note of deferredNotes) {
+      for (const tag of note.tags) {
+        tags.add(tag);
+      }
 
-      const section = deferredCriteria.section;
+      if (note.trashed) {
+        counts.bin += 1;
+      } else if (note.archived) {
+        counts.archive += 1;
+      } else {
+        counts.notes += 1;
+      }
+
       const matchesSection =
         section === "notes"
           ? !note.archived && !note.trashed
@@ -53,19 +58,32 @@ export function useNoteFiltering(
           ? note.archived && !note.trashed
           : note.trashed;
 
-      return (
-        matchesSearch &&
-        matchesTag &&
-        matchesNotebook &&
-        matchesSection
-      );
-    });
-  }, [deferredNotes, deferredCriteria]);
+      if (!matchesSection) continue;
+      if (hasTagFilter && !note.tags.includes(deferredCriteria.tag)) continue;
+      if (hasNotebookFilter && note.notebookId !== deferredCriteria.notebookId) {
+        continue;
+      }
 
-  const allTags = useMemo(
-    () => [...new Set(deferredNotes.flatMap((note) => note.tags))],
-    [deferredNotes]
-  );
+      if (hasSearch) {
+        const title = note.title?.toLowerCase() ?? "";
+        const content = note.content?.toLowerCase() ?? "";
+        if (
+          !title.includes(normalizedSearch) &&
+          !content.includes(normalizedSearch)
+        ) {
+          continue;
+        }
+      }
+
+      filtered.push(note);
+    }
+
+    return {
+      filteredNotes: filtered,
+      allTags: Array.from(tags),
+      sectionCounts: counts,
+    };
+  }, [deferredNotes, deferredCriteria]);
 
   const sortedNotes = useMemo(() => {
     const ordered = [...filteredNotes].sort((a, b) => {
@@ -106,21 +124,6 @@ export function useNoteFiltering(
     deferredCriteria.section,
     deferredCriteria.sortBy,
   ]);
-
-  // Single-pass reduce instead of 3 separate filter calls
-  const sectionCounts = useMemo(
-    () =>
-      deferredNotes.reduce(
-        (acc, note) => {
-          if (note.trashed) acc.bin++;
-          else if (note.archived) acc.archive++;
-          else acc.notes++;
-          return acc;
-        },
-        { notes: 0, archive: 0, bin: 0 }
-      ),
-    [deferredNotes]
-  );
 
   return {
     filteredNotes,

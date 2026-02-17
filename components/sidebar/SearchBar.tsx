@@ -38,15 +38,11 @@ const SearchBar: React.FC<SearchBarProps> = React.memo(({
     const timer = setTimeout(() => {
       if (localValue !== value) {
         onChange(localValue);
-        // Save to recent searches when user submits a query
-        if (localValue.trim()) {
-          addSearch(localValue.trim());
-        }
       }
     }, debounceMs);
 
     return () => clearTimeout(timer);
-  }, [localValue, debounceMs, onChange, value, addSearch]);
+  }, [localValue, debounceMs, onChange, value]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -68,14 +64,40 @@ const SearchBar: React.FC<SearchBarProps> = React.memo(({
     (query: string) => {
       setLocalValue(query);
       onChange(query);
+      if (query.trim()) {
+        addSearch(query.trim());
+      }
       setShowDropdown(false);
       setHighlightedIndex(-1);
     },
-    [onChange]
+    [addSearch, onChange]
   );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Enter") {
+        if (showDropdown && highlightedIndex >= 0) {
+          event.preventDefault();
+          handleSelectSearch(recentSearches[highlightedIndex].query);
+          return;
+        }
+
+        const query = localValue.trim();
+        onChange(localValue);
+        if (query) {
+          addSearch(query);
+        }
+        setShowDropdown(false);
+        setHighlightedIndex(-1);
+        return;
+      }
+
+      if (event.key === "Escape") {
+        setShowDropdown(false);
+        setHighlightedIndex(-1);
+        return;
+      }
+
       if (!showDropdown || recentSearches.length === 0) return;
 
       switch (event.key) {
@@ -91,19 +113,17 @@ const SearchBar: React.FC<SearchBarProps> = React.memo(({
             prev > 0 ? prev - 1 : recentSearches.length - 1
           );
           break;
-        case "Enter":
-          if (highlightedIndex >= 0) {
-            event.preventDefault();
-            handleSelectSearch(recentSearches[highlightedIndex].query);
-          }
-          break;
-        case "Escape":
-          setShowDropdown(false);
-          setHighlightedIndex(-1);
-          break;
       }
     },
-    [showDropdown, recentSearches, highlightedIndex, handleSelectSearch]
+    [
+      addSearch,
+      handleSelectSearch,
+      highlightedIndex,
+      localValue,
+      onChange,
+      recentSearches,
+      showDropdown,
+    ]
   );
 
   const handleFocus = useCallback(() => {

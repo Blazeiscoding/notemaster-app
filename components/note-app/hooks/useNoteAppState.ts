@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useUser } from "@clerk/nextjs";
 import { useTheme } from "./useTheme";
@@ -82,40 +82,6 @@ export const useNoteApp = () => {
     });
   }, []);
 
-  const createNotebookOnServer = useCallback(
-    async (payload: {
-      name: string;
-      parentId?: string | null;
-      color?: string;
-    }) => {
-      return apiRequest<NotebookPayload>("/api/notebooks", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-    },
-    []
-  );
-
-  const deleteNotebookOnServer = useCallback(async (id: string) => {
-    return apiRequest<{ deleted: boolean; releasedNotes: number }>(
-      `/api/notebooks/${id}`,
-      { method: "DELETE" }
-    );
-  }, []);
-
-  const updateNotebookOnServer = useCallback(
-    async (
-      id: string,
-      updates: Partial<Pick<NotebookPayload, "name" | "parentId" | "color">>
-    ) => {
-      return apiRequest<NotebookPayload>(`/api/notebooks/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
-    },
-    []
-  );
-
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
     return apiRequest<NoteRevisionPayload[]>(`/api/notes/${id}/revisions`, {
       cache: "no-store",
@@ -148,7 +114,6 @@ export const useNoteApp = () => {
     notes,
     setNotes,
     notebooks,
-    setNotebooks,
     isLoading,
     error: dataError,
     retry: retryLoadData,
@@ -208,39 +173,59 @@ export const useNoteApp = () => {
     }
   );
 
-  // Real-time updates via SSE (only when authenticated)
-  useSSE(
-    {
-      onNoteCreated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
-        if (!data) return;
-        // Only add if not already in list (to avoid duplicates from own actions)
-        setNotes((prev) => {
-          if (prev.some((n) => n.id === noteId)) return prev;
-          return [data as NotePayload, ...prev];
-        });
-      }, [setNotes]),
-      
-      onNoteUpdated: useCallback((noteId: string, data?: Partial<NotePayload>) => {
-        if (!data) return;
-        setNotes((prev) => {
-          const index = prev.findIndex((n) => n.id === noteId);
-          if (index === -1) return prev;
-          const next = [...prev];
-          next[index] = { ...next[index], ...data };
-          return next;
-        });
-      }, [setNotes]),
-      
-      onNoteDeleted: useCallback((noteId: string) => {
-        setNotes((prev) => prev.filter((n) => n.id !== noteId));
-        // Close editor if the deleted note was being edited
-        if (currentNote?.id === noteId) {
-          setCurrentNote(null);
-        }
-      }, [setNotes, currentNote, setCurrentNote]),
+  const currentNoteIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentNoteIdRef.current = currentNote?.id ?? null;
+  }, [currentNote?.id]);
+
+  const handleSseNoteCreated = useCallback(
+    (noteId: string, data?: Partial<NotePayload>) => {
+      if (!data) return;
+      // Only add if not already in list (to avoid duplicates from own actions)
+      setNotes((prev) => {
+        if (prev.some((n) => n.id === noteId)) return prev;
+        return [data as NotePayload, ...prev];
+      });
     },
-    { enabled: isAuthenticated }
+    [setNotes]
   );
+
+  const handleSseNoteUpdated = useCallback(
+    (noteId: string, data?: Partial<NotePayload>) => {
+      if (!data) return;
+      setNotes((prev) => {
+        const index = prev.findIndex((n) => n.id === noteId);
+        if (index === -1) return prev;
+        const next = [...prev];
+        next[index] = { ...next[index], ...data };
+        return next;
+      });
+    },
+    [setNotes]
+  );
+
+  const handleSseNoteDeleted = useCallback(
+    (noteId: string) => {
+      setNotes((prev) => prev.filter((n) => n.id !== noteId));
+      // Close editor if the deleted note was being edited
+      if (currentNoteIdRef.current === noteId) {
+        setCurrentNote(null);
+      }
+    },
+    [setNotes, setCurrentNote]
+  );
+
+  const sseHandlers = useMemo(
+    () => ({
+      onNoteCreated: handleSseNoteCreated,
+      onNoteUpdated: handleSseNoteUpdated,
+      onNoteDeleted: handleSseNoteDeleted,
+    }),
+    [handleSseNoteCreated, handleSseNoteDeleted, handleSseNoteUpdated]
+  );
+
+  // Real-time updates via SSE (only when authenticated)
+  useSSE(sseHandlers, { enabled: isAuthenticated });
 
   // Close editor when switching away from notes section
   useEffect(() => {

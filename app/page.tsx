@@ -8,7 +8,6 @@ import MobileBottomNav from "@/components/layout/MobileBottomNav";
 import { MobileFloatingButton } from "@/components/layout/MobileFloatingButton";
 import NotesGrid from "@/components/notes/NotesGrid";
 import SidebarPanel from "@/components/sidebar/SidebarPanel";
-import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { LoadingSkeleton } from "@/components/note-app/LoadingSkeleton";
 import { OfflineIndicator } from "@/components/ui/OfflineIndicator";
@@ -118,10 +117,16 @@ const NoteApp = () => {
     return counts;
   }, [notes]);
 
-  // Memoize history visibility check to avoid linear scan on every render
+  const noteIds = React.useMemo(() => new Set(notes.map((note) => note.id)), [notes]);
+  const currentNoteId = currentNote?.id ?? null;
+
+  // Memoize history visibility check using O(1) lookups
   const canViewHistory = React.useMemo(
-    () => isAuthenticated && notes.some((n) => n.id === currentNote?.id),
-    [isAuthenticated, notes, currentNote?.id]
+    () =>
+      isAuthenticated &&
+      currentNoteId !== null &&
+      noteIds.has(currentNoteId),
+    [isAuthenticated, noteIds, currentNoteId]
   );
 
   // Keyboard shortcuts
@@ -145,8 +150,8 @@ const NoteApp = () => {
 
   // Memoized callbacks for better performance
   const handleToggleTheme = React.useCallback(
-    () => setDarkMode(!darkMode),
-    [darkMode, setDarkMode]
+    () => setDarkMode((prev) => !prev),
+    [setDarkMode]
   );
   const handleOpenThemePicker = React.useCallback(
     () => setShowThemePanel(true),
