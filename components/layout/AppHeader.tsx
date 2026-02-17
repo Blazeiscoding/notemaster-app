@@ -7,7 +7,6 @@ import {
   Calendar,
   Moon,
   Plus,
-  Save,
   Sun,
   Menu,
   Palette,

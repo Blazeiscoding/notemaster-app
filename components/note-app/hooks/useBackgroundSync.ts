@@ -11,9 +11,16 @@ import { getPendingSyncCount } from "@/lib/indexeddb";
 export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "error";
 
 export function useBackgroundSync() {
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(() =>
+    isOnline() ? "idle" : "offline"
+  );
   const [pendingCount, setPendingCount] = useState(0);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(() => isOnline());
+
+  const markSyncedThenIdle = useCallback(() => {
+    setSyncStatus("synced");
+    setTimeout(() => setSyncStatus("idle"), 2000);
+  }, []);
 
   // Update pending count
   const updatePendingCount = useCallback(async () => {
@@ -36,7 +43,7 @@ export function useBackgroundSync() {
     try {
       const result = await processSyncQueue();
       if (result.remaining === 0) {
-        setSyncStatus("synced");
+        markSyncedThenIdle();
       } else {
         setSyncStatus("idle");
       }
@@ -44,18 +51,17 @@ export function useBackgroundSync() {
     } catch {
       setSyncStatus("error");
     }
-  }, [updatePendingCount]);
+  }, [markSyncedThenIdle, updatePendingCount]);
 
   // Initialize background sync on mount
   useEffect(() => {
-    // Set initial online status
-    setIsConnected(isOnline());
-
     // Initialize background sync listeners
     const cleanup = initBackgroundSync();
 
     // Update pending count initially
-    updatePendingCount();
+    const initialPendingTimer = setTimeout(() => {
+      void updatePendingCount();
+    }, 0);
 
     // Listen for online/offline changes
     const handleOnline = () => {
@@ -74,10 +80,8 @@ export function useBackgroundSync() {
     // Listen for service worker sync completion messages
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === "SYNC_COMPLETE") {
-        setSyncStatus("synced");
+        markSyncedThenIdle();
         updatePendingCount();
-        // Reset to idle after a short delay
-        setTimeout(() => setSyncStatus("idle"), 2000);
       }
     };
 
@@ -87,13 +91,14 @@ export function useBackgroundSync() {
     const interval = setInterval(updatePendingCount, 30000);
 
     return () => {
+      clearTimeout(initialPendingTimer);
       cleanup();
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       navigator.serviceWorker?.removeEventListener("message", handleMessage);
       clearInterval(interval);
     };
-  }, [triggerSync, updatePendingCount]);
+  }, [markSyncedThenIdle, triggerSync, updatePendingCount]);
 
   return {
     syncStatus,

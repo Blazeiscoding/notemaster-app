@@ -1,6 +1,6 @@
 import { useRef, useCallback, type ChangeEvent } from "react";
 import type { NotePayload, Attachment } from "@/types/note";
-import { generateId, toBase64, parseInputToIso } from "@/components/note-app/util";
+import { generateId, parseInputToIso } from "@/components/note-app/util";
 import { useAttachmentUpload } from "./useAttachmentUpload";
 
 type CurrentNoteState = {

@@ -117,20 +117,6 @@ export async function getAllNotes(): Promise<NotePayload[]> {
   return allNotes;
 }
 
-async function getNote(id: string): Promise<NotePayload | undefined> {
-  const db = await getDB();
-  return db.get("notes", id);
-}
-
-async function saveNote(note: NotePayload): Promise<void> {
-  const db = await getDB();
-  const noteWithMeta = {
-    ...note,
-    _localUpdatedAt: Date.now(),
-  };
-  await db.put("notes", noteWithMeta);
-}
-
 export async function saveNotes(notes: NotePayload[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("notes", "readwrite");
@@ -142,24 +128,6 @@ export async function saveNotes(notes: NotePayload[]): Promise<void> {
     ),
     tx.done,
   ]);
-}
-
-async function deleteNote(id: string): Promise<void> {
-  const db = await getDB();
-  await db.delete("notes", id);
-}
-
-async function clearAllNotes(userId: string): Promise<void> {
-  const db = await getDB();
-  const tx = db.transaction("notes", "readwrite");
-  const index = tx.store.index("by-userId");
-
-  let cursor = await index.openCursor(userId);
-  while (cursor) {
-    await cursor.delete();
-    cursor = await cursor.continue();
-  }
-  await tx.done;
 }
 
 // Get notes for a specific authenticated user (for stale-while-revalidate cache)
@@ -228,11 +196,6 @@ export async function getAllNotebooks(): Promise<NotebookPayload[]> {
   return db.getAll("notebooks");
 }
 
-async function saveNotebook(notebook: NotebookPayload): Promise<void> {
-  const db = await getDB();
-  await db.put("notebooks", { ...notebook, _localUpdatedAt: Date.now() });
-}
-
 export async function saveNotebooks(
   notebooks: NotebookPayload[]
 ): Promise<void> {
@@ -246,11 +209,6 @@ export async function saveNotebooks(
     ),
     tx.done,
   ]);
-}
-
-async function deleteNotebook(id: string): Promise<void> {
-  const db = await getDB();
-  await db.delete("notebooks", id);
 }
 
 // =====================
@@ -287,11 +245,6 @@ export async function updatePendingSyncRetry(id: string): Promise<void> {
     op.retries += 1;
     await db.put("pendingSync", op);
   }
-}
-
-async function clearPendingSync(): Promise<void> {
-  const db = await getDB();
-  await db.clear("pendingSync");
 }
 
 export async function getPendingSyncCount(): Promise<number> {

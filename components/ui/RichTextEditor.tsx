@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useCallback, useRef, useMemo } from "react";
-import { useEditor, EditorContent } from "@tiptap/react";
+import React, { useCallback, useEffect, useRef } from "react";
+import { useEditor, EditorContent, type Editor as TiptapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
@@ -60,6 +60,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 }) => {
   const [isUploading, setIsUploading] = React.useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<TiptapEditor | null>(null);
 
   // Image upload function using ImageKit
   const uploadImage = useCallback(async (file: File): Promise<string | null> => {
@@ -108,8 +109,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       const url = await uploadImage(file);
       setIsUploading(false);
 
-      if (url && editor) {
-        editor.chain().focus().setImage({ src: url }).run();
+      const activeEditor = editorRef.current;
+      if (url && activeEditor) {
+        activeEditor.chain().focus().setImage({ src: url }).run();
       }
     },
     [uploadImage]
@@ -197,6 +199,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     },
     immediatelyRender: false,
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   // Trigger file input for image upload
   const handleImageButtonClick = useCallback(() => {

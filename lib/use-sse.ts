@@ -42,6 +42,7 @@ export function useSSE(
   const reconnectAttemptsRef = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const handlersRef = useRef(handlers);
+  const connectRef = useRef<(() => void) | null>(null);
 
   // Keep handlers ref up to date
   useEffect(() => {
@@ -133,7 +134,7 @@ export function useSSE(
         reconnectAttemptsRef.current++;
         
         reconnectTimeoutRef.current = setTimeout(() => {
-          connect();
+          connectRef.current?.();
         }, delay);
       } else {
         setStatus("disconnected");
@@ -141,6 +142,10 @@ export function useSSE(
       }
     };
   }, [handleEvent, maxReconnectAttempts, reconnectDelay]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // Disconnect from SSE
   const disconnect = useCallback(() => {
@@ -166,13 +171,16 @@ export function useSSE(
 
   // Connect/disconnect based on effective enabled state (respects tab visibility)
   useEffect(() => {
-    if (effectiveEnabled) {
-      connect();
-    } else {
-      disconnect();
-    }
+    const timer = setTimeout(() => {
+      if (effectiveEnabled) {
+        connect();
+      } else {
+        disconnect();
+      }
+    }, 0);
 
     return () => {
+      clearTimeout(timer);
       disconnect();
     };
   }, [effectiveEnabled, connect, disconnect]);

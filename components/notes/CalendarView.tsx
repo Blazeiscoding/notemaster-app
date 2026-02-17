@@ -9,7 +9,6 @@ import {
   endOfWeek,
   eachDayOfInterval,
   isSameMonth,
-  isSameDay,
   addMonths,
   subMonths,
   isToday,
@@ -88,7 +87,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
             {day}
           </div>
         ))}
-        {calendarDays.map((day, dayIdx) => {
+        {calendarDays.map((day) => {
           const dayNotes = notesByDate.get(format(day, "yyyy-MM-dd")) ?? [];
           const isCurrentMonth = isSameMonth(day, monthStart);
           const isDayToday = isToday(day);

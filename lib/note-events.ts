@@ -3,7 +3,6 @@ import type { NotePayload, NotebookPayload } from "@/types/note";
 // Event types for real-time updates
 export type NoteEventType = "note:created" | "note:updated" | "note:deleted";
 export type NotebookEventType = "notebook:created" | "notebook:updated" | "notebook:deleted";
-type EventType = NoteEventType | NotebookEventType | "heartbeat";
 
 export interface NoteEvent {
   type: NoteEventType;

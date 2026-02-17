@@ -4,7 +4,6 @@ import { prisma } from "../lib/prisma"
 import {
   decryptChecklist,
   decryptString,
-  decryptStringArray,
   encryptChecklist,
   encryptString,
   encryptStringArray,

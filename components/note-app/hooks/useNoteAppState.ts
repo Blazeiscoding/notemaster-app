@@ -166,7 +166,7 @@ export const useNoteApp = () => {
 
   // Revisions
   const revisionsHook = useNoteRevisions(
-    { notes, setNotes, currentNote, setCurrentNote },
+    { setNotes, setCurrentNote },
     isAuthenticated,
     {
       fetchRevisionsFromServer,

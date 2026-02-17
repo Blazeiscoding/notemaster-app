@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, Link as LinkIcon, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ function SharePageContent() {
   const searchParams = useSearchParams();
   
   const [isCreating, setIsCreating] = useState(false);
-  const [autoCreate, setAutoCreate] = useState(false);
+  const autoCreateRef = useRef(false);
   
   const title = searchParams.get("title") || "";
   const text = searchParams.get("text") || "";
@@ -19,7 +19,7 @@ function SharePageContent() {
   const fileCount = parseInt(searchParams.get("fileCount") || "0", 10);
   
   // Compose the note content
-  const composeContent = () => {
+  const composeContent = useCallback(() => {
     const parts: string[] = [];
     
     if (text) {
@@ -35,10 +35,10 @@ function SharePageContent() {
     }
     
     return parts.join("");
-  };
+  }, [fileCount, hasFiles, text, url]);
   
   // Create a new note with the shared content
-  const handleCreateNote = async () => {
+  const handleCreateNote = useCallback(async () => {
     setIsCreating(true);
     
     try {
@@ -57,19 +57,19 @@ function SharePageContent() {
       console.error("Failed to create note:", error);
       setIsCreating(false);
     }
-  };
+  }, [composeContent, router, title]);
   
   // Auto-create if there's content and user came directly from share
   useEffect(() => {
-    if ((title || text || url) && !autoCreate) {
-      setAutoCreate(true);
+    if ((title || text || url) && !autoCreateRef.current) {
+      autoCreateRef.current = true;
       // Small delay to show the UI first
       const timer = setTimeout(() => {
-        handleCreateNote();
+        void handleCreateNote();
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [title, text, url, autoCreate]);
+  }, [title, text, url, handleCreateNote]);
   
   const hasContent = title || text || url || hasFiles;
   

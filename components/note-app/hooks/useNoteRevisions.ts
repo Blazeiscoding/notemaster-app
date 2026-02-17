@@ -4,9 +4,7 @@ import type { NotePayload, NoteRevisionPayload } from "@/types/note";
 import { apiRequest } from "@/lib/api-client";
 
 type RevisionsState = {
-  notes: NotePayload[];
   setNotes: React.Dispatch<React.SetStateAction<NotePayload[]>>;
-  currentNote: NotePayload | null;
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
 
@@ -15,7 +13,7 @@ type ServerActions = {
 };
 
 export function useNoteRevisions(
-  { notes, setNotes, currentNote, setCurrentNote }: RevisionsState,
+  { setNotes, setCurrentNote }: RevisionsState,
   isAuthenticated: boolean, 
   serverActions: ServerActions
 ) {

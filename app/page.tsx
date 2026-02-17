@@ -20,13 +20,13 @@ import type { AccentPalette } from "@/types/note";
 // Dynamic imports for code splitting - only load when needed
 const NoteEditor = dynamic(() => import("@/components/notes/NoteEditor"), {
   loading: () => (
-    <div className="min-h-[500px] animate-pulse rounded-lg bg-muted" />
+    <div className="min-h-125 animate-pulse rounded-lg bg-muted" />
   ),
 });
 
 const CalendarView = dynamic(() => import("@/components/notes/CalendarView"), {
   loading: () => (
-    <div className="min-h-[600px] animate-pulse rounded-lg bg-muted" />
+    <div className="min-h-150 animate-pulse rounded-lg bg-muted" />
   ),
 });
 

@@ -4,7 +4,6 @@ import {
   getPendingSyncOperations,
   removePendingSync,
   updatePendingSyncRetry,
-  addToPendingSync,
   type SyncOperation,
 } from "@/lib/indexeddb";
 import { apiRequest } from "@/lib/api-client";
@@ -13,42 +12,12 @@ import type { NotePayload, NotebookPayload } from "@/types/note";
 // Max retries before giving up on an operation
 const MAX_RETRIES = 5;
 
-// Exponential backoff base delay (ms)
-const BASE_DELAY = 1000;
-
-async function registerBackgroundSync(): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  
-  try {
-    const registration = await navigator.serviceWorker?.ready;
-    if (registration && "sync" in registration) {
-      await (registration as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register("notemaster-sync");
-      return true;
-    }
-  } catch (error) {
-    console.error("Background sync registration failed:", error);
-  }
-  return false;
-}
-
 /**
  * Check if the device is online
  */
 export function isOnline(): boolean {
   if (typeof window === "undefined") return true;
   return navigator.onLine;
-}
-
-async function queueSyncOperation(
-  operation: Omit<SyncOperation, "id" | "timestamp" | "retries">
-): Promise<void> {
-  await addToPendingSync(operation);
-  
-  if (isOnline()) {
-    await processSyncQueue();
-  } else {
-    await registerBackgroundSync();
-  }
 }
 
 /**
@@ -181,10 +150,6 @@ async function processNotebookOperation(
       });
       break;
   }
-}
-
-function getBackoffDelay(retries: number): number {
-  return Math.min(BASE_DELAY * Math.pow(2, retries), 30000);
 }
 
 function setupConnectivityListeners(

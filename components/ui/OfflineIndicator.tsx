@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { WifiOff, CloudOff, RefreshCw, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackgroundSync } from "@/components/note-app/hooks/useBackgroundSync";
@@ -11,20 +11,11 @@ type OfflineIndicatorProps = {
 
 export function OfflineIndicator({ className }: OfflineIndicatorProps) {
   const { syncStatus, pendingCount, isConnected, triggerSync } = useBackgroundSync();
-  const [showBanner, setShowBanner] = useState(false);
-
-  // Show banner when offline, syncing, or has pending changes
-  useEffect(() => {
-    if (!isConnected || pendingCount > 0 || syncStatus === "syncing") {
-      setShowBanner(true);
-    } else if (syncStatus === "synced") {
-      // Hide after showing "synced" briefly
-      const timer = setTimeout(() => setShowBanner(false), 2000);
-      return () => clearTimeout(timer);
-    } else {
-      setShowBanner(false);
-    }
-  }, [isConnected, pendingCount, syncStatus]);
+  const showBanner =
+    !isConnected ||
+    pendingCount > 0 ||
+    syncStatus === "syncing" ||
+    syncStatus === "synced";
 
   if (!showBanner) return null;
 
