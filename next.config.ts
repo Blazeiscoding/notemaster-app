@@ -8,22 +8,6 @@ const withPWA = ((nextPWA as unknown as { default?: unknown }).default ?? nextPW
 // Runtime caching strategies for PWA
 const runtimeCaching = [
   {
-    // Cache API routes with NetworkFirst strategy
-    urlPattern: /^https?:\/\/.*\/api\/(notes|notebooks).*$/,
-    handler: "NetworkFirst",
-    options: {
-      cacheName: "api-cache",
-      networkTimeoutSeconds: 10,
-      expiration: {
-        maxEntries: 200,
-        maxAgeSeconds: 24 * 60 * 60, // 24 hours
-      },
-      cacheableResponse: {
-        statuses: [0, 200],
-      },
-    },
-  },
-  {
     // Cache images with CacheFirst strategy
     urlPattern: /^https:\/\/ik\.imagekit\.io\/.*$/,
     handler: "CacheFirst",

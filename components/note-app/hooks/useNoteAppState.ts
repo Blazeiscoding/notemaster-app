@@ -23,6 +23,13 @@ import { apiRequest } from "@/lib/api-client";
 import { useSSE } from "@/lib/use-sse";
 
 type NoteAppSection = "notes" | "archive" | "bin";
+type PaginatedNotesResponse = {
+  notes: NotePayload[];
+  nextCursor: string | null;
+  hasMore: boolean;
+};
+
+const NOTES_PAGE_SIZE = 100;
 
 export const useNoteApp = () => {
   // User and authentication
@@ -71,9 +78,40 @@ export const useNoteApp = () => {
 
   // Server actions
   const fetchNotesFromServer = useCallback(async () => {
-    return apiRequest<NotePayload[]>("/api/notes", {
-      cache: "no-store",
-    });
+    const allNotes: NotePayload[] = [];
+    let cursor: string | null = null;
+
+    while (true) {
+      const params = new URLSearchParams({
+        limit: String(NOTES_PAGE_SIZE),
+      });
+
+      if (cursor) {
+        params.set("cursor", cursor);
+      }
+
+      const response = await apiRequest<NotePayload[] | PaginatedNotesResponse>(
+        `/api/notes?${params.toString()}`,
+        {
+          cache: "no-store",
+        }
+      );
+
+      // Backward-compatible fallback in case server returns a plain array.
+      if (Array.isArray(response)) {
+        return response;
+      }
+
+      allNotes.push(...response.notes);
+
+      if (!response.hasMore || !response.nextCursor) {
+        break;
+      }
+
+      cursor = response.nextCursor;
+    }
+
+    return allNotes;
   }, []);
 
   const fetchNotebooksFromServer = useCallback(async () => {

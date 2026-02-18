@@ -142,47 +142,92 @@ export async function getUserNotebooks(userId: string): Promise<NotebookPayload[
   return db.getAllFromIndex("notebooks", "by-userId", userId);
 }
 
-// Save notes for authenticated user (replaces all cached notes for this user)
+function shouldUpsertUserNote(
+  existing: (NotePayload & { _localUpdatedAt?: number }) | undefined,
+  note: NotePayload
+): boolean {
+  if (!existing) return true;
+
+  return (
+    existing.updatedAt !== note.updatedAt ||
+    existing.createdAt !== note.createdAt ||
+    existing.notebookId !== note.notebookId ||
+    existing.title !== note.title ||
+    existing.content !== note.content ||
+    existing.pinned !== note.pinned ||
+    existing.archived !== note.archived ||
+    existing.trashed !== note.trashed ||
+    existing.dueAt !== note.dueAt ||
+    existing.tags.length !== note.tags.length ||
+    existing.checklist.length !== note.checklist.length ||
+    existing.attachments.length !== note.attachments.length
+  );
+}
+
+function shouldUpsertUserNotebook(
+  existing: (NotebookPayload & { _localUpdatedAt?: number }) | undefined,
+  notebook: NotebookPayload
+): boolean {
+  if (!existing) return true;
+
+  return (
+    existing.updatedAt !== notebook.updatedAt ||
+    existing.createdAt !== notebook.createdAt ||
+    existing.name !== notebook.name ||
+    existing.parentId !== notebook.parentId ||
+    existing.color !== notebook.color
+  );
+}
+
+// Save notes for authenticated user with diff-based writes.
 export async function saveUserNotes(userId: string, notes: NotePayload[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("notes", "readwrite");
   const index = tx.store.index("by-userId");
   const timestamp = Date.now();
+  const existingNotes = await index.getAll(userId);
+  const existingById = new Map(existingNotes.map((note) => [note.id, note]));
+  const incomingIds = new Set(notes.map((note) => note.id));
 
-  // Clear existing notes for this user
-  let cursor = await index.openCursor(userId);
-  while (cursor) {
-    await cursor.delete();
-    cursor = await cursor.continue();
+  for (const existing of existingNotes) {
+    if (!incomingIds.has(existing.id)) {
+      await tx.store.delete(existing.id);
+    }
   }
 
-  // Add new notes
   for (const note of notes) {
-    await tx.store.put({ ...note, _localUpdatedAt: timestamp });
+    if (shouldUpsertUserNote(existingById.get(note.id), note)) {
+      await tx.store.put({ ...note, _localUpdatedAt: timestamp });
+    }
   }
-  
+
   await tx.done;
 }
 
-// Save notebooks for authenticated user
+// Save notebooks for authenticated user with diff-based writes.
 export async function saveUserNotebooks(userId: string, notebooks: NotebookPayload[]): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("notebooks", "readwrite");
   const index = tx.store.index("by-userId");
   const timestamp = Date.now();
+  const existingNotebooks = await index.getAll(userId);
+  const existingById = new Map(
+    existingNotebooks.map((notebook) => [notebook.id, notebook])
+  );
+  const incomingIds = new Set(notebooks.map((nb) => nb.id));
 
-  // Clear existing notebooks for this user
-  let cursor = await index.openCursor(userId);
-  while (cursor) {
-    await cursor.delete();
-    cursor = await cursor.continue();
+  for (const existing of existingNotebooks) {
+    if (!incomingIds.has(existing.id)) {
+      await tx.store.delete(existing.id);
+    }
   }
 
-  // Add new notebooks
   for (const nb of notebooks) {
-    await tx.store.put({ ...nb, _localUpdatedAt: timestamp });
+    if (shouldUpsertUserNotebook(existingById.get(nb.id), nb)) {
+      await tx.store.put({ ...nb, _localUpdatedAt: timestamp });
+    }
   }
-  
+
   await tx.done;
 }
 

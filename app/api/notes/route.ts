@@ -47,7 +47,7 @@ export const GET = withAuth(
     if (!limit) {
       const notes = await prisma.note.findMany({
         where: { userId },
-        orderBy: { updatedAt: "desc" },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
         select: noteSelect,
       })
       return successResponse(notes.map(serializeNote), 200, rateLimitHeaders, requestId)
@@ -56,7 +56,7 @@ export const GET = withAuth(
     // Paginated query with cursor-based pagination
     const notes = await prisma.note.findMany({
       where: { userId },
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit + 1, // Fetch one extra to check if there are more
       select: noteSelect,
       ...(cursor && {

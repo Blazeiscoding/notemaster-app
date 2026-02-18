@@ -228,7 +228,6 @@ export function useNoteData(
         if (useIndexedDB) {
           if (isAuthenticated && userId) {
             await saveUserNotes(userId, notes);
-            setCacheTimestamp(userId);
           } else {
             await saveNotesToDB(notes);
           }
@@ -249,7 +248,7 @@ export function useNoteData(
         clearTimeout(notesPersistTimer.current);
       }
     };
-  }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB, setCacheTimestamp]);
+  }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB]);
 
   // Persist notebooks to local storage/IndexedDB (debounced)
   const notebooksPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

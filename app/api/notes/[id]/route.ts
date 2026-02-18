@@ -115,6 +115,25 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       return successResponse(serializeNote(existing), 200, rateLimitHeaders, requestId);
     }
 
+    const shouldCreateRevision = [
+      "title",
+      "content",
+      "tags",
+      "checklist",
+      "attachments",
+    ].some((field) => Object.prototype.hasOwnProperty.call(data, field));
+
+    if (!shouldCreateRevision) {
+      const updated = await prisma.note.update({
+        where: { id },
+        data,
+      });
+
+      logger.info("Note updated", { noteId: id });
+      emitNoteEvent(userId, "note:updated", id, serializeNote(updated));
+      return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId);
+    }
+
     // Create revision before updating - wrapped in transaction for atomicity
     const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
       noteId: existing.id,
