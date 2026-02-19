@@ -9,20 +9,23 @@ import { useCurrentNote } from "./useCurrentNote";
 import { useNoteRevisions } from "./useNoteRevisions";
 import { useNoteData } from "./useNoteData";
 import { useNoteFiltering } from "./useNoteFiltering";
+import { useUnsavedChangesWarning } from "./useUnsavedChangesWarning";
+import { useAutosave } from "./useAutosave";
 
 import type {
   NotePayload,
   NoteRevisionPayload,
   NotebookPayload,
   NotebookTreeNode,
+  SectionKey,
 } from "@/types/note";
-import { generateId } from "@/components/note-app/util";
+import { buildNewNote } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
 import { apiRequest } from "@/lib/api-client";
 import { useSSE } from "@/lib/use-sse";
 
-type NoteAppSection = "notes" | "archive" | "bin";
+
 type PaginatedNotesResponse = {
   notes: NotePayload[];
   nextCursor: string | null;
@@ -48,7 +51,7 @@ export const useNoteApp = () => {
   const [sortBy, setSortBy] = useState<"updated" | "created" | "title">(
     "updated"
   );
-  const [activeSection, setActiveSection] = useState<NoteAppSection>("notes");
+  const [activeSection, setActiveSection] = useState<SectionKey>("notes");
   const [isSavingNote, setIsSavingNote] = useState(false);
   const [customOrder, setCustomOrder] = useState<string[]>(() => {
     if (typeof window === "undefined") return [];
@@ -202,6 +205,34 @@ export const useNoteApp = () => {
   // Current note editing
   const currentNoteHook = useCurrentNote({ currentNote, setCurrentNote });
 
+  // Unsaved changes warning (beforeunload + dirty tracking)
+  const { isDirty } = useUnsavedChangesWarning(currentNote);
+
+  // Close confirmation state
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+
+  const handleCloseEditor = useCallback(() => {
+    if (isDirty) {
+      setShowCloseConfirmation(true);
+    } else {
+      setCurrentNote(null);
+    }
+  }, [isDirty, setCurrentNote]);
+
+  const confirmClose = useCallback(() => {
+    setShowCloseConfirmation(false);
+    setCurrentNote(null);
+  }, [setCurrentNote]);
+
+  const cancelClose = useCallback(() => {
+    setShowCloseConfirmation(false);
+  }, []);
+
+  // Autosave drafts to IndexedDB
+  const { clearDraft } = useAutosave(currentNote, {
+    onRestore: setCurrentNote,
+  });
+
   // Revisions
   const revisionsHook = useNoteRevisions(
     { setNotes, setCurrentNote },
@@ -280,26 +311,8 @@ export const useNoteApp = () => {
   const createNote = useCallback(() => {
     setActiveSection("notes");
     hapticLight();
-    const now = new Date().toISOString();
     const ownerId = isAuthenticated && userId ? userId : null;
-    const newNote: NotePayload = {
-      id: generateId(),
-      userId: ownerId,
-      notebookId: null,
-      title: "",
-      content: "",
-      tags: [],
-      checklist: [],
-      attachments: [],
-      type: "note",
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      archived: false,
-      trashed: false,
-      dueAt: null,
-    };
-    setCurrentNote(newNote);
+    setCurrentNote(buildNewNote(ownerId));
     setShowSidebar(false);
   }, [
     isAuthenticated,
@@ -313,26 +326,8 @@ export const useNoteApp = () => {
   const createNoteFromShare = useCallback((title: string, content: string) => {
     setActiveSection("notes");
     hapticLight();
-    const now = new Date().toISOString();
     const ownerId = isAuthenticated && userId ? userId : null;
-    const newNote: NotePayload = {
-      id: generateId(),
-      userId: ownerId,
-      notebookId: null,
-      title,
-      content,
-      tags: ["shared"],
-      checklist: [],
-      attachments: [],
-      type: "note",
-      createdAt: now,
-      updatedAt: now,
-      pinned: false,
-      archived: false,
-      trashed: false,
-      dueAt: null,
-    };
-    setCurrentNote(newNote);
+    setCurrentNote(buildNewNote(ownerId, { title, content, tags: ["shared"] }));
     setShowSidebar(false);
   }, [isAuthenticated, userId, setCurrentNote, setActiveSection, setShowSidebar]);
 
@@ -421,6 +416,7 @@ export const useNoteApp = () => {
           ? await updateNoteOnServer(baseNote.id, payload)
           : await createNoteOnServer(baseNote);
         applyLocal(saved);
+        clearDraft(baseNote.id);
         setCurrentNote(null);
         toast.success(exists ? "Note updated" : "Note created");
       } catch (error) {
@@ -437,6 +433,7 @@ export const useNoteApp = () => {
       }
     } else {
       applyLocal(baseNote);
+      clearDraft(baseNote.id);
       setCurrentNote(null);
     }
 
@@ -501,7 +498,11 @@ export const useNoteApp = () => {
     handleContentChange: currentNoteHook.handleContentChange,
     handleDueDateChange: currentNoteHook.handleDueDateChange,
     handleClearDueDate: currentNoteHook.handleClearDueDate,
-    handleCloseEditor: currentNoteHook.handleCloseEditor,
+    handleCloseEditor,
+    isDirty,
+    showCloseConfirmation,
+    confirmClose,
+    cancelClose,
     fileInputRef: currentNoteHook.fileInputRef,
     addChecklistItem: currentNoteHook.addChecklistItem,
     markAllChecklist: currentNoteHook.markAllChecklist,

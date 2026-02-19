@@ -1,10 +1,8 @@
 import { useMemo, useDeferredValue } from "react";
-import type { NotePayload } from "@/types/note";
-
-type NoteAppSection = "notes" | "archive" | "bin";
+import type { NotePayload, SectionKey } from "@/types/note";
 
 type FilterCriteria = {
-  section: NoteAppSection;
+  section: SectionKey;
   search: string;
   tag: string;
   sortBy: "updated" | "created" | "title";
@@ -56,7 +54,7 @@ export function useNoteFiltering(
 
     const tags = new Set<string>();
     const section = deferredCriteria.section;
-    const counts: Record<NoteAppSection, number> = {
+    const counts: Record<SectionKey, number> = {
       notes: 0,
       archive: 0,
       bin: 0,

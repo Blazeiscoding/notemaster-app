@@ -1,6 +1,35 @@
-import type { NotebookPayload, NotebookTreeNode } from "@/types/note";
+import type { NotePayload, NotebookPayload, NotebookTreeNode } from "@/types/note";
 
 export const NOTEBOOK_ROOT_ORDER_KEY = "__root__";
+
+/**
+ * Build a new NotePayload with sensible defaults.
+ * Pass `overrides` to customise title, content, tags, etc.
+ */
+export const buildNewNote = (
+  userId: string | null,
+  overrides?: Partial<Omit<NotePayload, "id" | "type">>
+): NotePayload => {
+  const now = new Date().toISOString();
+  return {
+    id: generateId(),
+    userId,
+    notebookId: null,
+    title: "",
+    content: "",
+    tags: [],
+    checklist: [],
+    attachments: [],
+    type: "note",
+    createdAt: now,
+    updatedAt: now,
+    pinned: false,
+    archived: false,
+    trashed: false,
+    dueAt: null,
+    ...overrides,
+  };
+};
 
 export type NotebookOrderMap = Record<string, string[]>;
 

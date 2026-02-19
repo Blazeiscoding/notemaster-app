@@ -14,6 +14,7 @@ import { OfflineIndicator } from "@/components/ui/OfflineIndicator";
 import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { AccentPalette } from "@/types/note";
 
 
@@ -83,6 +84,10 @@ const NoteApp = () => {
     handleTitleChange,
     handleContentChange,
     handleCloseEditor,
+    isDirty,
+    showCloseConfirmation,
+    confirmClose,
+    cancelClose,
     fileInputRef,
     addChecklistItem,
     markAllChecklist,
@@ -105,6 +110,24 @@ const NoteApp = () => {
   const [showThemePanel, setShowThemePanel] = React.useState(false);
   const [viewMode, setViewMode] = React.useState<"grid" | "calendar">("grid");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Delete forever confirmation state
+  const [pendingDeleteId, setPendingDeleteId] = React.useState<string | null>(null);
+
+  const handleDeleteForeverRequest = React.useCallback((id: string) => {
+    setPendingDeleteId(id);
+  }, []);
+
+  const handleConfirmDelete = React.useCallback(() => {
+    if (pendingDeleteId) {
+      deleteForever(pendingDeleteId);
+      setPendingDeleteId(null);
+    }
+  }, [pendingDeleteId, deleteForever]);
+
+  const handleCancelDelete = React.useCallback(() => {
+    setPendingDeleteId(null);
+  }, []);
 
   // Pre-compute tag counts for SidebarPanel to avoid passing the full notes array
   const notesCountByTag = React.useMemo(() => {
@@ -297,7 +320,7 @@ const NoteApp = () => {
                 onTrash={trashNote}
                 onUnarchive={unarchiveNote}
                 onRestoreFromBin={restoreFromBin}
-                onDeleteForever={deleteForever}
+                onDeleteForever={handleDeleteForeverRequest}
               />
             ) : (
               <CalendarView notes={sortedNotes} onOpenNote={setCurrentNote} />
@@ -322,6 +345,30 @@ const NoteApp = () => {
           onApply={handleApplyAccent}
         />
       </Modal>
+
+      {/* Unsaved Changes Confirmation */}
+      <ConfirmDialog
+        open={showCloseConfirmation}
+        onConfirm={confirmClose}
+        onCancel={cancelClose}
+        title="Discard unsaved changes?"
+        description="You have unsaved changes that will be lost if you close the editor."
+        confirmLabel="Discard"
+        cancelLabel="Keep Editing"
+        variant="danger"
+      />
+
+      {/* Delete Forever Confirmation */}
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onConfirm={handleConfirmDelete}
+        onCancel={handleCancelDelete}
+        title="Delete note permanently?"
+        description="This note will be permanently deleted and cannot be recovered."
+        confirmLabel="Delete Forever"
+        cancelLabel="Cancel"
+        variant="danger"
+      />
 
       {/* Save Smart Filter Modal */}
 

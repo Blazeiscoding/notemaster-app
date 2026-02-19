@@ -441,4 +441,21 @@ export async function isIndexedDBAvailable(): Promise<boolean> {
   }
 }
 
+// =====================
+// Draft Autosave
+// =====================
 
+const DRAFT_KEY_PREFIX = "draft-";
+
+export async function saveDraft(note: NotePayload): Promise<void> {
+  await setMeta(`${DRAFT_KEY_PREFIX}${note.id}`, note);
+}
+
+export async function getDraft(noteId: string): Promise<NotePayload | undefined> {
+  return getMeta<NotePayload>(`${DRAFT_KEY_PREFIX}${noteId}`);
+}
+
+export async function deleteDraft(noteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("meta", `${DRAFT_KEY_PREFIX}${noteId}`);
+}
