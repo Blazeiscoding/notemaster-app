@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import {
   Check,
   Clock,
-  Folder,
   History,
   Loader2,
   X,
@@ -22,7 +21,6 @@ const RichTextEditor = dynamic(
   () => import("@/components/ui/RichTextEditor"),
   { ssr: false, loading: () => <div className="min-h-[300px] animate-pulse rounded-lg bg-muted" /> }
 );
-import { Select } from "@/components/ui/select";
 import {
   Card,
   CardContent,
@@ -36,25 +34,16 @@ import { exportNoteToMarkdown, printNote } from "@/lib/export-utils";
 import type {
   Attachment,
   NotePayload,
-  NotebookPayload,
 } from "@/types/note";
-
-type NotebookOption = {
-  id: string;
-  label: string;
-};
 
 type NoteEditorProps = {
   note: NotePayload;
   isSaving: boolean;
   canViewHistory: boolean;
   historyTitle: string;
-  notebooksById: Map<string, NotebookPayload>;
-  notebookOptions: NotebookOption[];
   onClose: () => void;
   onOpenHistory: () => void;
   onSave: () => void;
-  onNotebookChange: (notebookId: string | null) => void;
   onTitleChange: (value: string) => void;
   onContentChange: (value: string) => void;
   onAddChecklistItem: () => void;
@@ -81,12 +70,9 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
   isSaving,
   canViewHistory,
   historyTitle,
-  notebooksById,
-  notebookOptions,
   onClose,
   onOpenHistory,
   onSave,
-  onNotebookChange,
   onTitleChange,
   onContentChange,
   onAddChecklistItem,
@@ -103,10 +89,6 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
   fileInputRef,
   onFilesSelected,
 }) => {
-  const notebookName = note.notebookId
-    ? notebooksById.get(note.notebookId)?.name ?? "Notebook"
-    : "Inbox";
-
   // Memoize formatted date — toLocaleString with options is non-trivial
   const formattedUpdatedAt = useMemo(
     () => new Date(note.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
@@ -158,10 +140,6 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
             <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
               <Clock className="size-3.5" />
               Edited {formattedUpdatedAt}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground/80">
-              <Folder className="size-3.5" />
-              {notebookName}
             </span>
           </CardDescription>
         </div>
@@ -231,28 +209,6 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
-        <div className="grid gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground/70">
-              Notebook
-            </label>
-            <Select
-              value={note.notebookId ?? ""}
-              onChange={(event) =>
-                onNotebookChange(event.target.value ? event.target.value : null)
-              }
-              className="w-full bg-background/50"
-            >
-              <option value="">Inbox</option>
-              {notebookOptions.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        </div>
-
         <div className="space-y-2">
           <RichTextEditor
             content={note.content}

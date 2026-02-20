@@ -1,6 +1,4 @@
-import type { NotePayload, NotebookPayload, NotebookTreeNode } from "@/types/note";
-
-export const NOTEBOOK_ROOT_ORDER_KEY = "__root__";
+import type { NotePayload } from "@/types/note";
 
 /**
  * Build a new NotePayload with sensible defaults.
@@ -14,7 +12,6 @@ export const buildNewNote = (
   return {
     id: generateId(),
     userId,
-    notebookId: null,
     title: "",
     content: "",
     tags: [],
@@ -31,68 +28,6 @@ export const buildNewNote = (
   };
 };
 
-export type NotebookOrderMap = Record<string, string[]>;
-
-export const buildNotebookTree = (
-  items: NotebookPayload[],
-  orderMap: NotebookOrderMap = {}
-): NotebookTreeNode[] => {
-  const map = new Map<string, NotebookTreeNode>();
-  const roots: NotebookTreeNode[] = [];
-
-  items.forEach((notebook) => {
-    map.set(notebook.id, { ...notebook, children: [] });
-  });
-
-  items.forEach((notebook) => {
-    if (notebook.parentId && map.has(notebook.parentId)) {
-      map.get(notebook.parentId)!.children.push(map.get(notebook.id)!);
-    } else {
-      roots.push(map.get(notebook.id)!);
-    }
-  });
-
-  const withChildrenSorted = roots.map((root) => ({
-    ...root,
-    children: sortChildren(root.children, root.id),
-  }));
-
-  return sortNodes(withChildrenSorted, NOTEBOOK_ROOT_ORDER_KEY);
-
-  function sortChildren(
-    children: NotebookTreeNode[],
-    parentId: string
-  ): NotebookTreeNode[] {
-    return sortNodes(
-      children.map((child) => ({
-        ...child,
-        children: sortChildren(child.children, child.id),
-      })),
-      parentId
-    );
-  }
-
-  function sortNodes(
-    nodes: NotebookTreeNode[],
-    parentKey: string
-  ): NotebookTreeNode[] {
-    const order = orderMap[parentKey] ?? [];
-    return nodes.sort((a, b) => {
-      const indexA = order.indexOf(a.id);
-      const indexB = order.indexOf(b.id);
-      if (indexA === -1 && indexB === -1) {
-        return a.name.localeCompare(b.name);
-      }
-      if (indexA === -1) return 1;
-      if (indexB === -1) return -1;
-      if (indexA === indexB) {
-        return a.name.localeCompare(b.name);
-      }
-      return indexA - indexB;
-    });
-  }
-};
-
 export const generateId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -107,26 +42,6 @@ export const toBase64 = (file: File) =>
     reader.onerror = () => reject(reader.error);
     reader.readAsDataURL(file);
   });
-
-export const buildNotebookOptions = (tree: NotebookTreeNode[]) => {
-  const options: { id: string; label: string }[] = [];
-
-  const walk = (nodes: NotebookTreeNode[], depth = 0) => {
-    nodes
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .forEach((node) => {
-        const indent = depth === 0 ? "" : `${"\u00A0".repeat(depth * 2)}↳ `;
-        options.push({ id: node.id, label: `${indent}${node.name}` });
-        walk(node.children, depth + 1);
-      });
-  };
-
-  walk(tree);
-  return options;
-};
-
-
 
 export const parseInputToIso = (value: string): string | null => {
   if (!value) return null;

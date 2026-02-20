@@ -15,8 +15,6 @@ import { useAutosave } from "./useAutosave";
 import type {
   NotePayload,
   NoteRevisionPayload,
-  NotebookPayload,
-  NotebookTreeNode,
   SectionKey,
 } from "@/types/note";
 import { buildNewNote } from "@/components/note-app/util";
@@ -117,12 +115,6 @@ export const useNoteApp = () => {
     return allNotes;
   }, []);
 
-  const fetchNotebooksFromServer = useCallback(async () => {
-    return apiRequest<NotebookPayload[]>("/api/notebooks", {
-      cache: "no-store",
-    });
-  }, []);
-
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
     return apiRequest<NoteRevisionPayload[]>(`/api/notes/${id}/revisions`, {
       cache: "no-store",
@@ -154,16 +146,17 @@ export const useNoteApp = () => {
   const {
     notes,
     setNotes,
-    notebooks,
     isLoading,
     error: dataError,
     retry: retryLoadData,
-  } = useNoteData(isAuthenticated, storageKey, {
-    fetchNotesFromServer,
-    fetchNotebooksFromServer: fetchNotebooksFromServer as () => Promise<
-      NotebookPayload[]
-    >,
-  }, userId);
+  } = useNoteData(
+    isAuthenticated,
+    storageKey,
+    {
+      fetchNotesFromServer,
+    },
+    userId
+  );
 
   // Note filtering and sorting
   const filterCriteria = useMemo(() => ({
@@ -171,7 +164,6 @@ export const useNoteApp = () => {
     search: searchQuery,
     tag: filterTag,
     sortBy,
-    notebookId: "all",
   }), [activeSection, searchQuery, filterTag, sortBy]);
 
   const { sortedNotes, allTags, sectionCounts } = useNoteFiltering(
@@ -190,34 +182,22 @@ export const useNoteApp = () => {
     }
   );
 
-  // Memoize notebook lookups to avoid creating new Map/Array on every render
-  const notebooksById = useMemo(() => {
-    const map = new Map<string, NotebookPayload>();
-    for (const nb of notebooks) map.set(nb.id, nb);
-    return map;
-  }, [notebooks]);
-
-  const notebookOptions = useMemo(() =>
-    notebooks.map((nb) => ({ id: nb.id, label: nb.name })),
-    [notebooks]
-  );
-
   // Current note editing
   const currentNoteHook = useCurrentNote({ currentNote, setCurrentNote });
 
   // Unsaved changes warning (beforeunload + dirty tracking)
-  const { isDirty } = useUnsavedChangesWarning(currentNote);
+  const { hasUnsavedChanges } = useUnsavedChangesWarning(currentNote);
 
   // Close confirmation state
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
 
   const handleCloseEditor = useCallback(() => {
-    if (isDirty) {
+    if (hasUnsavedChanges()) {
       setShowCloseConfirmation(true);
     } else {
       setCurrentNote(null);
     }
-  }, [isDirty, setCurrentNote]);
+  }, [hasUnsavedChanges, setCurrentNote]);
 
   const confirmClose = useCallback(() => {
     setShowCloseConfirmation(false);
@@ -376,10 +356,6 @@ export const useNoteApp = () => {
       userId: ownerId,
       updatedAt,
       dueAt: currentNote.dueAt ?? null,
-      notebookId:
-        currentNote.notebookId && currentNote.notebookId.trim().length > 0
-          ? currentNote.notebookId
-          : null,
     };
 
     const applyLocal = (note: NotePayload) => {
@@ -399,7 +375,6 @@ export const useNoteApp = () => {
     if (isAuthenticated) {
       try {
         const payload: Partial<NotePayload> = {
-          notebookId: baseNote.notebookId,
           title: baseNote.title,
           content: baseNote.content,
           tags: baseNote.tags,
@@ -444,6 +419,7 @@ export const useNoteApp = () => {
     notes,
     updateNoteOnServer,
     createNoteOnServer,
+    clearDraft,
     userId,
     setNotes,
     setCurrentNote,
@@ -493,13 +469,11 @@ export const useNoteApp = () => {
     handleRemoveAttachment: currentNoteHook.handleRemoveAttachment,
     handleDownloadAttachment: currentNoteHook.handleDownloadAttachment,
     handleClearAttachments: currentNoteHook.handleClearAttachments,
-    handleNotebookChange: currentNoteHook.handleNotebookChange,
     handleTitleChange: currentNoteHook.handleTitleChange,
     handleContentChange: currentNoteHook.handleContentChange,
     handleDueDateChange: currentNoteHook.handleDueDateChange,
     handleClearDueDate: currentNoteHook.handleClearDueDate,
     handleCloseEditor,
-    isDirty,
     showCloseConfirmation,
     confirmClose,
     cancelClose,
@@ -519,11 +493,6 @@ export const useNoteApp = () => {
     deleteForever: notesHook.deleteForever,
     exportNotes: notesHook.exportNotes,
     importNotes: notesHook.importNotes,
-    // Notebooks
-    notebooks,
-    notebookTree: [] as NotebookTreeNode[],
-    notebooksById,
-    notebookOptions,
     revisions: revisionsHook.revisions,
     isRevisionOpen: revisionsHook.isRevisionOpen,
     isLoadingRevisions: revisionsHook.isLoadingRevisions,

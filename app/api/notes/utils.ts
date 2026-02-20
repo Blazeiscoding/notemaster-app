@@ -20,7 +20,6 @@ type SerializableNote = {
   trashed: boolean
   createdAt: Date
   updatedAt: Date
-  notebookId: string | null
   attachments: Prisma.JsonValue
   dueAt: Date | null
 }
@@ -37,14 +36,12 @@ type SerializableRevision = {
   archived: boolean
   trashed: boolean
   createdAt: Date
-  notebookId: string | null
   dueAt: Date | null
 }
 
 export const serializeNote = (note: SerializableNote): NotePayload => ({
   id: note.id,
   userId: note.userId,
-  notebookId: note.notebookId,
   title: decryptString(note.title),
   content: decryptString(note.content),
   tags: decryptStringArray(note.tags),
@@ -64,7 +61,6 @@ export const serializeRevision = (
 ): NoteRevisionPayload => ({
   id: revision.id,
   noteId: revision.noteId,
-  notebookId: revision.notebookId ?? null,
   title: decryptString(revision.title),
   content: decryptString(revision.content),
   tags: decryptStringArray(revision.tags),

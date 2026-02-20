@@ -1,17 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import type { NotePayload, NotebookPayload } from "@/types/note";
+import type { NotePayload } from "@/types/note";
 import {
   getAllNotes,
-  getAllNotebooks,
   saveNotes as saveNotesToDB,
-  saveNotebooks as saveNotebooksToDB,
   migrateFromLocalStorage,
   isIndexedDBAvailable,
   getUserNotes,
-  getUserNotebooks,
   saveUserNotes,
-  saveUserNotebooks,
 } from "@/lib/indexeddb";
 
 // Cache keys for stale-while-revalidate pattern
@@ -20,7 +16,6 @@ const STALE_TIME = 5 * 60 * 1000; // 5 minutes - data older than this triggers b
 
 type ServerActions = {
   fetchNotesFromServer: () => Promise<NotePayload[]>;
-  fetchNotebooksFromServer: () => Promise<NotebookPayload[]>;
 };
 
 export function useNoteData(
@@ -29,14 +24,12 @@ export function useNoteData(
   serverActions: ServerActions,
   userId?: string | null
 ) {
-  const { fetchNotesFromServer, fetchNotebooksFromServer } = serverActions;
+  const { fetchNotesFromServer } = serverActions;
   const [notes, setNotes] = useState<NotePayload[]>([]);
-  const [notebooks, setNotebooks] = useState<NotebookPayload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useIndexedDB, setUseIndexedDB] = useState(true);
   const initialLoadComplete = useRef(false);
-  const isRevalidating = useRef(false);
 
   // Check IndexedDB availability on mount
   useEffect(() => {
@@ -60,135 +53,94 @@ export function useNoteData(
     localStorage.setItem(`${CACHE_TIMESTAMP_PREFIX}${uid}`, Date.now().toString());
   }, []);
 
-  // Background fetch from server (for stale-while-revalidate)
-  const fetchFromServer = useCallback(async (): Promise<{
-    notes: NotePayload[];
-    notebooks: NotebookPayload[];
-  }> => {
-    const [remoteNotes, remoteNotebooks] = await Promise.all([
-      fetchNotesFromServer(),
-      fetchNotebooksFromServer(),
-    ]);
-    
-    // Cache the fresh data to IndexedDB for next time
+  // Fetch and cache server data
+  const fetchFromServer = useCallback(async (): Promise<NotePayload[]> => {
+    const remoteNotes = await fetchNotesFromServer();
+
     if (useIndexedDB && userId) {
-      await Promise.all([
-        saveUserNotes(userId, remoteNotes),
-        saveUserNotebooks(userId, remoteNotebooks),
-      ]);
+      await saveUserNotes(userId, remoteNotes);
       setCacheTimestamp(userId);
     }
-    
-    return { notes: remoteNotes, notebooks: remoteNotebooks };
-  }, [fetchNotesFromServer, fetchNotebooksFromServer, useIndexedDB, userId, setCacheTimestamp]);
 
-  const loadNotesAndNotebooks = useCallback(async () => {
+    return remoteNotes;
+  }, [fetchNotesFromServer, useIndexedDB, userId, setCacheTimestamp]);
+
+  const loadNotes = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+
     try {
       if (isAuthenticated && userId) {
-        // Stale-while-revalidate pattern for authenticated users:
-        // 1. Show cached data immediately if available
-        // 2. Fetch fresh data in background if cache is stale
-        // 3. Update UI when fresh data arrives
-        
+        // Stale-while-revalidate for authenticated users.
         let hasCachedData = false;
-        
+
         if (useIndexedDB && !initialLoadComplete.current) {
           try {
-            const [cachedNotes, cachedNotebooks] = await Promise.all([
-              getUserNotes(userId),
-              getUserNotebooks(userId),
-            ]);
-            
-            if (cachedNotes.length > 0 || cachedNotebooks.length > 0) {
-              // Show cached data immediately
+            const cachedNotes = await getUserNotes(userId);
+
+            if (cachedNotes.length > 0) {
               setNotes(cachedNotes);
-              setNotebooks(cachedNotebooks);
               hasCachedData = true;
-              
-              // Check if cache is stale
+
               const lastFetch = getCacheTimestamp(userId);
               const isStale = !lastFetch || (Date.now() - lastFetch) > STALE_TIME;
-              
+
               if (isStale) {
-                // Fetch fresh data in background (don't show loading state)
                 setIsLoading(false);
-                isRevalidating.current = true;
                 fetchFromServer()
-                  .then(({ notes: freshNotes, notebooks: freshNotebooks }) => {
+                  .then((freshNotes) => {
                     setNotes(freshNotes);
-                    setNotebooks(freshNotebooks);
-                    isRevalidating.current = false;
                   })
                   .catch((err) => {
                     console.error("Background refresh failed:", err);
-                    isRevalidating.current = false;
-                    // Silent fail - we already have cached data
                   });
                 initialLoadComplete.current = true;
                 return;
               }
             }
           } catch {
-            // Cache read failed, continue to fetch from server
+            // Cache read failed, continue to fetch from server.
           }
         }
-        
-        // No cache or cache is fresh, fetch from server
+
         if (!hasCachedData) {
-          const { notes: freshNotes, notebooks: freshNotebooks } = await fetchFromServer();
+          const freshNotes = await fetchFromServer();
           setNotes(freshNotes);
-          setNotebooks(freshNotebooks);
         }
       } else if (typeof window !== "undefined") {
-        // Guest users: load from IndexedDB (with localStorage migration)
+        // Guest users: load from IndexedDB (with localStorage migration).
         if (useIndexedDB) {
-          // First, try to migrate from localStorage if not done yet
           const migrated = await migrateFromLocalStorage(storageKey);
-          
-          if (migrated.notes.length > 0 || migrated.notebooks.length > 0) {
-            // Use migrated data
+
+          if (migrated.notes.length > 0) {
             setNotes(migrated.notes);
-            setNotebooks(migrated.notebooks);
           } else {
-            // Load from IndexedDB
-            const [dbNotes, dbNotebooks] = await Promise.all([
-              getAllNotes(),
-              getAllNotebooks(),
-            ]);
+            const dbNotes = await getAllNotes();
             setNotes(dbNotes);
-            setNotebooks(dbNotebooks);
           }
         } else if (window.localStorage) {
-          // Fallback to localStorage
           const rawNotes = window.localStorage.getItem(storageKey);
-          const rawNotebooks = window.localStorage.getItem(
-            `${storageKey}-notebooks`
-          );
           setNotes(rawNotes ? JSON.parse(rawNotes) : []);
-          setNotebooks(rawNotebooks ? JSON.parse(rawNotebooks) : []);
         } else {
           setNotes([]);
-          setNotebooks([]);
         }
       } else {
         setNotes([]);
-        setNotebooks([]);
       }
+
       initialLoadComplete.current = true;
     } catch (error) {
-      console.error("Failed to load workspace", error);
+      console.error("Failed to load notes", error);
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Failed to load your notes. Please refresh the page.";
       setError(errorMessage);
+
       if (isAuthenticated) {
         toast.error("Failed to load your notes. Please refresh the page.");
       } else {
         setNotes([]);
-        setNotebooks([]);
       }
     } finally {
       setIsLoading(false);
@@ -203,20 +155,16 @@ export function useNoteData(
   ]);
 
   useEffect(() => {
-    loadNotesAndNotebooks();
-  }, [loadNotesAndNotebooks]);
+    loadNotes();
+  }, [loadNotes]);
 
   // Persist notes to local storage/IndexedDB (debounced to avoid excessive writes)
-  // For guests: this is their primary storage
-  // For authenticated users: this is cache for stale-while-revalidate
   const notesPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    // Don't persist during initial load
     if (!initialLoadComplete.current || isLoading) {
       return;
     }
 
-    // Clear any pending persist
     if (notesPersistTimer.current) {
       clearTimeout(notesPersistTimer.current);
     }
@@ -232,7 +180,6 @@ export function useNoteData(
             await saveNotesToDB(notes);
           }
         } else if (!isAuthenticated && window.localStorage) {
-          // localStorage fallback only for guests
           window.localStorage.setItem(storageKey, JSON.stringify(notes));
         }
       } catch (err) {
@@ -241,7 +188,7 @@ export function useNoteData(
           toast.error("Failed to save notes locally");
         }
       }
-    }, 500); // Debounce: batch writes within 500ms
+    }, 500);
 
     return () => {
       if (notesPersistTimer.current) {
@@ -250,65 +197,18 @@ export function useNoteData(
     };
   }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB]);
 
-  // Persist notebooks to local storage/IndexedDB (debounced)
-  const notebooksPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    // Don't persist during initial load
-    if (!initialLoadComplete.current || isLoading) {
-      return;
-    }
-
-    // Clear any pending persist
-    if (notebooksPersistTimer.current) {
-      clearTimeout(notebooksPersistTimer.current);
-    }
-
-    notebooksPersistTimer.current = setTimeout(async () => {
-      try {
-        if (typeof window === "undefined") return;
-
-        if (useIndexedDB) {
-          if (isAuthenticated && userId) {
-            await saveUserNotebooks(userId, notebooks);
-          } else {
-            await saveNotebooksToDB(notebooks);
-          }
-        } else if (!isAuthenticated && window.localStorage) {
-          // localStorage fallback only for guests
-          window.localStorage.setItem(
-            `${storageKey}-notebooks`,
-            JSON.stringify(notebooks)
-          );
-        }
-      } catch (err) {
-        console.error("Failed to save notebooks:", err);
-        if (!isAuthenticated) {
-          toast.error("Failed to save notebooks locally");
-        }
-      }
-    }, 500); // Debounce: batch writes within 500ms
-
-    return () => {
-      if (notebooksPersistTimer.current) {
-        clearTimeout(notebooksPersistTimer.current);
-      }
-    };
-  }, [notebooks, isAuthenticated, userId, storageKey, useIndexedDB, isLoading]);
-
-  // Force refresh function that bypasses cache
   const forceRefresh = useCallback(async () => {
     if (!isAuthenticated) {
-      return loadNotesAndNotebooks();
+      return loadNotes();
     }
-    
+
     setIsLoading(true);
     setError(null);
     try {
-      const { notes: freshNotes, notebooks: freshNotebooks } = await fetchFromServer();
+      const freshNotes = await fetchFromServer();
       setNotes(freshNotes);
-      setNotebooks(freshNotebooks);
     } catch (error) {
-      console.error("Failed to refresh workspace", error);
+      console.error("Failed to refresh notes", error);
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -318,16 +218,14 @@ export function useNoteData(
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, fetchFromServer, loadNotesAndNotebooks]);
+  }, [isAuthenticated, fetchFromServer, loadNotes]);
 
   return {
     notes,
     setNotes,
-    notebooks,
-    setNotebooks,
     isLoading,
     error,
-    retry: loadNotesAndNotebooks,
+    retry: loadNotes,
     forceRefresh,
   };
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import type { SSEEvent, NoteEvent, NotebookEvent } from "@/lib/note-events";
+import type { SSEEvent, NoteEvent } from "@/lib/note-events";
 
 export type SSEConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -9,9 +9,6 @@ export type SSEEventHandler = {
   onNoteCreated?: (noteId: string, data?: NoteEvent["data"]) => void;
   onNoteUpdated?: (noteId: string, data?: NoteEvent["data"]) => void;
   onNoteDeleted?: (noteId: string) => void;
-  onNotebookCreated?: (notebookId: string, data?: NotebookEvent["data"]) => void;
-  onNotebookUpdated?: (notebookId: string, data?: NotebookEvent["data"]) => void;
-  onNotebookDeleted?: (notebookId: string) => void;
   onHeartbeat?: (timestamp: number) => void;
   onError?: (error: Error) => void;
 };
@@ -86,15 +83,6 @@ export function useSSE(
         break;
       case "note:deleted":
         h.onNoteDeleted?.(event.noteId);
-        break;
-      case "notebook:created":
-        h.onNotebookCreated?.(event.notebookId, event.data);
-        break;
-      case "notebook:updated":
-        h.onNotebookUpdated?.(event.notebookId, event.data);
-        break;
-      case "notebook:deleted":
-        h.onNotebookDeleted?.(event.notebookId);
         break;
     }
   }, []);

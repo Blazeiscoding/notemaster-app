@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { WifiOff, CloudOff, RefreshCw, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBackgroundSync } from "@/components/note-app/hooks/useBackgroundSync";

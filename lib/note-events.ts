@@ -1,8 +1,7 @@
-import type { NotePayload, NotebookPayload } from "@/types/note";
+import type { NotePayload } from "@/types/note";
 
 // Event types for real-time updates
 export type NoteEventType = "note:created" | "note:updated" | "note:deleted";
-export type NotebookEventType = "notebook:created" | "notebook:updated" | "notebook:deleted";
 
 export interface NoteEvent {
   type: NoteEventType;
@@ -11,19 +10,12 @@ export interface NoteEvent {
   timestamp: number;
 }
 
-export interface NotebookEvent {
-  type: NotebookEventType;
-  notebookId: string;
-  data?: Partial<NotebookPayload>;
-  timestamp: number;
-}
-
 export interface HeartbeatEvent {
   type: "heartbeat";
   timestamp: number;
 }
 
-export type SSEEvent = NoteEvent | NotebookEvent | HeartbeatEvent;
+export type SSEEvent = NoteEvent | HeartbeatEvent;
 
 // In-memory store for server-side event broadcasting
 // In production, use Redis pub/sub for multi-instance support

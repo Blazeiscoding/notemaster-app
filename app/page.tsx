@@ -80,11 +80,9 @@ const NoteApp = () => {
     handleRemoveAttachment,
     handleDownloadAttachment,
     handleClearAttachments,
-    handleNotebookChange,
     handleTitleChange,
     handleContentChange,
     handleCloseEditor,
-    isDirty,
     showCloseConfirmation,
     confirmClose,
     cancelClose,
@@ -102,8 +100,6 @@ const NoteApp = () => {
     trashNote,
     restoreFromBin,
     deleteForever,
-    notebooksById,
-    notebookOptions,
     handleOpenRevisions,
   } = state;
 
@@ -287,12 +283,9 @@ const NoteApp = () => {
                     ? "View revision history"
                     : "Sign in to see revision history"
                 }
-                notebooksById={notebooksById}
-                notebookOptions={notebookOptions}
                 onClose={handleCloseEditor}
                 onOpenHistory={handleOpenRevisionsCallback}
                 onSave={saveCurrentNote}
-                onNotebookChange={handleNotebookChange}
                 onTitleChange={handleTitleChange}
                 onContentChange={handleContentChange}
                 onAddChecklistItem={addChecklistItem}

@@ -25,7 +25,6 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       select: {
         id: true,
         userId: true,
-        notebookId: true,
         title: true,
         content: true,
         tags: true,
@@ -48,24 +47,6 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
 
     const payload = body as Partial<NotePayload>;
     const data: Prisma.NoteUpdateInput = {};
-
-    if (typeof payload.notebookId === "string") {
-      if (payload.notebookId === "") {
-        data.notebook = { disconnect: true };
-      } else {
-        const notebook = await prisma.notebook.findUnique({
-          where: { id: payload.notebookId },
-          select: { id: true, userId: true },
-        });
-
-        if (!notebook || notebook.userId !== userId) {
-          logger.warn("Note update failed: notebook not found", { notebookId: payload.notebookId });
-          return errorResponse("Notebook not found", 404, rateLimitHeaders, requestId);
-        }
-
-        data.notebook = { connect: { id: notebook.id } };
-      }
-    }
 
     if (typeof payload.title === "string") {
       data.title = encryptString(payload.title);
@@ -137,7 +118,6 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
     // Create revision before updating - wrapped in transaction for atomicity
     const revisionData: Prisma.NoteRevisionUncheckedCreateInput = {
       noteId: existing.id,
-      notebookId: existing.notebookId,
       title: existing.title,
       content: existing.content,
       tags: existing.tags,

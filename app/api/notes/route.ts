@@ -20,7 +20,6 @@ import { emitNoteEvent } from "@/lib/note-events"
 const noteSelect = {
   id: true,
   userId: true,
-  notebookId: true,
   title: true,
   content: true,
   tags: true,
@@ -93,26 +92,9 @@ export const POST = withAuthAndJson(
       return errorResponse("Note ID is required", 400, rateLimitHeaders, requestId)
     }
 
-    let notebookId: string | null = null
-
-    if (typeof payload.notebookId === "string" && payload.notebookId.trim()) {
-      const notebook = await prisma.notebook.findUnique({
-        where: { id: payload.notebookId },
-        select: { id: true, userId: true },
-      })
-
-      if (!notebook || notebook.userId !== userId) {
-        logger.warn("Note creation failed: notebook not found", { notebookId: payload.notebookId });
-        return errorResponse("Notebook not found", 404, rateLimitHeaders, requestId)
-      }
-
-      notebookId = notebook.id
-    }
-
     const noteData: Prisma.NoteUncheckedCreateInput = {
       id: payload.id,
       userId,
-      notebookId,
       title: encryptString(payload.title ?? ""),
       content: encryptString(payload.content ?? ""),
       tags: encryptStringArray(payload.tags ?? []),

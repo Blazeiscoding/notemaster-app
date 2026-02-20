@@ -67,7 +67,7 @@ const NotesGrid: React.FC<NotesGridProps> = ({
             <div className="relative h-40 w-60 opacity-60">
               <Image
                 src="/note-empty.svg"
-                alt="Empty notebook illustration"
+                alt="Empty notes illustration"
                 fill
                 className="object-contain"
                 priority

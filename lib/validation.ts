@@ -61,35 +61,11 @@ export function sanitizeId(input: unknown): string {
   return trimmed;
 }
 
-export function sanitizeOptionalId(input: unknown): string | null {
-  if (input === null || input === undefined || input === "") {
-    return null;
-  }
-  return sanitizeId(input);
-}
-
-export function sanitizeColor(input: unknown): string {
-  if (typeof input !== "string") {
-    throw new Error("Invalid input type: expected string");
-  }
-  
-  const trimmed = input.trim();
-  // Basic hex color validation
-  const hexColorRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-  if (!hexColorRegex.test(trimmed)) {
-    throw new Error("Invalid color format");
-  }
-  
-  return trimmed;
-}
-
-
 export function validateNotePayload(payload: unknown): {
   id: string;
   title?: string;
   content?: string;
   tags?: string[];
-  notebookId?: string | null;
   type?: string;
   pinned?: boolean;
   archived?: boolean;
@@ -107,7 +83,6 @@ export function validateNotePayload(payload: unknown): {
     title?: string;
     content?: string;
     tags?: string[];
-    notebookId?: string | null;
     type?: string;
     pinned?: boolean;
     archived?: boolean;
@@ -129,10 +104,6 @@ export function validateNotePayload(payload: unknown): {
     validated.tags = sanitizeStringArray(p.tags, 50, 50);
   }
   
-  if (p.notebookId !== undefined) {
-    validated.notebookId = sanitizeOptionalId(p.notebookId);
-  }
-  
   if (p.type !== undefined && typeof p.type === "string") {
     validated.type = p.type;
   }
@@ -151,39 +122,6 @@ export function validateNotePayload(payload: unknown): {
   
   if (p.dueAt !== undefined) {
     validated.dueAt = p.dueAt === null ? null : String(p.dueAt);
-  }
-  
-  return validated;
-}
-
-export function validateNotebookPayload(payload: unknown): {
-  name: string;
-  color?: string;
-  parentId?: string | null;
-} {
-  if (typeof payload !== "object" || payload === null) {
-    throw new Error("Invalid payload: expected object");
-  }
-  
-  const p = payload as Record<string, unknown>;
-  
-  const name = sanitizeString(p.name as unknown, 200);
-  if (name.length === 0) {
-    throw new Error("Notebook name is required");
-  }
-  
-  const validated: {
-    name: string;
-    color?: string;
-    parentId?: string | null;
-  } = { name };
-  
-  if (p.color !== undefined) {
-    validated.color = sanitizeColor(p.color);
-  }
-  
-  if (p.parentId !== undefined) {
-    validated.parentId = sanitizeOptionalId(p.parentId);
   }
   
   return validated;

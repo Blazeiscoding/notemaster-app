@@ -120,6 +120,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Handle paste event for images
   const handlePaste = useCallback(
     (view: unknown, event: ClipboardEvent) => {
+      void view;
       const items = event.clipboardData?.items;
       if (!items) return false;
 
@@ -141,6 +142,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Handle drop event for images
   const handleDrop = useCallback(
     (view: unknown, event: DragEvent) => {
+      void view;
       const files = event.dataTransfer?.files;
       if (!files || files.length === 0) return false;
 

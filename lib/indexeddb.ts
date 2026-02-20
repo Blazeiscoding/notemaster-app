@@ -1,19 +1,19 @@
 "use client";
 
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { NotePayload, NotebookPayload } from "@/types/note";
+import type { NotePayload } from "@/types/note";
 
 // Database schema version - increment when schema changes
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const DB_NAME = "notemaster";
 
 // Types for pending sync operations
 export type SyncOperation = {
   id: string;
   type: "create" | "update" | "delete";
-  entity: "note" | "notebook";
+  entity: "note";
   entityId: string;
-  data: NotePayload | NotebookPayload | null;
+  data: NotePayload | null;
   timestamp: number;
   retries: number;
 };
@@ -30,11 +30,6 @@ interface NoteMasterDB extends DBSchema {
     key: string;
     value: NotePayload & { _localUpdatedAt?: number };
     indexes: { "by-userId": string; "by-updatedAt": string };
-  };
-  notebooks: {
-    key: string;
-    value: NotebookPayload & { _localUpdatedAt?: number };
-    indexes: { "by-userId": string };
   };
   pendingSync: {
     key: string;
@@ -65,38 +60,35 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
       upgrade(db, oldVersion) {
         // Fresh install or upgrade from version 0
         if (oldVersion < 1) {
-          // Notes store
           const notesStore = db.createObjectStore("notes", { keyPath: "id" });
           notesStore.createIndex("by-userId", "userId");
           notesStore.createIndex("by-updatedAt", "updatedAt");
 
-          // Notebooks store
-          const notebooksStore = db.createObjectStore("notebooks", {
-            keyPath: "id",
-          });
-          notebooksStore.createIndex("by-userId", "userId");
-
-          // Pending sync operations
           const pendingSyncStore = db.createObjectStore("pendingSync", {
             keyPath: "id",
           });
           pendingSyncStore.createIndex("by-timestamp", "timestamp");
 
-          // Recent searches
           const recentSearchesStore = db.createObjectStore("recentSearches", {
             keyPath: "id",
           });
           recentSearchesStore.createIndex("by-timestamp", "timestamp");
 
-          // Meta store for app settings
           db.createObjectStore("meta", { keyPath: "key" });
+        }
+
+        // Remove legacy notebooks store after notebook feature removal.
+        if (
+          oldVersion < 2 &&
+          (db as unknown as IDBDatabase).objectStoreNames.contains("notebooks")
+        ) {
+          (db as unknown as IDBDatabase).deleteObjectStore("notebooks");
         }
       },
       blocked() {
         console.warn("IndexedDB blocked - close other tabs");
       },
       blocking() {
-        // Close connection to allow upgrade in other tab
         dbPromise?.then((db) => db.close());
         dbPromise = null;
       },
@@ -112,9 +104,7 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
 
 export async function getAllNotes(): Promise<NotePayload[]> {
   const db = await getDB();
-  // Get all notes (for guest users, notes don't have userId field)
-  const allNotes = await db.getAll("notes");
-  return allNotes;
+  return db.getAll("notes");
 }
 
 export async function saveNotes(notes: NotePayload[]): Promise<void> {
@@ -136,12 +126,6 @@ export async function getUserNotes(userId: string): Promise<NotePayload[]> {
   return db.getAllFromIndex("notes", "by-userId", userId);
 }
 
-// Get notebooks for a specific authenticated user
-export async function getUserNotebooks(userId: string): Promise<NotebookPayload[]> {
-  const db = await getDB();
-  return db.getAllFromIndex("notebooks", "by-userId", userId);
-}
-
 function shouldUpsertUserNote(
   existing: (NotePayload & { _localUpdatedAt?: number }) | undefined,
   note: NotePayload
@@ -151,7 +135,6 @@ function shouldUpsertUserNote(
   return (
     existing.updatedAt !== note.updatedAt ||
     existing.createdAt !== note.createdAt ||
-    existing.notebookId !== note.notebookId ||
     existing.title !== note.title ||
     existing.content !== note.content ||
     existing.pinned !== note.pinned ||
@@ -164,23 +147,11 @@ function shouldUpsertUserNote(
   );
 }
 
-function shouldUpsertUserNotebook(
-  existing: (NotebookPayload & { _localUpdatedAt?: number }) | undefined,
-  notebook: NotebookPayload
-): boolean {
-  if (!existing) return true;
-
-  return (
-    existing.updatedAt !== notebook.updatedAt ||
-    existing.createdAt !== notebook.createdAt ||
-    existing.name !== notebook.name ||
-    existing.parentId !== notebook.parentId ||
-    existing.color !== notebook.color
-  );
-}
-
 // Save notes for authenticated user with diff-based writes.
-export async function saveUserNotes(userId: string, notes: NotePayload[]): Promise<void> {
+export async function saveUserNotes(
+  userId: string,
+  notes: NotePayload[]
+): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("notes", "readwrite");
   const index = tx.store.index("by-userId");
@@ -202,58 +173,6 @@ export async function saveUserNotes(userId: string, notes: NotePayload[]): Promi
   }
 
   await tx.done;
-}
-
-// Save notebooks for authenticated user with diff-based writes.
-export async function saveUserNotebooks(userId: string, notebooks: NotebookPayload[]): Promise<void> {
-  const db = await getDB();
-  const tx = db.transaction("notebooks", "readwrite");
-  const index = tx.store.index("by-userId");
-  const timestamp = Date.now();
-  const existingNotebooks = await index.getAll(userId);
-  const existingById = new Map(
-    existingNotebooks.map((notebook) => [notebook.id, notebook])
-  );
-  const incomingIds = new Set(notebooks.map((nb) => nb.id));
-
-  for (const existing of existingNotebooks) {
-    if (!incomingIds.has(existing.id)) {
-      await tx.store.delete(existing.id);
-    }
-  }
-
-  for (const nb of notebooks) {
-    if (shouldUpsertUserNotebook(existingById.get(nb.id), nb)) {
-      await tx.store.put({ ...nb, _localUpdatedAt: timestamp });
-    }
-  }
-
-  await tx.done;
-}
-
-// =====================
-// Notebooks Operations
-// =====================
-
-export async function getAllNotebooks(): Promise<NotebookPayload[]> {
-  const db = await getDB();
-  // Get all notebooks (for guest users, notebooks don't have userId field)
-  return db.getAll("notebooks");
-}
-
-export async function saveNotebooks(
-  notebooks: NotebookPayload[]
-): Promise<void> {
-  const db = await getDB();
-  const tx = db.transaction("notebooks", "readwrite");
-  const timestamp = Date.now();
-
-  await Promise.all([
-    ...notebooks.map((nb) =>
-      tx.store.put({ ...nb, _localUpdatedAt: timestamp })
-    ),
-    tx.done,
-  ]);
 }
 
 // =====================
@@ -309,24 +228,20 @@ export async function addRecentSearch(query: string): Promise<void> {
   const db = await getDB();
   const tx = db.transaction("recentSearches", "readwrite");
 
-  // Check if this query already exists
   const existing = await tx.store.getAll();
   const duplicate = existing.find(
     (s) => s.query.toLowerCase() === query.toLowerCase()
   );
 
   if (duplicate) {
-    // Update timestamp instead of adding new
     await tx.store.put({ ...duplicate, timestamp: Date.now() });
   } else {
-    // Add new search
     await tx.store.put({
       id: `search-${Date.now()}`,
       query: query.trim(),
       timestamp: Date.now(),
     });
 
-    // Remove oldest if over limit
     const all = await tx.store.index("by-timestamp").getAll();
     if (all.length > MAX_RECENT_SEARCHES) {
       const toRemove = all.slice(0, all.length - MAX_RECENT_SEARCHES);
@@ -342,7 +257,6 @@ export async function addRecentSearch(query: string): Promise<void> {
 export async function getRecentSearches(): Promise<RecentSearch[]> {
   const db = await getDB();
   const all = await db.getAllFromIndex("recentSearches", "by-timestamp");
-  // Return in reverse chronological order
   return all.reverse();
 }
 
@@ -377,21 +291,19 @@ async function setMeta<T>(key: string, value: T): Promise<void> {
 
 export async function migrateFromLocalStorage(
   storageKey: string
-): Promise<{ notes: NotePayload[]; notebooks: NotebookPayload[] }> {
+): Promise<{ notes: NotePayload[] }> {
   if (typeof window === "undefined") {
-    return { notes: [], notebooks: [] };
+    return { notes: [] };
   }
 
   const migrated = await getMeta<boolean>(`migrated-${storageKey}`);
   if (migrated) {
-    return { notes: [], notebooks: [] };
+    return { notes: [] };
   }
 
   let notes: NotePayload[] = [];
-  let notebooks: NotebookPayload[] = [];
 
   try {
-    // Load notes from localStorage
     const notesRaw = window.localStorage.getItem(storageKey);
     if (notesRaw) {
       notes = JSON.parse(notesRaw);
@@ -400,30 +312,14 @@ export async function migrateFromLocalStorage(
       }
     }
 
-    // Load notebooks from localStorage
-    const notebooksRaw = window.localStorage.getItem(`${storageKey}-notebooks`);
-    if (notebooksRaw) {
-      notebooks = JSON.parse(notebooksRaw);
-      if (Array.isArray(notebooks)) {
-        await saveNotebooks(notebooks);
-      }
-    }
-
-    // Mark as migrated
     await setMeta(`migrated-${storageKey}`, true);
 
-    // Optionally clear localStorage after successful migration
-    // window.localStorage.removeItem(storageKey);
-    // window.localStorage.removeItem(`${storageKey}-notebooks`);
-
-    console.log(
-      `Migrated ${notes.length} notes and ${notebooks.length} notebooks from localStorage`
-    );
+    console.log(`Migrated ${notes.length} notes from localStorage`);
   } catch (error) {
     console.error("Failed to migrate from localStorage:", error);
   }
 
-  return { notes, notebooks };
+  return { notes };
 }
 
 // =====================

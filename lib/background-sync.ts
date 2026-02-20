@@ -7,7 +7,7 @@ import {
   type SyncOperation,
 } from "@/lib/indexeddb";
 import { apiRequest } from "@/lib/api-client";
-import type { NotePayload, NotebookPayload } from "@/types/note";
+import type { NotePayload } from "@/types/note";
 
 // Max retries before giving up on an operation
 const MAX_RETRIES = 5;
@@ -70,9 +70,6 @@ async function processOperation(op: SyncOperation): Promise<void> {
     case "note":
       await processNoteOperation(type, entityId, data as NotePayload | null);
       break;
-    case "notebook":
-      await processNotebookOperation(type, entityId, data as NotebookPayload | null);
-      break;
     default:
       throw new Error(`Unknown entity type: ${entity}`);
   }
@@ -105,47 +102,6 @@ async function processNoteOperation(
       
     case "delete":
       await apiRequest(`/api/notes/${noteId}`, {
-        method: "DELETE",
-      });
-      break;
-  }
-}
-
-/**
- * Process notebook sync operation
- */
-async function processNotebookOperation(
-  type: SyncOperation["type"],
-  notebookId: string,
-  data: NotebookPayload | null
-): Promise<void> {
-  switch (type) {
-    case "create":
-      if (!data) throw new Error("Missing data for create operation");
-      await apiRequest<NotebookPayload>("/api/notebooks", {
-        method: "POST",
-        body: JSON.stringify({
-          name: data.name,
-          parentId: data.parentId,
-          color: data.color,
-        }),
-      });
-      break;
-      
-    case "update":
-      if (!data) throw new Error("Missing data for update operation");
-      await apiRequest<NotebookPayload>(`/api/notebooks/${notebookId}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: data.name,
-          parentId: data.parentId,
-          color: data.color,
-        }),
-      });
-      break;
-      
-    case "delete":
-      await apiRequest(`/api/notebooks/${notebookId}`, {
         method: "DELETE",
       });
       break;

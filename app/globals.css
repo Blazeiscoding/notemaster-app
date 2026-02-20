@@ -83,8 +83,6 @@
   --surface: oklch(0.98 0.01 250);
   --surface-alt: oklch(0.93 0.04 255);
   --surface-muted: oklch(0.89 0.02 260);
-  --notebook-card: oklch(0.99 0.02 255);
-  --notebook-ink: oklch(0.23 0.05 250);
   --accent-hot: oklch(0.72 0.2 22);
   --accent-cool: oklch(0.67 0.18 260);
   --glow: rgba(254, 183, 0, 0.35);
@@ -147,8 +145,6 @@
   --surface: oklch(0.17 0.02 260);
   --surface-alt: oklch(0.22 0.05 270);
   --surface-muted: oklch(0.26 0.04 250);
-  --notebook-card: oklch(0.19 0.03 255);
-  --notebook-ink: oklch(0.96 0.01 250);
   --accent-hot: oklch(0.68 0.18 25);
   --accent-cool: oklch(0.67 0.2 275);
   --glow: rgba(255, 93, 93, 0.35);
@@ -224,45 +220,6 @@
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
-  }
-  .notebook-shimmer {
-    position: relative;
-    overflow: hidden;
-  }
-  .notebook-shimmer::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    transform: translateX(-100%);
-    animation: notebook-shimmer-sweep 3s linear infinite;
-    pointer-events: none;
-  }
-  @keyframes notebook-shimmer-sweep {
-    0% {
-      transform: translateX(-100%);
-    }
-    60% {
-      transform: translateX(120%);
-    }
-    100% {
-      transform: translateX(120%);
-    }
-  }
-  .notebook-fab {
-    animation: notebook-fab-breathe 4s ease-in-out infinite;
-  }
-  .notebook-fab:disabled {
-    animation: none;
-  }
-  @keyframes notebook-fab-breathe {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 rgba(103, 132, 255, 0.35);
-    }
-    50% {
-      box-shadow: 0 0 0 12px rgba(103, 132, 255, 0);
-    }
   }
   /* Skip layout/paint for off-screen cards — big win for long lists */
   .cv-auto {

@@ -6,7 +6,6 @@ type FilterCriteria = {
   search: string;
   tag: string;
   sortBy: "updated" | "created" | "title";
-  notebookId: string;
 };
 
 export function useNoteFiltering(
@@ -48,9 +47,6 @@ export function useNoteFiltering(
     const hasSearch = normalizedSearch.length > 0;
     const hasTagFilter =
       deferredCriteria.tag.length > 0 && deferredCriteria.tag !== "all";
-    const hasNotebookFilter =
-      deferredCriteria.notebookId.length > 0 &&
-      deferredCriteria.notebookId !== "all";
 
     const tags = new Set<string>();
     const section = deferredCriteria.section;
@@ -85,9 +81,6 @@ export function useNoteFiltering(
 
       if (!matchesSection) continue;
       if (hasTagFilter && !note.tags.includes(deferredCriteria.tag)) continue;
-      if (hasNotebookFilter && note.notebookId !== deferredCriteria.notebookId) {
-        continue;
-      }
 
       if (hasSearch) {
         if (
@@ -157,4 +150,3 @@ export function useNoteFiltering(
     sectionCounts,
   };
 }
-

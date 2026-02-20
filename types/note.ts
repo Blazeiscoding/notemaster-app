@@ -15,7 +15,6 @@ export type Attachment = {
 export type NotePayload = {
   id: string
   userId: string | null
-  notebookId: string | null
   title: string
   content: string
   tags: string[]
@@ -30,20 +29,9 @@ export type NotePayload = {
   updatedAt: string
 }
 
-export type NotebookPayload = {
-  id: string
-  userId: string
-  parentId: string | null
-  name: string
-  color: string
-  createdAt: string
-  updatedAt: string
-}
-
 export type NoteRevisionPayload = {
   id: string
   noteId: string
-  notebookId: string | null
   title: string
   content: string
   tags: string[]
@@ -54,10 +42,6 @@ export type NoteRevisionPayload = {
   trashed: boolean
   dueAt: string | null
   createdAt: string
-}
-
-export type NotebookTreeNode = NotebookPayload & {
-  children: NotebookTreeNode[]
 }
 
 export type AccentPalette = {

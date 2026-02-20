@@ -75,13 +75,6 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
     setCurrentNote((prev) => (prev ? { ...prev, attachments: [] } : prev));
   }, [setCurrentNote]);
 
-  const handleNotebookChange = useCallback(
-    (notebookId: string | null) => {
-      setCurrentNote((prev) => (prev ? { ...prev, notebookId } : prev));
-    },
-    [setCurrentNote]
-  );
-
   const handleTitleChange = useCallback(
     (value: string) => {
       setCurrentNote((prev) => (prev ? { ...prev, title: value } : prev));
@@ -205,7 +198,6 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
     handleRemoveAttachment,
     handleDownloadAttachment,
     handleClearAttachments,
-    handleNotebookChange,
     handleTitleChange,
     handleContentChange,
     handleDueDateChange,
