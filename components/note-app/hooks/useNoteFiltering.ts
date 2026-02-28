@@ -101,10 +101,6 @@ export function useNoteFiltering(
     };
   }, [preparedNotes, deferredCriteria]);
 
-  const filteredNotes = useMemo(
-    () => filteredPreparedNotes.map((entry) => entry.note),
-    [filteredPreparedNotes]
-  );
 
   const sortedNotes = useMemo(() => {
     const ordered = [...filteredPreparedNotes].sort((a, b) => {
@@ -144,7 +140,6 @@ export function useNoteFiltering(
   ]);
 
   return {
-    filteredNotes,
     sortedNotes,
     allTags,
     sectionCounts,

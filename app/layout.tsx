@@ -83,12 +83,6 @@ export default function RootLayout({
             rel="stylesheet"
             href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
           />
-          <noscript>
-            <link
-              rel="stylesheet"
-              href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
-            />
-          </noscript>
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}

@@ -8,8 +8,6 @@ type CurrentNoteState = {
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
 
-
-
 export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -28,14 +26,12 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
         const newAttachments = await uploadFiles(files);
 
         if (newAttachments.length > 0) {
-          setCurrentNote({
-            ...currentNote,
-            attachments: [...currentNote.attachments, ...newAttachments],
-          });
+          setCurrentNote((prev) =>
+            prev ? { ...prev, attachments: [...prev.attachments, ...newAttachments] } : prev
+          );
         }
       } catch (error) {
         console.error("Failed to upload files", error);
-        // Optionally show a toast error here
       } finally {
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
@@ -47,15 +43,13 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
 
   const handleRemoveAttachment = useCallback(
     (attachmentId: string) => {
-      if (!currentNote) return;
-      setCurrentNote({
-        ...currentNote,
-        attachments: currentNote.attachments.filter(
-          (item) => item.id !== attachmentId
-        ),
-      });
+      setCurrentNote((prev) =>
+        prev
+          ? { ...prev, attachments: prev.attachments.filter((item) => item.id !== attachmentId) }
+          : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   const handleDownloadAttachment = useCallback((attachment: Attachment) => {
@@ -106,89 +100,77 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
   }, [setCurrentNote]);
 
   const addChecklistItem = useCallback(() => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        checklist: [
-          ...currentNote.checklist,
-          { id: generateId(), text: "", checked: false },
-        ],
-      });
-    }
-  }, [currentNote, setCurrentNote]);
+    setCurrentNote((prev) =>
+      prev
+        ? {
+            ...prev,
+            checklist: [...prev.checklist, { id: generateId(), text: "", checked: false }],
+          }
+        : prev
+    );
+  }, [setCurrentNote]);
 
   const markAllChecklist = useCallback(
     (checked: boolean) => {
-      if (currentNote) {
-        setCurrentNote({
-          ...currentNote,
-          checklist: currentNote.checklist.map((item) => ({
-            ...item,
-            checked,
-          })),
-        });
-      }
+      setCurrentNote((prev) =>
+        prev
+          ? { ...prev, checklist: prev.checklist.map((item) => ({ ...item, checked })) }
+          : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   const clearCompletedChecklist = useCallback(() => {
-    if (currentNote) {
-      setCurrentNote({
-        ...currentNote,
-        checklist: currentNote.checklist.filter((i) => !i.checked),
-      });
-    }
-  }, [currentNote, setCurrentNote]);
+    setCurrentNote((prev) =>
+      prev ? { ...prev, checklist: prev.checklist.filter((i) => !i.checked) } : prev
+    );
+  }, [setCurrentNote]);
 
   const updateChecklistItem = useCallback(
     (itemId: string, field: "text" | "checked", value: string | boolean) => {
-      if (currentNote) {
-        setCurrentNote({
-          ...currentNote,
-          checklist: currentNote.checklist.map((item) =>
-            item.id === itemId ? { ...item, [field]: value as never } : item
-          ),
-        });
-      }
+      setCurrentNote((prev) =>
+        prev
+          ? {
+              ...prev,
+              checklist: prev.checklist.map((item) =>
+                item.id === itemId ? { ...item, [field]: value as never } : item
+              ),
+            }
+          : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   const deleteChecklistItem = useCallback(
     (itemId: string) => {
-      if (currentNote) {
-        setCurrentNote({
-          ...currentNote,
-          checklist: currentNote.checklist.filter((item) => item.id !== itemId),
-        });
-      }
+      setCurrentNote((prev) =>
+        prev
+          ? { ...prev, checklist: prev.checklist.filter((item) => item.id !== itemId) }
+          : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   const addTag = useCallback(
     (tag: string) => {
-      if (currentNote && tag && !currentNote.tags.includes(tag)) {
-        setCurrentNote({
-          ...currentNote,
-          tags: [...currentNote.tags, tag],
-        });
-      }
+      if (!tag) return;
+      setCurrentNote((prev) =>
+        prev && !prev.tags.includes(tag) ? { ...prev, tags: [...prev.tags, tag] } : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   const removeTag = useCallback(
     (tag: string) => {
-      if (currentNote) {
-        setCurrentNote({
-          ...currentNote,
-          tags: currentNote.tags.filter((t) => t !== tag),
-        });
-      }
+      setCurrentNote((prev) =>
+        prev ? { ...prev, tags: prev.tags.filter((t) => t !== tag) } : prev
+      );
     },
-    [currentNote, setCurrentNote]
+    [setCurrentNote]
   );
 
   return {
@@ -213,4 +195,3 @@ export function useCurrentNote({ currentNote, setCurrentNote }: CurrentNoteState
     isUploading,
   };
 }
-

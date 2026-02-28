@@ -7,6 +7,27 @@ import {
   decryptStringArray,
 } from "@/lib/encryption"
 
+/**
+ * Shared Prisma select fields for note queries.
+ * Defined once here to avoid duplication across route files.
+ */
+export const noteSelect = {
+  id: true,
+  userId: true,
+  title: true,
+  content: true,
+  tags: true,
+  checklist: true,
+  attachments: true,
+  type: true,
+  pinned: true,
+  archived: true,
+  trashed: true,
+  dueAt: true,
+  createdAt: true,
+  updatedAt: true,
+} as const satisfies Prisma.NoteSelect
+
 type SerializableNote = {
   id: string
   userId: string

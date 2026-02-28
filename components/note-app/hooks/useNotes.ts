@@ -20,234 +20,153 @@ type ServerActions = {
   deleteNoteOnServer: (id: string) => Promise<void>;
 };
 
+// ---------------------------------------------------------------------------
+// Optimistic update helper
+// ---------------------------------------------------------------------------
+
+type OptimisticUpdateOptions = {
+  /** Fields to merge onto the existing note (optimistic state). */
+  updates: Partial<NotePayload>;
+  /** Server payload — only the fields that need to be persisted. */
+  serverPayload: Partial<NotePayload>;
+  /** Toast message on success. */
+  successMessage: string;
+  /** Haptic feedback function to call after optimistic apply. */
+  haptic: () => void;
+  /** If true, close the editor when the note being edited matches. */
+  closeIfCurrent?: boolean;
+};
+
+/**
+ * Creates a reusable async function that:
+ * 1. Applies an optimistic update to local state
+ * 2. Syncs with the server (if authenticated)
+ * 3. Rolls back on failure
+ */
+function makeOptimisticAction(
+  { setNotes, currentNote, setCurrentNote }: NotesState,
+  isAuthenticated: boolean,
+  updateNoteOnServer: ServerActions["updateNoteOnServer"]
+) {
+  return async (id: string, opts: OptimisticUpdateOptions) => {
+    let existing: NotePayload | undefined;
+
+    setNotes((prev) => {
+      existing = prev.find((n) => n.id === id);
+      if (!existing) return prev;
+      const optimistic: NotePayload = {
+        ...existing,
+        ...opts.updates,
+        updatedAt: new Date().toISOString(),
+      };
+      return prev.map((note) => (note.id === id ? optimistic : note));
+    });
+
+    if (!existing) return;
+    opts.haptic();
+
+    const wasCurrent = currentNote?.id === id;
+    if (opts.closeIfCurrent && wasCurrent) setCurrentNote(null);
+
+    if (isAuthenticated) {
+      try {
+        const saved = await updateNoteOnServer(id, opts.serverPayload);
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? saved : note))
+        );
+        toast.success(opts.successMessage);
+      } catch (error) {
+        console.error(`Failed to ${opts.successMessage.toLowerCase()}`, error);
+        const rollback = existing;
+        setNotes((prev) =>
+          prev.map((note) => (note.id === id ? rollback : note))
+        );
+        if (opts.closeIfCurrent && wasCurrent) setCurrentNote(rollback);
+        toast.error(`Failed to update note. Please try again.`);
+      }
+    } else {
+      toast.success(opts.successMessage);
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hook
+// ---------------------------------------------------------------------------
+
 export function useNotes(
-  { notes, setNotes, currentNote, setCurrentNote }: NotesState,
+  state: NotesState,
   isAuthenticated: boolean,
   serverActions: ServerActions
 ) {
+  const { notes, setNotes, currentNote, setCurrentNote } = state;
   const { updateNoteOnServer, deleteNoteOnServer } = serverActions;
 
-  const togglePin = useCallback(
-    async (id: string) => {
-      let existing: NotePayload | undefined;
-      let optimistic: NotePayload | undefined;
-
-      setNotes((prev) => {
-        existing = prev.find((n) => n.id === id);
-        if (!existing) return prev;
-        optimistic = {
-          ...existing,
-          pinned: !existing.pinned,
-          updatedAt: new Date().toISOString(),
-        };
-        return prev.map((note) => (note.id === id ? optimistic! : note));
-      });
-
-      if (!existing || !optimistic) return;
-      hapticLight();
-
-      if (isAuthenticated) {
-        try {
-          const saved = await updateNoteOnServer(id, {
-            pinned: optimistic.pinned,
-          });
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? saved : note))
-          );
-          toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
-        } catch (error) {
-          console.error("Failed to toggle pin", error);
-          const rollback = existing;
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? rollback : note))
-          );
-          toast.error("Failed to update note. Please try again.");
-        }
-      } else {
-        toast.success(optimistic.pinned ? "Note pinned" : "Note unpinned");
-      }
-    },
-    [isAuthenticated, updateNoteOnServer, setNotes]
-  );
-
-  const archiveNote = useCallback(
-    async (id: string) => {
-      let existing: NotePayload | undefined;
-
-      setNotes((prev) => {
-        existing = prev.find((n) => n.id === id);
-        if (!existing) return prev;
-        const optimistic: NotePayload = {
-          ...existing,
-          archived: true,
-          pinned: false,
-          updatedAt: new Date().toISOString(),
-        };
-        return prev.map((note) => (note.id === id ? optimistic : note));
-      });
-
-      if (!existing) return;
-      hapticMedium();
-
-      if (isAuthenticated) {
-        try {
-          const saved = await updateNoteOnServer(id, {
-            archived: true,
-            pinned: false,
-          });
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? saved : note))
-          );
-          toast.success("Note archived");
-        } catch (error) {
-          console.error("Failed to archive note", error);
-          const rollback = existing;
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? rollback : note))
-          );
-          toast.error("Failed to archive note. Please try again.");
-        }
-      } else {
-        toast.success("Note archived");
-      }
-    },
-    [isAuthenticated, updateNoteOnServer, setNotes]
-  );
-
-  const unarchiveNote = useCallback(
-    async (id: string) => {
-      let existing: NotePayload | undefined;
-
-      setNotes((prev) => {
-        existing = prev.find((n) => n.id === id);
-        if (!existing) return prev;
-        const optimistic: NotePayload = {
-          ...existing,
-          archived: false,
-          updatedAt: new Date().toISOString(),
-        };
-        return prev.map((note) => (note.id === id ? optimistic : note));
-      });
-
-      if (!existing) return;
-      hapticMedium();
-
-      if (isAuthenticated) {
-        try {
-          const saved = await updateNoteOnServer(id, {
-            archived: false,
-          });
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? saved : note))
-          );
-          toast.success("Note restored");
-        } catch (error) {
-          console.error("Failed to unarchive note", error);
-          const rollback = existing;
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? rollback : note))
-          );
-          toast.error("Failed to unarchive note. Please try again.");
-        }
-      } else {
-        toast.success("Note restored");
-      }
-    },
-    [isAuthenticated, updateNoteOnServer, setNotes]
-  );
-
-  const trashNote = useCallback(
-    async (id: string) => {
-      let existing: NotePayload | undefined;
-
-      setNotes((prev) => {
-        existing = prev.find((n) => n.id === id);
-        if (!existing) return prev;
-        const optimistic: NotePayload = {
-          ...existing,
-          trashed: true,
-          archived: false,
-          pinned: false,
-          updatedAt: new Date().toISOString(),
-        };
-        return prev.map((note) => (note.id === id ? optimistic : note));
-      });
-
-      if (!existing) return;
-      hapticMedium();
-
-      const wasCurrent = currentNote?.id === id;
-      if (wasCurrent) setCurrentNote(null);
-
-      if (isAuthenticated) {
-        try {
-          const saved = await updateNoteOnServer(id, {
-            trashed: true,
-            archived: false,
-            pinned: false,
-          });
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? saved : note))
-          );
-          toast.success("Note moved to bin");
-        } catch (error) {
-          console.error("Failed to move note to bin", error);
-          const rollback = existing;
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? rollback : note))
-          );
-          if (wasCurrent) setCurrentNote(rollback);
-          toast.error("Failed to move note to bin. Please try again.");
-        }
-      } else {
-        toast.success("Note moved to bin");
-      }
-    },
+  const optimisticAction = useCallback(
+    (id: string, opts: OptimisticUpdateOptions) =>
+      makeOptimisticAction(state, isAuthenticated, updateNoteOnServer)(id, opts),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [currentNote, isAuthenticated, updateNoteOnServer, setNotes, setCurrentNote]
   );
 
-  const restoreFromBin = useCallback(
+  const togglePin = useCallback(
     async (id: string) => {
-      let existing: NotePayload | undefined;
-
-      setNotes((prev) => {
-        existing = prev.find((n) => n.id === id);
-        if (!existing) return prev;
-        const optimistic: NotePayload = {
-          ...existing,
-          trashed: false,
-          archived: false,
-          updatedAt: new Date().toISOString(),
-        };
-        return prev.map((note) => (note.id === id ? optimistic : note));
+      const note = notes.find((n) => n.id === id);
+      if (!note) return;
+      const newPinned = !note.pinned;
+      await optimisticAction(id, {
+        updates: { pinned: newPinned },
+        serverPayload: { pinned: newPinned },
+        successMessage: newPinned ? "Note pinned" : "Note unpinned",
+        haptic: hapticLight,
       });
-
-      if (!existing) return;
-      hapticSuccess();
-
-      if (isAuthenticated) {
-        try {
-          const saved = await updateNoteOnServer(id, {
-            trashed: false,
-            archived: false,
-          });
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? saved : note))
-          );
-          toast.success("Note restored");
-        } catch (error) {
-          console.error("Failed to restore note", error);
-          const rollback = existing;
-          setNotes((prev) =>
-            prev.map((note) => (note.id === id ? rollback : note))
-          );
-          toast.error("Failed to restore note. Please try again.");
-        }
-      } else {
-        toast.success("Note restored");
-      }
     },
-    [isAuthenticated, updateNoteOnServer, setNotes]
+    [notes, optimisticAction]
+  );
+
+  const archiveNote = useCallback(
+    (id: string) =>
+      optimisticAction(id, {
+        updates: { archived: true, pinned: false },
+        serverPayload: { archived: true, pinned: false },
+        successMessage: "Note archived",
+        haptic: hapticMedium,
+      }),
+    [optimisticAction]
+  );
+
+  const unarchiveNote = useCallback(
+    (id: string) =>
+      optimisticAction(id, {
+        updates: { archived: false },
+        serverPayload: { archived: false },
+        successMessage: "Note restored",
+        haptic: hapticMedium,
+      }),
+    [optimisticAction]
+  );
+
+  const trashNote = useCallback(
+    (id: string) =>
+      optimisticAction(id, {
+        updates: { trashed: true, archived: false, pinned: false },
+        serverPayload: { trashed: true, archived: false, pinned: false },
+        successMessage: "Note moved to bin",
+        haptic: hapticMedium,
+        closeIfCurrent: true,
+      }),
+    [optimisticAction]
+  );
+
+  const restoreFromBin = useCallback(
+    (id: string) =>
+      optimisticAction(id, {
+        updates: { trashed: false, archived: false },
+        serverPayload: { trashed: false, archived: false },
+        successMessage: "Note restored",
+        haptic: hapticSuccess,
+      }),
+    [optimisticAction]
   );
 
   const deleteForever = useCallback(
@@ -349,4 +268,3 @@ export function useNotes(
     importNotes,
   };
 }
-

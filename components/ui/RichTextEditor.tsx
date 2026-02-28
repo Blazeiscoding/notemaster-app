@@ -20,6 +20,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // Create lowlight instance - lazy loaded
@@ -101,7 +102,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     async (file: File) => {
       if (!file.type.startsWith("image/")) return;
       if (file.size > 10 * 1024 * 1024) {
-        alert("Image must be less than 10MB");
+        toast.error("Image must be less than 10MB");
         return;
       }
 

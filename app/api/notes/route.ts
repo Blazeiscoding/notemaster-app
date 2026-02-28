@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { NotePayload } from "@/types/note"
-import { serializeNote } from "./utils"
+import { serializeNote, noteSelect } from "./utils"
 import {
   encryptAttachments,
   encryptChecklist,
@@ -16,23 +16,6 @@ import {
 } from "@/lib/api-middleware"
 import { emitNoteEvent } from "@/lib/note-events"
 
-// Common select fields for note queries - optimized to only fetch needed fields
-const noteSelect = {
-  id: true,
-  userId: true,
-  title: true,
-  content: true,
-  tags: true,
-  checklist: true,
-  attachments: true,
-  type: true,
-  pinned: true,
-  archived: true,
-  trashed: true,
-  dueAt: true,
-  createdAt: true,
-  updatedAt: true,
-} as const
 
 export const GET = withAuth(
   async ({ userId, rateLimitHeaders, requestId, request }) => {

@@ -266,8 +266,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
               <CardTitle className="text-base font-semibold leading-snug line-clamp-2 flex-1">
                 {note.title || "Untitled note"}
               </CardTitle>
-              <>
-                <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1">
                   {isNotesSection && (
                     <>
                       <Tooltip>
@@ -388,7 +387,6 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                     </>
                   )}
                 </div>
-              </>
             </div>
             <CardDescription className="flex items-center gap-2 text-xs">
               <Clock className="size-3" />

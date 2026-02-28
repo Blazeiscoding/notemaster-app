@@ -31,12 +31,120 @@ export interface AuthOptions {
   rateLimitSuffix?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Shared middleware core
+// ---------------------------------------------------------------------------
+
+/**
+ * Core middleware that handles auth, rate limiting, request IDs, and errors.
+ * All public middleware helpers delegate to this function.
+ */
+async function middlewareCore<TResult>(
+  request: NextRequest | Request,
+  options: AuthOptions,
+  run: (context: ApiContext) => Promise<TResult>
+): Promise<TResult | NextResponse> {
+  const requestId = generateRequestId();
+  const method =
+    request instanceof NextRequest
+      ? request.method
+      : (request as Request).method;
+  const url =
+    request instanceof NextRequest
+      ? request.url
+      : (request as Request).url;
+  const route = new URL(url).pathname;
+
+  try {
+    // Get authenticated user (via proxy.ts Clerk middleware)
+    const { userId } = await auth();
+
+    if (!userId) {
+      const logger = createLogger({ requestId, route, method });
+      logger.warn("Authentication required", { route });
+      return NextResponse.json(
+        { success: false, error: "Authentication required" },
+        { status: 401, headers: { "X-Request-Id": requestId } }
+      );
+    }
+
+    const rateLimitSuffix = options.rateLimitSuffix || method.toLowerCase();
+    const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
+
+    // Apply rate limiting
+    const rateLimitResult = rateLimit(rateLimitIdentifier);
+
+    if (!rateLimitResult.success) {
+      const logger = createLogger({ requestId, route, method, userId });
+      logger.warn("Rate limit exceeded", { rateLimitIdentifier });
+      return NextResponse.json(
+        { success: false, error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { ...getRateLimitHeaders(rateLimitResult), "X-Request-Id": requestId },
+        }
+      );
+    }
+
+    const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+    const logger = createLogger({ requestId, route, method, userId });
+
+    const context: ApiContext = {
+      userId,
+      request,
+      rateLimitHeaders,
+      requestId,
+      logger,
+    };
+
+    return await run(context);
+  } catch (error) {
+    const logger = createLogger({ requestId, route, method });
+    logger.error("API route error", error, { route, method });
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          process.env.NODE_ENV === "production"
+            ? "Internal server error"
+            : error instanceof Error
+              ? error.message
+              : "Internal server error",
+      },
+      { status: 500, headers: { "X-Request-Id": requestId } }
+    );
+  }
+}
+
+/**
+ * Parse JSON body from request, returning an error response on failure.
+ */
+async function parseJsonBody(
+  request: NextRequest | Request,
+  logger: ReturnType<typeof createLogger>,
+  requestId: string,
+  route: string
+): Promise<{ body: unknown } | NextResponse> {
+  try {
+    return { body: await request.json() };
+  } catch {
+    logger.warn("Invalid JSON body", { route });
+    return NextResponse.json(
+      { success: false, error: "Invalid request format" },
+      { status: 400, headers: { "X-Request-Id": requestId } }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public middleware helpers
+// ---------------------------------------------------------------------------
+
 /**
  * Wraps an API route handler with authentication and rate limiting
- * 
+ *
  * @example
  * export const GET = withAuth(async ({ userId, rateLimitHeaders }) => {
- *   // Your handler logic here
  *   return NextResponse.json({ data: "..." }, { headers: rateLimitHeaders });
  * });
  */
@@ -44,277 +152,53 @@ export function withAuth(
   handler: (context: ApiContext) => Promise<NextResponse>,
   options: AuthOptions = {}
 ) {
-  return async (request: NextRequest | Request) => {
-    const requestId = generateRequestId();
-    const method = request instanceof NextRequest 
-      ? request.method 
-      : (request as Request).method;
-    const url = request instanceof NextRequest 
-      ? request.url 
-      : (request as Request).url;
-    const route = new URL(url).pathname;
-
-    try {
-      // Get authenticated user (via proxy.ts Clerk middleware)
-      const { userId } = await auth();
-
-      if (!userId) {
-        const logger = createLogger({ requestId, route, method });
-        logger.warn("Authentication required", { route });
-        return NextResponse.json(
-          { success: false, error: "Authentication required" },
-          { status: 401, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      const rateLimitSuffix = options.rateLimitSuffix || method.toLowerCase();
-      const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
-
-      // Apply rate limiting
-      const rateLimitResult = rateLimit(rateLimitIdentifier);
-      
-      if (!rateLimitResult.success) {
-        const logger = createLogger({ requestId, route, method, userId });
-        logger.warn("Rate limit exceeded", { rateLimitIdentifier });
-        return NextResponse.json(
-          { success: false, error: "Too many requests. Please try again later." },
-          {
-            status: 429,
-            headers: { ...getRateLimitHeaders(rateLimitResult), "X-Request-Id": requestId },
-          }
-        );
-      }
-
-      const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
-      const logger = createLogger({ requestId, route, method, userId });
-
-      // Create context and call handler
-      const context: ApiContext = {
-        userId,
-        request,
-        rateLimitHeaders,
-        requestId,
-        logger,
-      };
-
-      return await handler(context);
-    } catch (error) {
-      const logger = createLogger({ requestId, route, method });
-      logger.error("API route error", error, { route, method });
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: process.env.NODE_ENV === "production" 
-            ? "Internal server error" 
-            : error instanceof Error ? error.message : "Internal server error"
-        },
-        { status: 500, headers: { "X-Request-Id": requestId } }
-      );
-    }
-  };
+  return (request: NextRequest | Request) =>
+    middlewareCore(request, options, handler);
 }
 
 /**
  * Wraps an API route handler with authentication, rate limiting, and JSON parsing
- * Useful for POST/PATCH/PUT routes that need request body
- * 
+ *
  * @example
- * export const POST = withAuthAndJson(async ({ userId, rateLimitHeaders, body }) => {
- *   // body is already parsed
- *   return NextResponse.json({ success: true }, { headers: rateLimitHeaders });
+ * export const POST = withAuthAndJson(async ({ userId, body }) => {
+ *   return NextResponse.json({ success: true });
  * });
  */
 export function withAuthAndJson(
-  handler: (
-    context: ApiContext & { body: unknown }
-  ) => Promise<NextResponse>,
+  handler: (context: ApiContext & { body: unknown }) => Promise<NextResponse>,
   options: AuthOptions = {}
 ) {
-  return async (request: NextRequest | Request) => {
-    const requestId = generateRequestId();
-    const method = request instanceof NextRequest 
-      ? request.method 
-      : (request as Request).method;
-    const url = request instanceof NextRequest 
-      ? request.url 
-      : (request as Request).url;
-    const route = new URL(url).pathname;
-
-    try {
-      // Get authenticated user (via proxy.ts Clerk middleware)
-      const { userId } = await auth();
-
-      if (!userId) {
-        const logger = createLogger({ requestId, route, method });
-        logger.warn("Authentication required", { route });
-        return NextResponse.json(
-          { success: false, error: "Authentication required" },
-          { status: 401, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      const rateLimitSuffix = options.rateLimitSuffix || method.toLowerCase();
-      const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
-
-      // Apply rate limiting
-      const rateLimitResult = rateLimit(rateLimitIdentifier);
-      
-      if (!rateLimitResult.success) {
-        const logger = createLogger({ requestId, route, method, userId });
-        logger.warn("Rate limit exceeded", { rateLimitIdentifier });
-        return NextResponse.json(
-          { success: false, error: "Too many requests. Please try again later." },
-          {
-            status: 429,
-            headers: { ...getRateLimitHeaders(rateLimitResult), "X-Request-Id": requestId },
-          }
-        );
-      }
-
-      const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
-      const logger = createLogger({ requestId, route, method, userId });
-
-      // Parse JSON body
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        logger.warn("Invalid JSON body", { route });
-        return NextResponse.json(
-          { success: false, error: "Invalid request format" },
-          { status: 400, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      // Create context and call handler
-      const context: ApiContext & { body: unknown } = {
-        userId,
-        request,
-        rateLimitHeaders,
-        requestId,
-        logger,
-        body,
-      };
-
-      return await handler(context);
-    } catch (error) {
-      const logger = createLogger({ requestId, route, method });
-      logger.error("API route error", error, { route, method });
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: process.env.NODE_ENV === "production" 
-            ? "Internal server error" 
-            : error instanceof Error ? error.message : "Internal server error"
-        },
-        { status: 500, headers: { "X-Request-Id": requestId } }
-      );
-    }
-  };
+  return (request: NextRequest | Request) =>
+    middlewareCore(request, options, async (ctx) => {
+      const route = new URL(request.url).pathname;
+      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, route);
+      if (result instanceof NextResponse) return result;
+      return handler({ ...ctx, body: result.body });
+    });
 }
 
 /**
  * Wraps an API route handler with authentication, rate limiting, and params support
- * Useful for routes with dynamic segments like [id]
- * 
+ *
  * @example
- * export const PATCH = withAuthAndParams(
- *   async ({ userId, rateLimitHeaders }, { id }) => {
- *     // Your handler logic here
- *   }
- * );
+ * export const PATCH = withAuthAndParams(async (ctx, { id }) => { ... });
  */
 export function withAuthAndParams<TParams extends Promise<Record<string, string>>>(
-  handler: (
-    context: ApiContext,
-    params: Awaited<TParams>
-  ) => Promise<NextResponse>,
+  handler: (context: ApiContext, params: Awaited<TParams>) => Promise<NextResponse>,
   options: AuthOptions = {}
 ) {
-  return async (
-    request: NextRequest | Request,
-    { params }: { params: TParams }
-  ) => {
-    const requestId = generateRequestId();
-    const method = request instanceof NextRequest 
-      ? request.method 
-      : (request as Request).method;
-    const url = request instanceof NextRequest 
-      ? request.url 
-      : (request as Request).url;
-    const route = new URL(url).pathname;
-
-    try {
-      // Get authenticated user (via proxy.ts Clerk middleware)
-      const { userId } = await auth();
-
-      if (!userId) {
-        const logger = createLogger({ requestId, route, method });
-        logger.warn("Authentication required", { route });
-        return NextResponse.json(
-          { success: false, error: "Authentication required" },
-          { status: 401, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      const rateLimitSuffix = options.rateLimitSuffix || method.toLowerCase();
-      const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
-
-      // Apply rate limiting
-      const rateLimitResult = rateLimit(rateLimitIdentifier);
-      
-      if (!rateLimitResult.success) {
-        const logger = createLogger({ requestId, route, method, userId });
-        logger.warn("Rate limit exceeded", { rateLimitIdentifier });
-        return NextResponse.json(
-          { success: false, error: "Too many requests. Please try again later." },
-          {
-            status: 429,
-            headers: { ...getRateLimitHeaders(rateLimitResult), "X-Request-Id": requestId },
-          }
-        );
-      }
-
-      const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+  return (request: NextRequest | Request, { params }: { params: TParams }) =>
+    middlewareCore(request, options, async (ctx) => {
       const resolvedParams = await params;
-      const logger = createLogger({ requestId, route, method, userId });
-
-      // Create context and call handler
-      const context: ApiContext = {
-        userId,
-        request,
-        rateLimitHeaders,
-        requestId,
-        logger,
-      };
-
-      return await handler(context, resolvedParams);
-    } catch (error) {
-      const logger = createLogger({ requestId, route, method });
-      logger.error("API route error", error, { route, method });
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: process.env.NODE_ENV === "production" 
-            ? "Internal server error" 
-            : error instanceof Error ? error.message : "Internal server error"
-        },
-        { status: 500, headers: { "X-Request-Id": requestId } }
-      );
-    }
-  };
+      return handler(ctx, resolvedParams);
+    });
 }
 
 /**
  * Wraps an API route handler with authentication, rate limiting, JSON parsing, and params
- * Useful for POST/PATCH/PUT routes with dynamic segments
- * 
+ *
  * @example
- * export const PATCH = withAuthJsonAndParams(
- *   async ({ userId, rateLimitHeaders, body }, { id }) => {
- *     // body and id are available
- *   }
- * );
+ * export const PATCH = withAuthJsonAndParams(async ({ body }, { id }) => { ... });
  */
 export function withAuthJsonAndParams<TParams extends Promise<Record<string, string>>>(
   handler: (
@@ -323,92 +207,19 @@ export function withAuthJsonAndParams<TParams extends Promise<Record<string, str
   ) => Promise<NextResponse>,
   options: AuthOptions = {}
 ) {
-  return async (
-    request: NextRequest | Request,
-    { params }: { params: TParams }
-  ) => {
-    const requestId = generateRequestId();
-    const method = request instanceof NextRequest 
-      ? request.method 
-      : (request as Request).method;
-    const url = request instanceof NextRequest 
-      ? request.url 
-      : (request as Request).url;
-    const route = new URL(url).pathname;
-
-    try {
-      // Get authenticated user (via proxy.ts Clerk middleware)
-      const { userId } = await auth();
-
-      if (!userId) {
-        const logger = createLogger({ requestId, route, method });
-        logger.warn("Authentication required", { route });
-        return NextResponse.json(
-          { success: false, error: "Authentication required" },
-          { status: 401, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      const rateLimitSuffix = options.rateLimitSuffix || method.toLowerCase();
-      const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
-
-      // Apply rate limiting
-      const rateLimitResult = rateLimit(rateLimitIdentifier);
-      
-      if (!rateLimitResult.success) {
-        const logger = createLogger({ requestId, route, method, userId });
-        logger.warn("Rate limit exceeded", { rateLimitIdentifier });
-        return NextResponse.json(
-          { success: false, error: "Too many requests. Please try again later." },
-          {
-            status: 429,
-            headers: { ...getRateLimitHeaders(rateLimitResult), "X-Request-Id": requestId },
-          }
-        );
-      }
-
-      const rateLimitHeaders = getRateLimitHeaders(rateLimitResult);
+  return (request: NextRequest | Request, { params }: { params: TParams }) =>
+    middlewareCore(request, options, async (ctx) => {
+      const route = new URL(request.url).pathname;
+      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, route);
+      if (result instanceof NextResponse) return result;
       const resolvedParams = await params;
-      const logger = createLogger({ requestId, route, method, userId });
-
-      // Parse JSON body
-      let body: unknown;
-      try {
-        body = await request.json();
-      } catch {
-        logger.warn("Invalid JSON body", { route });
-        return NextResponse.json(
-          { success: false, error: "Invalid request format" },
-          { status: 400, headers: { "X-Request-Id": requestId } }
-        );
-      }
-
-      // Create context and call handler
-      const context: ApiContext & { body: unknown } = {
-        userId,
-        request,
-        rateLimitHeaders,
-        requestId,
-        logger,
-        body,
-      };
-
-      return await handler(context, resolvedParams);
-    } catch (error) {
-      const logger = createLogger({ requestId, route, method });
-      logger.error("API route error", error, { route, method });
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: process.env.NODE_ENV === "production" 
-            ? "Internal server error" 
-            : error instanceof Error ? error.message : "Internal server error"
-        },
-        { status: 500, headers: { "X-Request-Id": requestId } }
-      );
-    }
-  };
+      return handler({ ...ctx, body: result.body }, resolvedParams);
+    });
 }
+
+// ---------------------------------------------------------------------------
+// Response helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Standardized API response format
@@ -467,11 +278,10 @@ export function successResponse<T>(
 
   return NextResponse.json(response, {
     status,
-    headers: { 
-      ...rateLimitHeaders, 
+    headers: {
+      ...rateLimitHeaders,
       ...(requestId && { "X-Request-Id": requestId }),
       "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
     },
   });
 }
-

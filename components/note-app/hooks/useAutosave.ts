@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import type { NotePayload } from "@/types/note";
 import { saveDraft, getDraft, deleteDraft } from "@/lib/indexeddb";
@@ -76,11 +76,11 @@ export function useAutosave(
     };
   }, [currentNote]);
 
-  const clearDraft = (noteId: string) => {
+  const clearDraft = useCallback((noteId: string) => {
     deleteDraft(noteId).catch((err) => {
       console.error("Failed to clear draft", err);
     });
-  };
+  }, []);
 
   return { clearDraft };
 }
