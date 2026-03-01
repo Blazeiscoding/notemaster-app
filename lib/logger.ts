@@ -48,11 +48,7 @@ function logInfo(message: string, context?: LogContext): void {
     context,
   };
   
-  if (process.env.NODE_ENV === "development") {
-    console.log(formatLogEntry(entry));
-  } else {
-    console.log(formatLogEntry(entry));
-  }
+  console.log(formatLogEntry(entry));
 }
 
 function logWarn(message: string, context?: LogContext): void {

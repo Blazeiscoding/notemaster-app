@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import type { SSEEvent, NoteEvent } from "@/lib/note-events";
 
 export type SSEConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
@@ -61,10 +61,7 @@ export function useSSE(
   }, []);
 
   // Effective enabled state: only connect if enabled AND tab is visible
-  const effectiveEnabled = useMemo(
-    () => enabled && isTabVisible,
-    [enabled, isTabVisible]
-  );
+  const effectiveEnabled = enabled && isTabVisible;
 
   // Process incoming event
   const handleEvent = useCallback((event: SSEEvent) => {

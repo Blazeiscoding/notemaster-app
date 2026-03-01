@@ -32,22 +32,12 @@ export async function compressImage(
   file: File,
   options: CompressOptions = {}
 ): Promise<File> {
+  // Skip files that don't need compression (non-image, GIF, or < 100KB)
+  if (!needsCompression(file)) {
+    return file;
+  }
+
   const opts = { ...DEFAULT_OPTIONS, ...options };
-
-  // Skip non-image files
-  if (!file.type.startsWith("image/")) {
-    return file;
-  }
-
-  // Skip if already small enough (< 100KB)
-  if (file.size < 100 * 1024) {
-    return file;
-  }
-
-  // Skip GIFs (to preserve animation from upload)
-  if (file.type === "image/gif") {
-    return file;
-  }
 
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

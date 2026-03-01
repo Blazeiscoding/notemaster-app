@@ -103,7 +103,7 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
     link.href = url;
     link.download = `${note.title || "note"}.md`;
     link.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [note]);
 
   const handleExportPDF = useCallback(async () => {

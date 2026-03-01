@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef } from "react";
 import { useEditor, EditorContent, type Editor as TiptapEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -228,7 +228,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   // Track editor state changes for toolbar updates
   // The editor instance itself is stable, but we derive state from it
   const isInCodeBlock = editor?.isActive("codeBlock") ?? false;
-  const toolbarConfig = {
+  const toolbarConfig = useMemo(() => ({
     heading1Active: editor?.isActive("heading", { level: 1 }) ?? false,
     heading2Active: editor?.isActive("heading", { level: 2 }) ?? false,
     boldActive: editor?.isActive("bold") ?? false,
@@ -237,7 +237,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     orderedListActive: editor?.isActive("orderedList") ?? false,
     blockquoteActive: editor?.isActive("blockquote") ?? false,
     codeBlockLanguage: editor?.getAttributes("codeBlock").language || "plaintext",
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [editor, editor?.state.selection]);
 
   if (!editor) {
     return null;
