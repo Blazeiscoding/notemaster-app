@@ -104,7 +104,8 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
     link.download = `${note.title || "note"}.md`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }, [note]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note.title, note.content, note.checklist, note.tags, note.dueAt, note.createdAt, note.updatedAt]);
 
   const handleExportPDF = useCallback(async () => {
     // Dynamic import to avoid loading jspdf (~250KB) until needed

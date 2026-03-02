@@ -111,9 +111,13 @@ export function useNotes(
 
   const togglePin = useCallback(
     async (id: string) => {
-      const note = notes.find((n) => n.id === id);
-      if (!note) return;
-      const newPinned = !note.pinned;
+      let newPinned = false;
+      setNotes((prev) => {
+        const note = prev.find((n) => n.id === id);
+        if (!note) return prev;
+        newPinned = !note.pinned;
+        return prev; // actual update handled by optimisticAction below
+      });
       await optimisticAction(id, {
         updates: { pinned: newPinned },
         serverPayload: { pinned: newPinned },
@@ -121,7 +125,7 @@ export function useNotes(
         haptic: hapticLight,
       });
     },
-    [notes, optimisticAction]
+    [setNotes, optimisticAction]
   );
 
   const archiveNote = useCallback(

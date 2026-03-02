@@ -17,6 +17,7 @@ export interface ApiContext {
   request: NextRequest | Request;
   rateLimitHeaders: Record<string, string>;
   requestId: string;
+  route: string;
   logger: ReturnType<typeof createLogger>;
 }
 
@@ -94,6 +95,7 @@ async function middlewareCore<TResult>(
       request,
       rateLimitHeaders,
       requestId,
+      route,
       logger,
     };
 
@@ -170,8 +172,7 @@ export function withAuthAndJson(
 ) {
   return (request: NextRequest | Request) =>
     middlewareCore(request, options, async (ctx) => {
-      const route = new URL(request.url).pathname;
-      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, route);
+      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, ctx.route);
       if (result instanceof NextResponse) return result;
       return handler({ ...ctx, body: result.body });
     });
@@ -209,8 +210,7 @@ export function withAuthJsonAndParams<TParams extends Promise<Record<string, str
 ) {
   return (request: NextRequest | Request, { params }: { params: TParams }) =>
     middlewareCore(request, options, async (ctx) => {
-      const route = new URL(request.url).pathname;
-      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, route);
+      const result = await parseJsonBody(request, ctx.logger, ctx.requestId, ctx.route);
       if (result instanceof NextResponse) return result;
       const resolvedParams = await params;
       return handler({ ...ctx, body: result.body }, resolvedParams);

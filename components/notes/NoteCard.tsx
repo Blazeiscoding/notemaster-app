@@ -200,9 +200,16 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     }, [note.updatedAt]);
 
     const strippedContent = useMemo(() => {
-      return note.content?.replace(/<[^>]*>/g, "") || "No content yet";
+      if (!note.content) return "No content yet";
+      // Truncate before stripping tags — only a short preview is displayed (line-clamp-3)
+      const truncated = note.content.length > 500 ? note.content.slice(0, 500) : note.content;
+      return truncated.replace(/<[^>]*>/g, "") || "No content yet";
     }, [note.content]);
 
+
+    const checkedCount = useMemo(() => {
+      return note.checklist.filter((item) => item.checked).length;
+    }, [note.checklist]);
 
     const firstImage = useMemo(() => {
       return note.attachments.find((att) => att.type.startsWith("image/"));
@@ -413,7 +420,7 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
             {note.checklist.length > 0 && (
               <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs font-medium border border-border/50">
                 <span className="text-foreground">
-                  {note.checklist.filter((item) => item.checked).length}
+                  {checkedCount}
                 </span>
                 <span className="text-muted-foreground"> of </span>
                 <span className="text-foreground">{note.checklist.length}</span>

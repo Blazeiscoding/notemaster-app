@@ -72,17 +72,20 @@ export default function RootLayout({
           {/* Preconnect to Fontshare for faster Clash Display loading */}
           <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
           <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
-          {/* Non-blocking preload for Clash Display (not on Google Fonts) */}
-          <link
-            rel="preload"
-            href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
-            as="style"
-          />
-          {/* Load Clash Display stylesheet */}
+          {/* Non-blocking load for Clash Display (not on Google Fonts) */}
           <link
             rel="stylesheet"
             href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+            media="print"
+            // @ts-expect-error -- onLoad reassigns media to make the stylesheet active after async load
+            onLoad="this.media='all'"
           />
+          <noscript>
+            <link
+              rel="stylesheet"
+              href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+            />
+          </noscript>
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}

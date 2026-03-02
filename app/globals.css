@@ -225,5 +225,6 @@
   .cv-auto {
     content-visibility: auto;
     contain-intrinsic-size: auto 220px;
+    will-change: transform;
   }
 }

@@ -40,100 +40,94 @@ export async function compressImage(
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+    // Use createObjectURL instead of readAsDataURL to avoid base64 encoding overhead (~33% less memory)
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
 
-    reader.onload = (event) => {
-      const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        // Calculate new dimensions while maintaining aspect ratio
+        let { width, height } = img;
 
-      img.onload = () => {
-        try {
-          // Calculate new dimensions while maintaining aspect ratio
-          let { width, height } = img;
-
-          if (width > opts.maxWidth) {
-            height = (height * opts.maxWidth) / width;
-            width = opts.maxWidth;
-          }
-
-          if (height > opts.maxHeight) {
-            width = (width * opts.maxHeight) / height;
-            height = opts.maxHeight;
-          }
-
-          // Round to integers
-          width = Math.round(width);
-          height = Math.round(height);
-
-          // Create canvas and draw resized image
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            throw new Error("Could not get canvas context");
-          }
-
-          // Use high-quality image smoothing
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-
-          // Draw the image
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Convert to blob
-          canvas.toBlob(
-            (blob) => {
-              if (!blob) {
-                // If compression failed, return original
-                resolve(file);
-                return;
-              }
-
-              // If compressed file is larger than original, use original
-              if (blob.size >= file.size) {
-                resolve(file);
-                return;
-              }
-
-              // Create new file with compressed data
-              const compressedFile = new File(
-                [blob],
-                file.name.replace(/\.[^.]+$/, getExtension(opts.mimeType)),
-                {
-                  type: opts.mimeType,
-                  lastModified: Date.now(),
-                }
-              );
-
-              console.log(
-                `Compressed ${file.name}: ${formatSize(file.size)} → ${formatSize(compressedFile.size)} (${Math.round((1 - compressedFile.size / file.size) * 100)}% reduction)`
-              );
-
-              resolve(compressedFile);
-            },
-            opts.mimeType,
-            opts.quality
-          );
-        } catch (error) {
-          console.error("Compression error:", error);
-          resolve(file); // Return original on error
+        if (width > opts.maxWidth) {
+          height = (height * opts.maxWidth) / width;
+          width = opts.maxWidth;
         }
-      };
 
-      img.onerror = () => {
-        console.error("Failed to load image for compression");
+        if (height > opts.maxHeight) {
+          width = (width * opts.maxHeight) / height;
+          height = opts.maxHeight;
+        }
+
+        // Round to integers
+        width = Math.round(width);
+        height = Math.round(height);
+
+        // Create canvas and draw resized image
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          throw new Error("Could not get canvas context");
+        }
+
+        // Use high-quality image smoothing
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        // Draw the image
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              // If compression failed, return original
+              resolve(file);
+              return;
+            }
+
+            // If compressed file is larger than original, use original
+            if (blob.size >= file.size) {
+              resolve(file);
+              return;
+            }
+
+            // Create new file with compressed data
+            const compressedFile = new File(
+              [blob],
+              file.name.replace(/\.[^.]+$/, getExtension(opts.mimeType)),
+              {
+                type: opts.mimeType,
+                lastModified: Date.now(),
+              }
+            );
+
+            console.log(
+              `Compressed ${file.name}: ${formatSize(file.size)} → ${formatSize(compressedFile.size)} (${Math.round((1 - compressedFile.size / file.size) * 100)}% reduction)`
+            );
+
+            resolve(compressedFile);
+          },
+          opts.mimeType,
+          opts.quality
+        );
+      } catch (error) {
+        console.error("Compression error:", error);
         resolve(file); // Return original on error
-      };
-
-      img.src = event.target?.result as string;
+      }
     };
 
-    reader.onerror = () => {
-      reject(new Error("Failed to read file"));
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      console.error("Failed to load image for compression");
+      resolve(file); // Return original on error
     };
 
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
   });
 }
 

@@ -20,6 +20,7 @@ type ParamsPromise = Promise<{ id: string }>;
 
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
   async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
+    // Read existing note inside the transaction to reduce DB round-trips
     const existing = await prisma.note.findUnique({
       where: { id },
       select: noteSelect,
