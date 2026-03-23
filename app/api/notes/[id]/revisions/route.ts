@@ -8,11 +8,23 @@ import {
   successResponse,
   errorResponse,
 } from "@/lib/api-middleware"
+import { emitNoteEvent } from "@/lib/note-events"
 
 type ParamsPromise = Promise<{ id: string }>
 
 export const GET = withAuthAndParams<ParamsPromise>(
   async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    try {
+      sanitizeId(id)
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      )
+    }
+
     const note = await prisma.note.findUnique({
       where: { id },
       select: { id: true, userId: true },
@@ -42,6 +54,17 @@ export const GET = withAuthAndParams<ParamsPromise>(
 
 export const POST = withAuthJsonAndParams<ParamsPromise>(
   async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
+    try {
+      sanitizeId(id)
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      )
+    }
+
     const note = await prisma.note.findUnique({ where: { id } })
 
     if (!note || note.userId !== userId) {
@@ -83,22 +106,40 @@ export const POST = withAuthJsonAndParams<ParamsPromise>(
       return errorResponse("Revision not found", 404, rateLimitHeaders, requestId)
     }
 
-    const updated = await prisma.note.update({
-      where: { id: note.id },
-      data: {
-        title: revision.title,
-        content: revision.content,
-        tags: revision.tags,
-        checklist: revision.checklist as Prisma.InputJsonValue,
-        attachments: revision.attachments as Prisma.InputJsonValue,
-        pinned: revision.pinned,
-        archived: revision.archived,
-        trashed: revision.trashed,
-        dueAt: revision.dueAt,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.noteRevision.create({
+        data: {
+          noteId: note.id,
+          title: note.title,
+          content: note.content,
+          tags: note.tags,
+          checklist: note.checklist as Prisma.InputJsonValue,
+          attachments: note.attachments as Prisma.InputJsonValue,
+          pinned: note.pinned,
+          archived: note.archived,
+          trashed: note.trashed,
+          dueAt: note.dueAt ?? undefined,
+        },
+      })
+
+      return tx.note.update({
+        where: { id: note.id },
+        data: {
+          title: revision.title,
+          content: revision.content,
+          tags: revision.tags,
+          checklist: revision.checklist as Prisma.InputJsonValue,
+          attachments: revision.attachments as Prisma.InputJsonValue,
+          pinned: revision.pinned,
+          archived: revision.archived,
+          trashed: revision.trashed,
+          dueAt: revision.dueAt,
+        },
+      })
     })
 
     logger.info("Revision restored", { noteId: id, revisionId });
+    emitNoteEvent(userId, "note:updated", id, serializeNote(updated))
     return successResponse(serializeNote(updated), 200, rateLimitHeaders, requestId)
   },
   { rateLimitSuffix: "revisions-post" }

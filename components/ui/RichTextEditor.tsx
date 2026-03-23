@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import type { ApiResponse } from "@/lib/api-middleware";
 
 // Create lowlight instance - lazy loaded
 let lowlightInstance: ReturnType<typeof createLowlight> | null = null;
@@ -68,8 +69,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     try {
       // Get auth params from ImageKit
       const authResponse = await fetch("/api/auth/imagekit");
-      if (!authResponse.ok) throw new Error("Failed to get upload auth");
-      const authParams = await authResponse.json();
+      if (!authResponse.ok) {
+        throw new Error(
+          authResponse.status === 401
+            ? "Sign in to upload images"
+            : "Failed to get upload auth"
+        );
+      }
+      const authResponseJson = (await authResponse.json()) as ApiResponse<{
+        token: string;
+        signature: string;
+        expire: number;
+      }>;
+      const authParams = authResponseJson.data;
+      if (!authParams) {
+        throw new Error("Failed to get upload auth");
+      }
 
       const ImageKit = (await import("imagekit-javascript")).default;
       const imagekit = new ImageKit({
@@ -93,6 +108,9 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
       });
     } catch (error) {
       console.error("Image upload failed:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Image upload failed"
+      );
       return null;
     }
   }, []);

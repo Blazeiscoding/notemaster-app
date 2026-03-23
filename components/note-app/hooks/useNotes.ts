@@ -7,6 +7,8 @@ import {
   hapticMedium,
   hapticSuccess,
 } from "@/lib/haptics";
+import { addToPendingSync } from "@/lib/indexeddb";
+import { isOnline } from "@/lib/background-sync";
 
 type NotesState = {
   notes: NotePayload[];
@@ -69,6 +71,21 @@ function makeOptimisticAction(
     if (opts.closeIfCurrent && wasCurrent) setCurrentNote(null);
 
     if (isAuthenticated) {
+      if (!isOnline()) {
+        await addToPendingSync({
+          type: "update",
+          entity: "note",
+          entityId: id,
+          data: {
+            ...existing,
+            ...opts.updates,
+            updatedAt: new Date().toISOString(),
+          },
+        });
+        toast.success(`${opts.successMessage} and queued for sync`);
+        return;
+      }
+
       try {
         const saved = await updateNoteOnServer(id, opts.serverPayload);
         setNotes((prev) =>
@@ -77,6 +94,20 @@ function makeOptimisticAction(
         toast.success(opts.successMessage);
       } catch (error) {
         console.error(`Failed to ${opts.successMessage.toLowerCase()}`, error);
+        if (error instanceof TypeError || error instanceof DOMException) {
+          await addToPendingSync({
+            type: "update",
+            entity: "note",
+            entityId: id,
+            data: {
+              ...existing,
+              ...opts.updates,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+          toast.success(`${opts.successMessage} and queued for sync`);
+          return;
+        }
         const rollback = existing;
         setNotes((prev) =>
           prev.map((note) => (note.id === id ? rollback : note))
@@ -192,11 +223,32 @@ export function useNotes(
       if (wasCurrent) setCurrentNote(null);
 
       if (isAuthenticated) {
+        if (!isOnline()) {
+          await addToPendingSync({
+            type: "delete",
+            entity: "note",
+            entityId: id,
+            data: null,
+          });
+          toast.success("Note deleted locally and queued for sync");
+          return;
+        }
+
         try {
           await deleteNoteOnServer(id);
           toast.success("Note deleted permanently");
         } catch (error) {
           console.error("Failed to delete note", error);
+          if (error instanceof TypeError || error instanceof DOMException) {
+            await addToPendingSync({
+              type: "delete",
+              entity: "note",
+              entityId: id,
+              data: null,
+            });
+            toast.success("Note deleted locally and queued for sync");
+            return;
+          }
           const rollback = existing;
           const rollbackIndex = existingIndex;
           setNotes((prev) => {

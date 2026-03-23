@@ -1,7 +1,4 @@
-/**
- * Simple in-memory rate limiting
- * For production, consider using Redis or a dedicated rate limiting service
- */
+import { Pool } from "pg";
 
 interface RateLimitEntry {
   count: number;
@@ -9,35 +6,51 @@ interface RateLimitEntry {
 }
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
+const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 
-const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 60; // 60 requests per minute
+const connectionString = process.env.DATABASE_URL;
+const pgPool = connectionString
+  ? new Pool({
+      connectionString,
+      max: 2,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    })
+  : null;
+let ensureTablePromise: Promise<void> | null = null;
 
-export function rateLimit(identifier: string): {
-  success: boolean;
-  remaining: number;
-  resetAt: number;
-} {
+async function ensureRateLimitTable() {
+  if (!pgPool) return;
+  if (!ensureTablePromise) {
+    ensureTablePromise = pgPool
+      .query(`
+        CREATE TABLE IF NOT EXISTS app_rate_limits (
+          identifier TEXT PRIMARY KEY,
+          count INTEGER NOT NULL,
+          reset_at TIMESTAMPTZ NOT NULL
+        );
+      `)
+      .then(() => undefined)
+      .catch((error) => {
+        ensureTablePromise = null;
+        throw error;
+      });
+  }
+
+  await ensureTablePromise;
+}
+
+function memoryRateLimit(identifier: string) {
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 
   if (!entry || now > entry.resetAt) {
-    // Create new entry or reset expired entry
-    const newEntry: RateLimitEntry = {
+    const newEntry = {
       count: 1,
       resetAt: now + RATE_LIMIT_WINDOW,
     };
     rateLimitStore.set(identifier, newEntry);
-    
-    // Clean up old entries periodically
-    if (rateLimitStore.size > 10000) {
-      for (const [key, value] of rateLimitStore.entries()) {
-        if (now > value.resetAt) {
-          rateLimitStore.delete(key);
-        }
-      }
-    }
-    
     return {
       success: true,
       remaining: RATE_LIMIT_MAX_REQUESTS - 1,
@@ -53,7 +66,7 @@ export function rateLimit(identifier: string): {
     };
   }
 
-  entry.count++;
+  entry.count += 1;
   return {
     success: true,
     remaining: RATE_LIMIT_MAX_REQUESTS - entry.count,
@@ -61,8 +74,57 @@ export function rateLimit(identifier: string): {
   };
 }
 
+async function databaseRateLimit(identifier: string) {
+  if (!pgPool) {
+    return memoryRateLimit(identifier);
+  }
+
+  await ensureRateLimitTable();
+
+  const result = await pgPool.query<{
+    count: number;
+    reset_at_ms: string;
+  }>(
+    `
+      INSERT INTO app_rate_limits (identifier, count, reset_at)
+      VALUES ($1, 1, NOW() + INTERVAL '60 seconds')
+      ON CONFLICT (identifier) DO UPDATE SET
+        count = CASE
+          WHEN app_rate_limits.reset_at <= NOW() THEN 1
+          WHEN app_rate_limits.count < $2 THEN app_rate_limits.count + 1
+          ELSE app_rate_limits.count
+        END,
+        reset_at = CASE
+          WHEN app_rate_limits.reset_at <= NOW() THEN NOW() + INTERVAL '60 seconds'
+          ELSE app_rate_limits.reset_at
+        END
+      RETURNING count, FLOOR(EXTRACT(EPOCH FROM reset_at) * 1000)::bigint AS reset_at_ms
+    `,
+    [identifier, RATE_LIMIT_MAX_REQUESTS]
+  );
+
+  const row = result.rows[0];
+  const resetAt = Number(row?.reset_at_ms ?? Date.now() + RATE_LIMIT_WINDOW);
+  const count = Number(row?.count ?? RATE_LIMIT_MAX_REQUESTS);
+
+  return {
+    success: count <= RATE_LIMIT_MAX_REQUESTS,
+    remaining: Math.max(0, RATE_LIMIT_MAX_REQUESTS - count),
+    resetAt,
+  };
+}
+
+export async function rateLimit(identifier: string) {
+  try {
+    return await databaseRateLimit(identifier);
+  } catch (error) {
+    console.error("Database-backed rate limit unavailable, falling back to memory", error);
+    return memoryRateLimit(identifier);
+  }
+}
+
 export function getRateLimitHeaders(
-  result: ReturnType<typeof rateLimit>
+  result: Awaited<ReturnType<typeof rateLimit>>
 ): Record<string, string> {
   return {
     "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
@@ -70,4 +132,3 @@ export function getRateLimitHeaders(
     "X-RateLimit-Reset": String(Math.ceil(result.resetAt / 1000)),
   };
 }
-

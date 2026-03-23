@@ -15,6 +15,7 @@ import {
   errorResponse,
 } from "@/lib/api-middleware"
 import { emitNoteEvent } from "@/lib/note-events"
+import { validateNotePayload } from "@/lib/validation"
 
 
 export const GET = withAuth(
@@ -67,12 +68,19 @@ export const GET = withAuth(
 
 export const POST = withAuthAndJson(
   async ({ userId, body, rateLimitHeaders, requestId, logger }) => {
-    const payload = body as Partial<NotePayload>
-
-    // Input validation
-    if (!payload.id || typeof payload.id !== "string") {
-      logger.warn("Note creation failed: missing ID");
-      return errorResponse("Note ID is required", 400, rateLimitHeaders, requestId)
+    let payload: Partial<NotePayload> & Pick<NotePayload, "id">
+    try {
+      payload = validateNotePayload(body, { partial: false })
+    } catch (error) {
+      logger.warn("Note creation failed: invalid payload", {
+        error: error instanceof Error ? error.message : "Invalid payload",
+      });
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid payload",
+        400,
+        rateLimitHeaders,
+        requestId
+      )
     }
 
     const noteData: Prisma.NoteUncheckedCreateInput = {
