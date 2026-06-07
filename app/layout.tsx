@@ -64,7 +64,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
+      <html lang="en" data-scroll-behavior="smooth">
         <head>
           {/* Preconnect to ImageKit for faster image loading */}
           <link rel="preconnect" href="https://ik.imagekit.io" />
