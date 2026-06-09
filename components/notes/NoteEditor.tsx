@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Check,
@@ -117,14 +117,22 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
     printNote(note);
   }, [note]);
 
-  // Memoize word and character counts to avoid expensive regex operations on every render
-  const { wordCount, charCount } = useMemo(() => {
-    const strippedContent = note.content.replace(/<[^>]*>/g, '');
-    const trimmed = strippedContent.trim();
-    return {
-      wordCount: trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0,
-      charCount: strippedContent.length,
-    };
+  const [contentStats, setContentStats] = useState({
+    wordCount: 0,
+    charCount: 0,
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const strippedContent = note.content.replace(/<[^>]*>/g, "");
+      const trimmed = strippedContent.trim();
+      setContentStats({
+        wordCount: trimmed ? trimmed.split(/\s+/).filter(Boolean).length : 0,
+        charCount: strippedContent.length,
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
   }, [note.content]);
 
   return (
@@ -219,9 +227,9 @@ const NoteEditor: React.FC<NoteEditorProps> = React.memo(({
           />
           <div className="flex items-center justify-end gap-4 text-xs text-muted-foreground/60 font-medium">
             <span>
-              {wordCount} words
+              {contentStats.wordCount} words
             </span>
-            <span>{charCount} characters</span>
+            <span>{contentStats.charCount} characters</span>
           </div>
         </div>
 

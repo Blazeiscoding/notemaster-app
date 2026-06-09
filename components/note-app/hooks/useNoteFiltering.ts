@@ -1,5 +1,5 @@
 import { useMemo, useDeferredValue } from "react";
-import type { NotePayload, SectionKey } from "@/types/note";
+import type { NoteSummaryPayload, SectionKey } from "@/types/note";
 
 type FilterCriteria = {
   section: SectionKey;
@@ -9,16 +9,16 @@ type FilterCriteria = {
 };
 
 export function useNoteFiltering(
-  notes: NotePayload[],
+  notes: NoteSummaryPayload[],
   criteria: FilterCriteria,
   customOrder: string[]
 ) {
   type PreparedNote = {
-    note: NotePayload;
+    note: NoteSummaryPayload;
     createdAtMs: number;
     updatedAtMs: number;
     titleLower: string;
-    contentLower: string;
+    previewLower: string;
   };
 
   // Defer filtering to keep UI responsive during rapid updates (e.g., typing in search)
@@ -30,16 +30,12 @@ export function useNoteFiltering(
       deferredNotes.map((note) => {
         const createdAtMs = Date.parse(note.createdAt);
         const updatedAtMs = Date.parse(note.updatedAt);
-        // Truncate content before lowercasing — search on huge notes has diminishing UI returns
-        const rawContent = note.content ?? "";
-        const searchContent = rawContent.length > 5000 ? rawContent.slice(0, 5000) : rawContent;
-
         return {
           note,
           createdAtMs: Number.isFinite(createdAtMs) ? createdAtMs : 0,
           updatedAtMs: Number.isFinite(updatedAtMs) ? updatedAtMs : 0,
           titleLower: note.title?.toLowerCase() ?? "",
-          contentLower: searchContent.toLowerCase(),
+          previewLower: note.preview.toLowerCase(),
         };
       }),
     [deferredNotes]
@@ -88,7 +84,7 @@ export function useNoteFiltering(
       if (hasSearch) {
         if (
           !prepared.titleLower.includes(normalizedSearch) &&
-          !prepared.contentLower.includes(normalizedSearch)
+          !prepared.previewLower.includes(normalizedSearch)
         ) {
           continue;
         }

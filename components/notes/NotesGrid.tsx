@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import NoteCard from "./NoteCard";
 import { useVirtualizedGrid } from "./useVirtualizedGrid";
-import type { NotePayload, SectionKey } from "@/types/note";
+import type { NoteSummaryPayload, SectionKey } from "@/types/note";
 
 type NotesGridProps = {
-  notes: NotePayload[];
+  notes: NoteSummaryPayload[];
   activeSection: SectionKey;
   onCreateNote: () => void;
-  onOpenNote: (note: NotePayload) => void;
+  onOpenNote: (note: NoteSummaryPayload) => void;
   onPin: (id: string) => void;
   onArchive: (id: string) => void;
   onTrash: (id: string) => void;

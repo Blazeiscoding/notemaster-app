@@ -1,10 +1,11 @@
 "use client";
 
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { NotePayload } from "@/types/note";
+import type { NotePayload, NoteSummaryPayload } from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
 
 // Database schema version - increment when schema changes
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const DB_NAME = "notemaster";
 
 // Types for pending sync operations
@@ -26,6 +27,11 @@ export type RecentSearch = {
 
 // IndexedDB Schema
 interface NoteMasterDB extends DBSchema {
+  noteSummaries: {
+    key: string;
+    value: NoteSummaryPayload & { _localUpdatedAt?: number };
+    indexes: { "by-userId": string; "by-updatedAt": string };
+  };
   notes: {
     key: string;
     value: NotePayload & { _localUpdatedAt?: number };
@@ -60,6 +66,12 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
       upgrade(db, oldVersion) {
         // Fresh install or upgrade from version 0
         if (oldVersion < 1) {
+          const summariesStore = db.createObjectStore("noteSummaries", {
+            keyPath: "id",
+          });
+          summariesStore.createIndex("by-userId", "userId");
+          summariesStore.createIndex("by-updatedAt", "updatedAt");
+
           const notesStore = db.createObjectStore("notes", { keyPath: "id" });
           notesStore.createIndex("by-userId", "userId");
           notesStore.createIndex("by-updatedAt", "updatedAt");
@@ -84,6 +96,19 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
         ) {
           (db as unknown as IDBDatabase).deleteObjectStore("notebooks");
         }
+
+        if (
+          oldVersion < 3 &&
+          !(db as unknown as IDBDatabase).objectStoreNames.contains(
+            "noteSummaries"
+          )
+        ) {
+          const summariesStore = db.createObjectStore("noteSummaries", {
+            keyPath: "id",
+          });
+          summariesStore.createIndex("by-userId", "userId");
+          summariesStore.createIndex("by-updatedAt", "updatedAt");
+        }
       },
       blocked() {
         console.warn("IndexedDB blocked - close other tabs");
@@ -101,6 +126,26 @@ function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
 // =====================
 // Notes Operations
 // =====================
+
+export async function getAllNoteSummaries(): Promise<NoteSummaryPayload[]> {
+  const db = await getDB();
+  return db.getAll("noteSummaries");
+}
+
+export async function saveNoteSummaries(
+  summaries: NoteSummaryPayload[]
+): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("noteSummaries", "readwrite");
+  const timestamp = Date.now();
+
+  await Promise.all([
+    ...summaries.map((summary) =>
+      tx.store.put({ ...summary, _localUpdatedAt: timestamp })
+    ),
+    tx.done,
+  ]);
+}
 
 export async function getAllNotes(): Promise<NotePayload[]> {
   const db = await getDB();
@@ -120,10 +165,56 @@ export async function saveNotes(notes: NotePayload[]): Promise<void> {
   ]);
 }
 
+export async function getNoteDetail(
+  noteId: string
+): Promise<NotePayload | undefined> {
+  const db = await getDB();
+  return db.get("notes", noteId);
+}
+
+export async function saveNoteDetail(note: NotePayload): Promise<void> {
+  const db = await getDB();
+  await db.put("notes", { ...note, _localUpdatedAt: Date.now() });
+}
+
+export async function deleteNoteDetail(noteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("notes", noteId);
+}
+
+export async function deleteNoteSummary(noteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("noteSummaries", noteId);
+}
+
 // Get notes for a specific authenticated user (for stale-while-revalidate cache)
 export async function getUserNotes(userId: string): Promise<NotePayload[]> {
   const db = await getDB();
   return db.getAllFromIndex("notes", "by-userId", userId);
+}
+
+export async function getUserNoteSummaries(
+  userId: string
+): Promise<NoteSummaryPayload[]> {
+  const db = await getDB();
+  const summaries = await db.getAllFromIndex(
+    "noteSummaries",
+    "by-userId",
+    userId
+  );
+
+  if (summaries.length > 0) {
+    return summaries;
+  }
+
+  const legacyNotes = await getUserNotes(userId);
+  if (legacyNotes.length === 0) {
+    return [];
+  }
+
+  const derived = legacyNotes.map(deriveNoteSummary);
+  await saveUserNoteSummaries(userId, derived);
+  return derived;
 }
 
 function shouldUpsertUserNote(
@@ -145,6 +236,60 @@ function shouldUpsertUserNote(
     existing.checklist.length !== note.checklist.length ||
     existing.attachments.length !== note.attachments.length
   );
+}
+
+function shouldUpsertUserNoteSummary(
+  existing:
+    | (NoteSummaryPayload & { _localUpdatedAt?: number })
+    | undefined,
+  summary: NoteSummaryPayload
+): boolean {
+  if (!existing) return true;
+
+  return (
+    existing.updatedAt !== summary.updatedAt ||
+    existing.createdAt !== summary.createdAt ||
+    existing.title !== summary.title ||
+    existing.preview !== summary.preview ||
+    existing.pinned !== summary.pinned ||
+    existing.archived !== summary.archived ||
+    existing.trashed !== summary.trashed ||
+    existing.dueAt !== summary.dueAt ||
+    existing.tags.length !== summary.tags.length ||
+    existing.checklistCompletedCount !== summary.checklistCompletedCount ||
+    existing.checklistTotalCount !== summary.checklistTotalCount ||
+    existing.firstImage?.id !== summary.firstImage?.id ||
+    existing.firstImage?.data !== summary.firstImage?.data
+  );
+}
+
+export async function saveUserNoteSummaries(
+  userId: string,
+  summaries: NoteSummaryPayload[]
+): Promise<void> {
+  const db = await getDB();
+  const tx = db.transaction("noteSummaries", "readwrite");
+  const index = tx.store.index("by-userId");
+  const timestamp = Date.now();
+  const existingSummaries = await index.getAll(userId);
+  const existingById = new Map(
+    existingSummaries.map((summary) => [summary.id, summary])
+  );
+  const incomingIds = new Set(summaries.map((summary) => summary.id));
+
+  for (const existing of existingSummaries) {
+    if (!incomingIds.has(existing.id)) {
+      await tx.store.delete(existing.id);
+    }
+  }
+
+  for (const summary of summaries) {
+    if (shouldUpsertUserNoteSummary(existingById.get(summary.id), summary)) {
+      await tx.store.put({ ...summary, _localUpdatedAt: timestamp });
+    }
+  }
+
+  await tx.done;
 }
 
 // Save notes for authenticated user with diff-based writes.

@@ -15,17 +15,25 @@ import { useAutosave } from "./useAutosave";
 import type {
   NotePayload,
   NoteRevisionPayload,
+  NoteSummaryPayload,
   SectionKey,
 } from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
 import { buildNewNote } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
 import { apiRequest } from "@/lib/api-client";
+import {
+  deleteNoteDetail,
+  getAllNotes,
+  getNoteDetail,
+  saveNoteDetail,
+} from "@/lib/indexeddb";
 import { useSSE } from "@/lib/use-sse";
 
 
 type PaginatedNotesResponse = {
-  notes: NotePayload[];
+  notes: NoteSummaryPayload[];
   nextCursor: string | null;
   hasMore: boolean;
 };
@@ -78,8 +86,8 @@ export const useNoteApp = () => {
   } = useAccent();
 
   // Server actions
-  const fetchNotesFromServer = useCallback(async () => {
-    const allNotes: NotePayload[] = [];
+  const fetchNoteSummariesFromServer = useCallback(async () => {
+    const allNotes: NoteSummaryPayload[] = [];
     let cursor: string | null = null;
 
     while (true) {
@@ -91,7 +99,9 @@ export const useNoteApp = () => {
         params.set("cursor", cursor);
       }
 
-      const response = await apiRequest<NotePayload[] | PaginatedNotesResponse>(
+      const response = await apiRequest<
+        NoteSummaryPayload[] | PaginatedNotesResponse
+      >(
         `/api/notes?${params.toString()}`,
         {
           cache: "no-store",
@@ -113,6 +123,12 @@ export const useNoteApp = () => {
     }
 
     return allNotes;
+  }, []);
+
+  const fetchNoteFromServer = useCallback(async (id: string) => {
+    return apiRequest<NotePayload>(`/api/notes/${id}`, {
+      cache: "no-store",
+    });
   }, []);
 
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
@@ -142,6 +158,30 @@ export const useNoteApp = () => {
     await apiRequest(`/api/notes/${id}`, { method: "DELETE" });
   }, []);
 
+  const getGuestLocalStorageNotes = useCallback((): NotePayload[] => {
+    if (typeof window === "undefined") return [];
+    try {
+      const rawNotes = window.localStorage?.getItem(storageKey);
+      const parsed = rawNotes ? JSON.parse(rawNotes) : [];
+      return Array.isArray(parsed) ? (parsed as NotePayload[]) : [];
+    } catch (error) {
+      console.error("Failed to read local notes", error);
+      return [];
+    }
+  }, [storageKey]);
+
+  const writeGuestLocalStorageNotes = useCallback(
+    (nextNotes: NotePayload[]) => {
+      if (typeof window === "undefined") return;
+      try {
+        window.localStorage?.setItem(storageKey, JSON.stringify(nextNotes));
+      } catch (error) {
+        console.error("Failed to persist local notes", error);
+      }
+    },
+    [storageKey]
+  );
+
   // Data loading
   const {
     notes,
@@ -153,7 +193,7 @@ export const useNoteApp = () => {
     isAuthenticated,
     storageKey,
     {
-      fetchNotesFromServer,
+      fetchNoteSummariesFromServer,
     },
     userId
   );
@@ -170,6 +210,67 @@ export const useNoteApp = () => {
     notes,
     filterCriteria,
     customOrder
+  );
+
+  const openNote = useCallback(
+    async (summary: NoteSummaryPayload) => {
+      try {
+        if (isAuthenticated) {
+          const cached = await getNoteDetail(summary.id);
+          if (cached && cached.updatedAt === summary.updatedAt) {
+            setCurrentNote(cached);
+            setShowSidebar(false);
+            return;
+          }
+
+          try {
+            const fullNote = await fetchNoteFromServer(summary.id);
+            await saveNoteDetail(fullNote);
+            setCurrentNote(fullNote);
+            setShowSidebar(false);
+          } catch (error) {
+            if (!cached) {
+              throw error;
+            }
+
+            setCurrentNote(cached);
+            setShowSidebar(false);
+            toast.info("Opened cached note", {
+              description: "Showing the last saved local copy.",
+            });
+          }
+          return;
+        }
+
+        const cached = await getNoteDetail(summary.id).catch(() => undefined);
+        if (cached) {
+          setCurrentNote(cached);
+          setShowSidebar(false);
+          return;
+        }
+
+        const localNote = getGuestLocalStorageNotes().find(
+          (note) => note.id === summary.id
+        );
+        if (localNote) {
+          setCurrentNote(localNote);
+          setShowSidebar(false);
+          return;
+        }
+
+        toast.error("Unable to open note. The full note was not found locally.");
+      } catch (error) {
+        console.error("Failed to open note", error);
+        toast.error("Failed to open note. Please try again.");
+      }
+    },
+    [
+      fetchNoteFromServer,
+      getGuestLocalStorageNotes,
+      isAuthenticated,
+      setCurrentNote,
+      setShowSidebar,
+    ]
   );
 
   // Notes operations
@@ -233,7 +334,7 @@ export const useNoteApp = () => {
       // Only add if not already in list (to avoid duplicates from own actions)
       setNotes((prev) => {
         if (prev.some((n) => n.id === noteId)) return prev;
-        return [data as NotePayload, ...prev];
+        return [deriveNoteSummary(data as NotePayload), ...prev];
       });
     },
     [setNotes]
@@ -246,9 +347,10 @@ export const useNoteApp = () => {
         const index = prev.findIndex((n) => n.id === noteId);
         if (index === -1) return prev;
         const next = [...prev];
-        next[index] = { ...next[index], ...data };
+        next[index] = deriveNoteSummary(data as NotePayload);
         return next;
       });
+      void saveNoteDetail(data as NotePayload);
     },
     [setNotes]
   );
@@ -260,6 +362,7 @@ export const useNoteApp = () => {
       if (currentNoteIdRef.current === noteId) {
         setCurrentNote(null);
       }
+      void deleteNoteDetail(noteId);
     },
     [setNotes, setCurrentNote]
   );
@@ -359,14 +462,15 @@ export const useNoteApp = () => {
     };
 
     const applyLocal = (note: NotePayload) => {
+      const summary = deriveNoteSummary(note);
       setNotes((prev) => {
-        const existingIndex = prev.findIndex((n) => n.id === note.id);
+        const existingIndex = prev.findIndex((n) => n.id === summary.id);
         if (existingIndex >= 0) {
           const next = [...prev];
-          next[existingIndex] = note;
+          next[existingIndex] = summary;
           return next;
         }
-        return [note, ...prev];
+        return [summary, ...prev];
       });
     };
 
@@ -391,6 +495,7 @@ export const useNoteApp = () => {
           ? await updateNoteOnServer(baseNote.id, payload)
           : await createNoteOnServer(baseNote);
         applyLocal(saved);
+        await saveNoteDetail(saved);
         clearDraft(baseNote.id);
         setCurrentNote(null);
         toast.success(exists ? "Note updated" : "Note created");
@@ -408,6 +513,21 @@ export const useNoteApp = () => {
       }
     } else {
       applyLocal(baseNote);
+      try {
+        await saveNoteDetail(baseNote);
+        const localNotes = await getAllNotes();
+        writeGuestLocalStorageNotes(localNotes);
+      } catch {
+        const localNotes = getGuestLocalStorageNotes();
+        const existingIndex = localNotes.findIndex((note) => note.id === baseNote.id);
+        const nextNotes = [...localNotes];
+        if (existingIndex >= 0) {
+          nextNotes[existingIndex] = baseNote;
+        } else {
+          nextNotes.unshift(baseNote);
+        }
+        writeGuestLocalStorageNotes(nextNotes);
+      }
       clearDraft(baseNote.id);
       setCurrentNote(null);
     }
@@ -423,6 +543,8 @@ export const useNoteApp = () => {
     userId,
     setNotes,
     setCurrentNote,
+    getGuestLocalStorageNotes,
+    writeGuestLocalStorageNotes,
   ]);
 
   return {
@@ -437,6 +559,7 @@ export const useNoteApp = () => {
     sortedNotes,
     currentNote,
     setCurrentNote,
+    openNote,
     showSidebar,
     setShowSidebar,
     sortBy,

@@ -18,6 +18,23 @@ import { emitNoteEvent } from "@/lib/note-events";
 
 type ParamsPromise = Promise<{ id: string }>;
 
+export const GET = withAuthAndParams<ParamsPromise>(
+  async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    const note = await prisma.note.findUnique({
+      where: { id },
+      select: noteSelect,
+    });
+
+    if (!note || note.userId !== userId) {
+      logger.warn("Note detail fetch failed: note not found", { noteId: id });
+      return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
+    }
+
+    return successResponse(serializeNote(note), 200, rateLimitHeaders, requestId);
+  },
+  { rateLimitSuffix: "notes-detail-get" }
+);
+
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
   async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
     // Read existing note inside the transaction to reduce DB round-trips

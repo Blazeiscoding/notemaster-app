@@ -2,7 +2,7 @@
 /* eslint-disable react-hooks/incompatible-library */
 import { useRef, useMemo, useState, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { NotePayload } from "@/types/note";
+import type { NoteSummaryPayload } from "@/types/note";
 
 const VIRTUAL_SCROLL_THRESHOLD = 50;
 
@@ -18,7 +18,7 @@ const getColumnsCount = (): number => {
   return 1; // mobile
 };
 
-export function useVirtualizedGrid(notes: NotePayload[]) {
+export function useVirtualizedGrid(notes: NoteSummaryPayload[]) {
   "use no memo";
 
   const parentRef = useRef<HTMLDivElement>(null);
@@ -45,7 +45,7 @@ export function useVirtualizedGrid(notes: NotePayload[]) {
   // Group notes into rows for virtual scrolling
   const rows = useMemo(() => {
     if (!shouldVirtualize) return [];
-    const rows: NotePayload[][] = [];
+    const rows: NoteSummaryPayload[][] = [];
     for (let i = 0; i < notes.length; i += columnsCount) {
       rows.push(notes.slice(i, i + columnsCount));
     }
