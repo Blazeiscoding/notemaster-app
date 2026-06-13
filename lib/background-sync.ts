@@ -132,7 +132,7 @@ export function initBackgroundSync(): () => void {
       await processSyncQueue();
     },
     () => {
-      // Operations will be queued automatically when offline
+      // Writes are queued by the note actions while offline.
     }
   );
 }

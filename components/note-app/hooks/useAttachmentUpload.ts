@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { generateId } from "@/components/note-app/util";
 import { compressImage, needsCompression } from "@/lib/image-utils";
 import type { Attachment } from "@/types/note";
+import type { ApiResponse } from "@/lib/api-middleware";
 
 interface ImageKitUploadResult {
   fileId: string;
@@ -81,10 +82,20 @@ export function useAttachmentUpload() {
       // Step 2: Fetch auth parameters
       const authResponse = await fetch("/api/auth/imagekit");
       if (!authResponse.ok) {
+        if (authResponse.status === 401) {
+          throw new Error("Sign in to upload images");
+        }
         throw new Error("Failed to fetch authentication parameters");
       }
-      const authData = await authResponse.json();
-      const { token, signature, expire } = authData;
+      const authData = (await authResponse.json()) as ApiResponse<{
+        token: string;
+        signature: string;
+        expire: number;
+      }>;
+      const { token, signature, expire } = authData.data ?? {};
+      if (!token || !signature || !expire) {
+        throw new Error("Upload authentication is unavailable");
+      }
 
       // Step 3: Upload compressed files
       const ImageKit = (await import("imagekit-javascript")).default;
@@ -132,6 +143,9 @@ export function useAttachmentUpload() {
       return attachments;
     } catch (error) {
       console.error("Failed to upload files:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload files"
+      );
       throw error;
     } finally {
       setIsUploading(false);

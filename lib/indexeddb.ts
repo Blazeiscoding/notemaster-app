@@ -54,6 +54,15 @@ interface NoteMasterDB extends DBSchema {
 }
 
 let dbPromise: Promise<IDBPDatabase<NoteMasterDB>> | null = null;
+const SYNC_QUEUE_EVENT = "notemaster:sync-queue-changed";
+
+function notifySyncQueueChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(SYNC_QUEUE_EVENT));
+  }
+}
+
+export const syncQueueChangedEvent = SYNC_QUEUE_EVENT;
 
 // Get or create database connection
 function getDB(): Promise<IDBPDatabase<NoteMasterDB>> {
@@ -328,6 +337,33 @@ export async function addToPendingSync(
   operation: Omit<SyncOperation, "id" | "timestamp" | "retries">
 ): Promise<void> {
   const db = await getDB();
+  const existingOps = await db.getAllFromIndex("pendingSync", "by-timestamp");
+  const existing = existingOps.find(
+    (op) => op.entity === operation.entity && op.entityId === operation.entityId
+  );
+
+  if (existing) {
+    if (existing.type === "create" && operation.type === "delete") {
+      await db.delete("pendingSync", existing.id);
+      return;
+    }
+
+    const nextType =
+      existing.type === "create" && operation.type === "update"
+        ? "create"
+        : operation.type;
+
+    await db.put("pendingSync", {
+      ...existing,
+      type: nextType,
+      data: operation.data,
+      timestamp: Date.now(),
+      retries: 0,
+    });
+    notifySyncQueueChanged();
+    return;
+  }
+
   const syncOp: SyncOperation = {
     ...operation,
     id: `${operation.entity}-${operation.entityId}-${Date.now()}`,
@@ -335,6 +371,7 @@ export async function addToPendingSync(
     retries: 0,
   };
   await db.put("pendingSync", syncOp);
+  notifySyncQueueChanged();
 }
 
 export async function getPendingSyncOperations(): Promise<SyncOperation[]> {
@@ -345,6 +382,7 @@ export async function getPendingSyncOperations(): Promise<SyncOperation[]> {
 export async function removePendingSync(id: string): Promise<void> {
   const db = await getDB();
   await db.delete("pendingSync", id);
+  notifySyncQueueChanged();
 }
 
 export async function updatePendingSyncRetry(id: string): Promise<void> {
@@ -353,6 +391,7 @@ export async function updatePendingSyncRetry(id: string): Promise<void> {
   if (op) {
     op.retries += 1;
     await db.put("pendingSync", op);
+    notifySyncQueueChanged();
   }
 }
 

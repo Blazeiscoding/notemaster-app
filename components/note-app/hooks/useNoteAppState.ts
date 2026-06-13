@@ -11,37 +11,23 @@ import { useNoteData } from "./useNoteData";
 import { useNoteFiltering } from "./useNoteFiltering";
 import { useUnsavedChangesWarning } from "./useUnsavedChangesWarning";
 import { useAutosave } from "./useAutosave";
-
-import type {
-  NotePayload,
-  NoteRevisionPayload,
-  NoteSummaryPayload,
-  SectionKey,
-} from "@/types/note";
+import { useNoteServerActions } from "./useNoteServerActions";
+import { useSharedNoteImport } from "./useSharedNoteImport";
+import type { NotePayload, NoteSummaryPayload, SectionKey } from "@/types/note";
 import { deriveNoteSummary } from "@/types/note";
 import { buildNewNote } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
-import { apiRequest } from "@/lib/api-client";
+import { useSSE } from "@/lib/use-sse";
+import { addToPendingSync } from "@/lib/indexeddb";
 import {
   deleteNoteDetail,
-  getAllNotes,
   getNoteDetail,
   saveNoteDetail,
 } from "@/lib/indexeddb";
-import { useSSE } from "@/lib/use-sse";
-
-
-type PaginatedNotesResponse = {
-  notes: NoteSummaryPayload[];
-  nextCursor: string | null;
-  hasMore: boolean;
-};
-
-const NOTES_PAGE_SIZE = 100;
+import { isOnline } from "@/lib/background-sync";
 
 export const useNoteApp = () => {
-  // User and authentication
   const { user } = useUser();
   const userFirstName =
     (user as { firstName?: string } | null)?.firstName ?? null;
@@ -49,7 +35,6 @@ export const useNoteApp = () => {
   const isAuthenticated = Boolean(userId);
   const storageKey = `notemaster-notes-${userId ?? "guest"}`;
 
-  // UI state
   const [currentNote, setCurrentNote] = useState<NotePayload | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSidebar, setShowSidebar] = useState(false);
@@ -63,16 +48,14 @@ export const useNoteApp = () => {
     if (typeof window === "undefined") return [];
     try {
       const stored = window.localStorage?.getItem(NOTE_ORDER_STORAGE_KEY);
-      if (!stored) return [];
-      const parsed = JSON.parse(stored) as string[];
-      if (Array.isArray(parsed)) return parsed;
+      const parsed = stored ? (JSON.parse(stored) as string[]) : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       console.error("Failed to read note order", error);
+      return [];
     }
-    return [];
   });
 
-  // Extract hooks
   const { darkMode, setDarkMode } = useTheme();
   const { canInstall, installApp, showIosInstallTip, setShowIosInstallTip } =
     usePWA();
@@ -84,103 +67,7 @@ export const useNoteApp = () => {
     handleSelectAccent,
     accentPalettes,
   } = useAccent();
-
-  // Server actions
-  const fetchNoteSummariesFromServer = useCallback(async () => {
-    const allNotes: NoteSummaryPayload[] = [];
-    let cursor: string | null = null;
-
-    while (true) {
-      const params = new URLSearchParams({
-        limit: String(NOTES_PAGE_SIZE),
-      });
-
-      if (cursor) {
-        params.set("cursor", cursor);
-      }
-
-      const response = await apiRequest<
-        NoteSummaryPayload[] | PaginatedNotesResponse
-      >(
-        `/api/notes?${params.toString()}`,
-        {
-          cache: "no-store",
-        }
-      );
-
-      // Backward-compatible fallback in case server returns a plain array.
-      if (Array.isArray(response)) {
-        return response;
-      }
-
-      allNotes.push(...response.notes);
-
-      if (!response.hasMore || !response.nextCursor) {
-        break;
-      }
-
-      cursor = response.nextCursor;
-    }
-
-    return allNotes;
-  }, []);
-
-  const fetchNoteFromServer = useCallback(async (id: string) => {
-    return apiRequest<NotePayload>(`/api/notes/${id}`, {
-      cache: "no-store",
-    });
-  }, []);
-
-  const fetchRevisionsFromServer = useCallback(async (id: string) => {
-    return apiRequest<NoteRevisionPayload[]>(`/api/notes/${id}/revisions`, {
-      cache: "no-store",
-    });
-  }, []);
-
-  const createNoteOnServer = useCallback(async (note: NotePayload) => {
-    return apiRequest<NotePayload>("/api/notes", {
-      method: "POST",
-      body: JSON.stringify(note),
-    });
-  }, []);
-
-  const updateNoteOnServer = useCallback(
-    async (id: string, updates: Partial<NotePayload>) => {
-      return apiRequest<NotePayload>(`/api/notes/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify(updates),
-      });
-    },
-    []
-  );
-
-  const deleteNoteOnServer = useCallback(async (id: string) => {
-    await apiRequest(`/api/notes/${id}`, { method: "DELETE" });
-  }, []);
-
-  const getGuestLocalStorageNotes = useCallback((): NotePayload[] => {
-    if (typeof window === "undefined") return [];
-    try {
-      const rawNotes = window.localStorage?.getItem(storageKey);
-      const parsed = rawNotes ? JSON.parse(rawNotes) : [];
-      return Array.isArray(parsed) ? (parsed as NotePayload[]) : [];
-    } catch (error) {
-      console.error("Failed to read local notes", error);
-      return [];
-    }
-  }, [storageKey]);
-
-  const writeGuestLocalStorageNotes = useCallback(
-    (nextNotes: NotePayload[]) => {
-      if (typeof window === "undefined") return;
-      try {
-        window.localStorage?.setItem(storageKey, JSON.stringify(nextNotes));
-      } catch (error) {
-        console.error("Failed to persist local notes", error);
-      }
-    },
-    [storageKey]
-  );
+  const serverActions = useNoteServerActions();
 
   // Data loading
   const {
@@ -193,18 +80,20 @@ export const useNoteApp = () => {
     isAuthenticated,
     storageKey,
     {
-      fetchNoteSummariesFromServer,
+      fetchNoteSummariesFromServer: serverActions.fetchNoteSummariesFromServer,
     },
     userId
   );
 
-  // Note filtering and sorting
-  const filterCriteria = useMemo(() => ({
-    section: activeSection,
-    search: searchQuery,
-    tag: filterTag,
-    sortBy,
-  }), [activeSection, searchQuery, filterTag, sortBy]);
+  const filterCriteria = useMemo(
+    () => ({
+      section: activeSection,
+      search: searchQuery,
+      tag: filterTag,
+      sortBy,
+    }),
+    [activeSection, searchQuery, filterTag, sortBy]
+  );
 
   const { sortedNotes, allTags, sectionCounts } = useNoteFiltering(
     notes,
@@ -224,7 +113,7 @@ export const useNoteApp = () => {
           }
 
           try {
-            const fullNote = await fetchNoteFromServer(summary.id);
+            const fullNote = await serverActions.fetchNoteFromServer(summary.id);
             await saveNoteDetail(fullNote);
             setCurrentNote(fullNote);
             setShowSidebar(false);
@@ -249,15 +138,6 @@ export const useNoteApp = () => {
           return;
         }
 
-        const localNote = getGuestLocalStorageNotes().find(
-          (note) => note.id === summary.id
-        );
-        if (localNote) {
-          setCurrentNote(localNote);
-          setShowSidebar(false);
-          return;
-        }
-
         toast.error("Unable to open note. The full note was not found locally.");
       } catch (error) {
         console.error("Failed to open note", error);
@@ -265,8 +145,7 @@ export const useNoteApp = () => {
       }
     },
     [
-      fetchNoteFromServer,
-      getGuestLocalStorageNotes,
+      serverActions,
       isAuthenticated,
       setCurrentNote,
       setShowSidebar,
@@ -278,19 +157,31 @@ export const useNoteApp = () => {
     { notes, setNotes, currentNote, setCurrentNote },
     isAuthenticated,
     {
-      updateNoteOnServer,
-      deleteNoteOnServer,
+      updateNoteOnServer: serverActions.updateNoteOnServer,
+      deleteNoteOnServer: serverActions.deleteNoteOnServer,
     }
   );
 
-  // Current note editing
   const currentNoteHook = useCurrentNote({ currentNote, setCurrentNote });
-
-  // Unsaved changes warning (beforeunload + dirty tracking)
   const { hasUnsavedChanges } = useUnsavedChangesWarning(currentNote);
+  const { clearDraft } = useAutosave(currentNote, {
+    onRestore: setCurrentNote,
+  });
 
-  // Close confirmation state
+  const revisionsHook = useNoteRevisions(
+    { setNotes, setCurrentNote },
+    isAuthenticated,
+    {
+      fetchRevisionsFromServer: serverActions.fetchRevisionsFromServer,
+    }
+  );
+
   const [showCloseConfirmation, setShowCloseConfirmation] = useState(false);
+  const currentNoteIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    currentNoteIdRef.current = currentNote?.id ?? null;
+  }, [currentNote?.id]);
 
   const handleCloseEditor = useCallback(() => {
     if (hasUnsavedChanges()) {
@@ -298,40 +189,160 @@ export const useNoteApp = () => {
     } else {
       setCurrentNote(null);
     }
-  }, [hasUnsavedChanges, setCurrentNote]);
+  }, [hasUnsavedChanges]);
 
   const confirmClose = useCallback(() => {
     setShowCloseConfirmation(false);
     setCurrentNote(null);
-  }, [setCurrentNote]);
+  }, []);
 
   const cancelClose = useCallback(() => {
     setShowCloseConfirmation(false);
   }, []);
 
-  // Autosave drafts to IndexedDB
-  const { clearDraft } = useAutosave(currentNote, {
-    onRestore: setCurrentNote,
-  });
+  const createNote = useCallback(() => {
+    setActiveSection("notes");
+    hapticLight();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    setCurrentNote(buildNewNote(ownerId));
+    setShowSidebar(false);
+  }, [isAuthenticated, userId]);
 
-  // Revisions
-  const revisionsHook = useNoteRevisions(
-    { setNotes, setCurrentNote },
-    isAuthenticated,
-    {
-      fetchRevisionsFromServer,
-    }
+  const createNoteFromShare = useCallback(
+    (title: string, content: string) => {
+      setActiveSection("notes");
+      hapticLight();
+      const ownerId = isAuthenticated && userId ? userId : null;
+      setCurrentNote(
+        buildNewNote(ownerId, { title, content, tags: ["shared"] })
+      );
+      setShowSidebar(false);
+    },
+    [isAuthenticated, userId]
   );
 
-  const currentNoteIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    currentNoteIdRef.current = currentNote?.id ?? null;
-  }, [currentNote?.id]);
+  useSharedNoteImport(createNoteFromShare);
+
+  const applyLocal = useCallback((note: NotePayload) => {
+    const summary = deriveNoteSummary(note);
+    setNotes((prev) => {
+      const existingIndex = prev.findIndex((n) => n.id === summary.id);
+      if (existingIndex >= 0) {
+        const next = [...prev];
+        next[existingIndex] = summary;
+        return next;
+      }
+      return [summary, ...prev];
+    });
+  }, [setNotes]);
+
+  const saveCurrentNote = useCallback(async () => {
+    if (!currentNote) return;
+
+    const hasContent =
+      Boolean(currentNote.title?.trim()) ||
+      Boolean(currentNote.content?.trim()) ||
+      currentNote.checklist.length > 0 ||
+      currentNote.attachments.length > 0;
+
+    if (!hasContent) return;
+
+    setIsSavingNote(true);
+
+    const updatedAt = new Date().toISOString();
+    const ownerId = isAuthenticated && userId ? userId : null;
+    const baseNote: NotePayload = {
+      ...currentNote,
+      userId: ownerId,
+      updatedAt,
+      dueAt: currentNote.dueAt ?? null,
+    };
+    const exists = notes.some((n) => n.id === baseNote.id);
+
+    if (!isAuthenticated) {
+      applyLocal(baseNote);
+      await saveNoteDetail(baseNote);
+      clearDraft(baseNote.id);
+      setCurrentNote(null);
+      setIsSavingNote(false);
+      return;
+    }
+
+    if (!isOnline()) {
+      applyLocal(baseNote);
+      await addToPendingSync({
+        type: exists ? "update" : "create",
+        entity: "note",
+        entityId: baseNote.id,
+        data: baseNote,
+      });
+      clearDraft(baseNote.id);
+      setCurrentNote(null);
+      setIsSavingNote(false);
+      toast.success(exists ? "Note updated and queued for sync" : "Note created and queued for sync");
+      return;
+    }
+
+    try {
+      const payload: Partial<NotePayload> = {
+        title: baseNote.title,
+        content: baseNote.content,
+        tags: baseNote.tags,
+        checklist: baseNote.checklist,
+        attachments: baseNote.attachments,
+        pinned: baseNote.pinned,
+        archived: baseNote.archived,
+        trashed: baseNote.trashed,
+        dueAt: baseNote.dueAt,
+        updatedAt: baseNote.updatedAt,
+      };
+
+      const saved = exists
+        ? await serverActions.updateNoteOnServer(baseNote.id, payload)
+        : await serverActions.createNoteOnServer(baseNote);
+      applyLocal(saved);
+      await saveNoteDetail(saved);
+      clearDraft(baseNote.id);
+      setCurrentNote(null);
+      toast.success(exists ? "Note updated" : "Note created");
+    } catch (error) {
+      console.error("Failed to save note", error);
+      if (error instanceof TypeError || error instanceof DOMException) {
+        applyLocal(baseNote);
+        await addToPendingSync({
+          type: exists ? "update" : "create",
+          entity: "note",
+          entityId: baseNote.id,
+          data: baseNote,
+        });
+        clearDraft(baseNote.id);
+        setCurrentNote(null);
+        toast.success(exists ? "Note updated and queued for sync" : "Note created and queued for sync");
+      } else {
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to save note";
+        toast.error(
+          errorMessage.includes("Too many requests")
+            ? "Too many requests. Please wait a moment and try again."
+            : errorMessage
+        );
+      }
+    } finally {
+      setIsSavingNote(false);
+    }
+  }, [
+    applyLocal,
+    clearDraft,
+    currentNote,
+    isAuthenticated,
+    notes,
+    serverActions,
+    userId,
+  ]);
 
   const handleSseNoteCreated = useCallback(
     (noteId: string, data?: Partial<NotePayload>) => {
       if (!data) return;
-      // Only add if not already in list (to avoid duplicates from own actions)
       setNotes((prev) => {
         if (prev.some((n) => n.id === noteId)) return prev;
         return [deriveNoteSummary(data as NotePayload), ...prev];
@@ -358,194 +369,34 @@ export const useNoteApp = () => {
   const handleSseNoteDeleted = useCallback(
     (noteId: string) => {
       setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      // Close editor if the deleted note was being edited
       if (currentNoteIdRef.current === noteId) {
         setCurrentNote(null);
       }
       void deleteNoteDetail(noteId);
     },
-    [setNotes, setCurrentNote]
+    [setNotes]
   );
 
-  const sseHandlers = useMemo(
-    () => ({
-      onNoteCreated: handleSseNoteCreated,
-      onNoteUpdated: handleSseNoteUpdated,
-      onNoteDeleted: handleSseNoteDeleted,
-    }),
-    [handleSseNoteCreated, handleSseNoteDeleted, handleSseNoteUpdated]
+  useSSE(
+    useMemo(
+      () => ({
+        onNoteCreated: handleSseNoteCreated,
+        onNoteUpdated: handleSseNoteUpdated,
+        onNoteDeleted: handleSseNoteDeleted,
+      }),
+      [handleSseNoteCreated, handleSseNoteDeleted, handleSseNoteUpdated]
+    ),
+    { enabled: isAuthenticated }
   );
 
-  // Real-time updates via SSE (only when authenticated)
-  useSSE(sseHandlers, { enabled: isAuthenticated });
-
-  // Close editor when switching away from notes section
   useEffect(() => {
     if (activeSection !== "notes" && currentNote) {
-      // Use setTimeout to avoid synchronous setState in effect
       const timer = setTimeout(() => {
         setCurrentNote(null);
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [activeSection, currentNote, setCurrentNote]);
-
-  // Create and save note handlers
-  const createNote = useCallback(() => {
-    setActiveSection("notes");
-    hapticLight();
-    const ownerId = isAuthenticated && userId ? userId : null;
-    setCurrentNote(buildNewNote(ownerId));
-    setShowSidebar(false);
-  }, [
-    isAuthenticated,
-    userId,
-    setCurrentNote,
-    setActiveSection,
-    setShowSidebar,
-  ]);
-
-  // Create note from PWA share target
-  const createNoteFromShare = useCallback((title: string, content: string) => {
-    setActiveSection("notes");
-    hapticLight();
-    const ownerId = isAuthenticated && userId ? userId : null;
-    setCurrentNote(buildNewNote(ownerId, { title, content, tags: ["shared"] }));
-    setShowSidebar(false);
-  }, [isAuthenticated, userId, setCurrentNote, setActiveSection, setShowSidebar]);
-
-  // Check for shared note from PWA share target on mount
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    
-    try {
-      const sharedNoteRaw = sessionStorage.getItem("notemaster-shared-note");
-      if (sharedNoteRaw) {
-        sessionStorage.removeItem("notemaster-shared-note");
-        const sharedNote = JSON.parse(sharedNoteRaw) as { title: string; content: string };
-        if (sharedNote.title || sharedNote.content) {
-          // Small delay to ensure app is fully loaded
-          setTimeout(() => {
-            createNoteFromShare(sharedNote.title || "Shared Note", sharedNote.content || "");
-          }, 500);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to process shared note:", error);
-    }
-  }, [createNoteFromShare]);
-
-  const saveCurrentNote = useCallback(async () => {
-    if (!currentNote) {
-      return;
-    }
-
-    const hasContent =
-      Boolean(currentNote.title?.trim()) ||
-      Boolean(currentNote.content?.trim()) ||
-      currentNote.checklist.length > 0 ||
-      currentNote.attachments.length > 0;
-
-    if (!hasContent) {
-      return;
-    }
-
-    setIsSavingNote(true);
-
-    const updatedAt = new Date().toISOString();
-    const ownerId = isAuthenticated && userId ? userId : null;
-    const baseNote: NotePayload = {
-      ...currentNote,
-      userId: ownerId,
-      updatedAt,
-      dueAt: currentNote.dueAt ?? null,
-    };
-
-    const applyLocal = (note: NotePayload) => {
-      const summary = deriveNoteSummary(note);
-      setNotes((prev) => {
-        const existingIndex = prev.findIndex((n) => n.id === summary.id);
-        if (existingIndex >= 0) {
-          const next = [...prev];
-          next[existingIndex] = summary;
-          return next;
-        }
-        return [summary, ...prev];
-      });
-    };
-
-    const exists = notes.some((n) => n.id === baseNote.id);
-
-    if (isAuthenticated) {
-      try {
-        const payload: Partial<NotePayload> = {
-          title: baseNote.title,
-          content: baseNote.content,
-          tags: baseNote.tags,
-          checklist: baseNote.checklist,
-          attachments: baseNote.attachments,
-          pinned: baseNote.pinned,
-          archived: baseNote.archived,
-          trashed: baseNote.trashed,
-          dueAt: baseNote.dueAt,
-          updatedAt: baseNote.updatedAt,
-        };
-
-        const saved = exists
-          ? await updateNoteOnServer(baseNote.id, payload)
-          : await createNoteOnServer(baseNote);
-        applyLocal(saved);
-        await saveNoteDetail(saved);
-        clearDraft(baseNote.id);
-        setCurrentNote(null);
-        toast.success(exists ? "Note updated" : "Note created");
-      } catch (error) {
-        console.error("Failed to save note", error);
-        const errorMessage =
-          error instanceof Error ? error.message : "Failed to save note";
-        if (errorMessage.includes("Too many requests")) {
-          toast.error("Too many requests. Please wait a moment and try again.");
-        } else {
-          toast.error("Failed to save note. Please try again.");
-        }
-        setIsSavingNote(false);
-        return;
-      }
-    } else {
-      applyLocal(baseNote);
-      try {
-        await saveNoteDetail(baseNote);
-        const localNotes = await getAllNotes();
-        writeGuestLocalStorageNotes(localNotes);
-      } catch {
-        const localNotes = getGuestLocalStorageNotes();
-        const existingIndex = localNotes.findIndex((note) => note.id === baseNote.id);
-        const nextNotes = [...localNotes];
-        if (existingIndex >= 0) {
-          nextNotes[existingIndex] = baseNote;
-        } else {
-          nextNotes.unshift(baseNote);
-        }
-        writeGuestLocalStorageNotes(nextNotes);
-      }
-      clearDraft(baseNote.id);
-      setCurrentNote(null);
-    }
-
-    setIsSavingNote(false);
-  }, [
-    currentNote,
-    isAuthenticated,
-    notes,
-    updateNoteOnServer,
-    createNoteOnServer,
-    clearDraft,
-    userId,
-    setNotes,
-    setCurrentNote,
-    getGuestLocalStorageNotes,
-    writeGuestLocalStorageNotes,
-  ]);
+  }, [activeSection, currentNote]);
 
   return {
     isLoading,
@@ -619,6 +470,7 @@ export const useNoteApp = () => {
     revisions: revisionsHook.revisions,
     isRevisionOpen: revisionsHook.isRevisionOpen,
     isLoadingRevisions: revisionsHook.isLoadingRevisions,
+    isRestoringRevision: revisionsHook.isRestoringRevision,
     revisionTargetId: revisionsHook.revisionTargetId,
     handleOpenRevisions: revisionsHook.handleOpenRevisions,
     handleCloseRevisions: revisionsHook.handleCloseRevisions,

@@ -15,6 +15,7 @@ import {
   errorResponse,
 } from "@/lib/api-middleware";
 import { emitNoteEvent } from "@/lib/note-events";
+import { sanitizeId, validateNotePayload } from "@/lib/validation";
 
 type ParamsPromise = Promise<{ id: string }>;
 
@@ -37,7 +38,16 @@ export const GET = withAuthAndParams<ParamsPromise>(
 
 export const PATCH = withAuthJsonAndParams<ParamsPromise>(
   async ({ userId, body, rateLimitHeaders, requestId, logger }, { id }) => {
-    // Read existing note inside the transaction to reduce DB round-trips
+    try {
+      sanitizeId(id);
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
     const existing = await prisma.note.findUnique({
       where: { id },
       select: noteSelect,
@@ -48,7 +58,22 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       return errorResponse("Note not found", 404, rateLimitHeaders, requestId);
     }
 
-    const payload = body as Partial<NotePayload>;
+    let payload: Partial<NotePayload> & Pick<NotePayload, "id">;
+    try {
+      payload = validateNotePayload({ ...(body as object), id }, { partial: true });
+    } catch (error) {
+      logger.warn("Note update failed: invalid payload", {
+        noteId: id,
+        error: error instanceof Error ? error.message : "Invalid payload",
+      });
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid payload",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
     const data: Prisma.NoteUpdateInput = {};
 
     if (typeof payload.title === "string") {
@@ -91,7 +116,7 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       data.trashed = payload.trashed;
     }
 
-    if (typeof payload.dueAt === "string") {
+    if (payload.dueAt !== undefined) {
       data.dueAt = payload.dueAt ? new Date(payload.dueAt) : null;
     }
 
@@ -161,6 +186,17 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
 
 export const DELETE = withAuthAndParams<ParamsPromise>(
   async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    try {
+      sanitizeId(id);
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
     const existing = await prisma.note.findUnique({
       where: { id },
       select: { id: true, userId: true },

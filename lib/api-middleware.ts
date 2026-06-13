@@ -73,7 +73,7 @@ async function middlewareCore<TResult>(
     const rateLimitIdentifier = `${rateLimitSuffix}-${userId}`;
 
     // Apply rate limiting
-    const rateLimitResult = rateLimit(rateLimitIdentifier);
+    const rateLimitResult = await rateLimit(rateLimitIdentifier);
 
     if (!rateLimitResult.success) {
       const logger = createLogger({ requestId, route, method, userId });

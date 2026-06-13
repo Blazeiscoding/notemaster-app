@@ -109,7 +109,8 @@ export const decryptString = (encrypted: string): string => {
     ]);
     return decrypted.toString("utf8");
   } catch (error) {
-    return error instanceof Error ? error.message : "Unknown error";
+    console.error("Failed to decrypt note field", error);
+    return "[Unable to decrypt content]";
   }
 };
 

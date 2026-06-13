@@ -1,13 +1,10 @@
 import type { NotePayload } from "@/types/note";
+import { richTextHtmlToMarkdown, stripHtml } from "@/lib/note-html";
+import { sanitizeRichTextHtml } from "@/lib/validation";
 
 // =====================
 // Shared helpers
 // =====================
-
-/** Strip HTML tags from rich-text content so plain text can be rendered. */
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "");
-}
 
 /** Escape user-derived strings before injecting them into raw HTML. */
 function escapeHtml(str: string): string {
@@ -23,7 +20,7 @@ export function exportNoteToMarkdown(note: NotePayload): string {
   let markdown = `# ${note.title || "Untitled Note"}\n\n`;
   
   if (note.content) {
-    markdown += `${note.content}\n\n`;
+    markdown += `${richTextHtmlToMarkdown(note.content)}\n\n`;
   }
 
   if (note.checklist.length > 0) {
@@ -190,7 +187,7 @@ export function printNote(note: NotePayload): void {
   if (!printWindow) return;
 
   const safeTitle = escapeHtml(note.title || "Untitled Note");
-  const safeContent = note.content.replace(/\n/g, "<br>");
+  const safeContent = sanitizeRichTextHtml(note.content);
 
   const html = `
     <!DOCTYPE html>

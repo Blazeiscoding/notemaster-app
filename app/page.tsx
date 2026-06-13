@@ -15,6 +15,7 @@ import { useNoteApp } from "@/components/note-app/hooks/useNoteAppState";
 import { useKeyboardShortcuts } from "@/components/note-app/hooks/useKeyboardShortcuts";
 import { ErrorState } from "@/components/ErrorState";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { RevisionHistoryModal } from "@/components/notes/RevisionHistoryModal";
 import type { AccentPalette } from "@/types/note";
 
 
@@ -101,6 +102,12 @@ const NoteApp = () => {
     restoreFromBin,
     deleteForever,
     handleOpenRevisions,
+    handleCloseRevisions,
+    handleRestoreRevision,
+    revisions,
+    isRevisionOpen,
+    isLoadingRevisions,
+    isRestoringRevision,
   } = state;
 
   const [showThemePanel, setShowThemePanel] = React.useState(false);
@@ -363,8 +370,17 @@ const NoteApp = () => {
         variant="danger"
       />
 
-      {/* Save Smart Filter Modal */}
-
+      <RevisionHistoryModal
+        open={isRevisionOpen}
+        isLoading={isLoadingRevisions || isRestoringRevision}
+        revisions={revisions}
+        onClose={handleCloseRevisions}
+        onRestore={(revisionId) => {
+          if (currentNote) {
+            void handleRestoreRevision(currentNote.id, revisionId);
+          }
+        }}
+      />
 
       {/* Mobile Bottom Navigation - visible only on mobile */}
       <div className="lg:hidden">

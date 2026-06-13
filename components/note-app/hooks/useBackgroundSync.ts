@@ -6,7 +6,7 @@ import {
   processSyncQueue,
   isOnline,
 } from "@/lib/background-sync";
-import { getPendingSyncCount } from "@/lib/indexeddb";
+import { getPendingSyncCount, syncQueueChangedEvent } from "@/lib/indexeddb";
 
 export type SyncStatus = "idle" | "syncing" | "synced" | "offline" | "error";
 
@@ -86,6 +86,7 @@ export function useBackgroundSync() {
     };
 
     navigator.serviceWorker?.addEventListener("message", handleMessage);
+    window.addEventListener(syncQueueChangedEvent, updatePendingCount);
 
     // Periodic pending count update
     const interval = setInterval(updatePendingCount, 30000);
@@ -96,6 +97,7 @@ export function useBackgroundSync() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       navigator.serviceWorker?.removeEventListener("message", handleMessage);
+      window.removeEventListener(syncQueueChangedEvent, updatePendingCount);
       clearInterval(interval);
     };
   }, [markSyncedThenIdle, triggerSync, updatePendingCount]);

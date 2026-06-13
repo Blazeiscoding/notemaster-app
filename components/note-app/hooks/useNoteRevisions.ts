@@ -26,6 +26,7 @@ export function useNoteRevisions(
   const [revisions, setRevisions] = useState<NoteRevisionPayload[]>([]);
   const [isRevisionOpen, setIsRevisionOpen] = useState(false);
   const [isLoadingRevisions, setIsLoadingRevisions] = useState(false);
+  const [isRestoringRevision, setIsRestoringRevision] = useState(false);
   const [revisionTargetId, setRevisionTargetId] = useState<string | null>(null);
 
   const handleOpenRevisions = useCallback(
@@ -62,6 +63,7 @@ export function useNoteRevisions(
       if (!isAuthenticated) return;
 
       try {
+        setIsRestoringRevision(true);
         const restored = await apiRequest<NotePayload>(
           `/api/notes/${noteId}/revisions`,
           {
@@ -80,6 +82,8 @@ export function useNoteRevisions(
       } catch (error) {
         console.error("Failed to restore revision", error);
         toast.error("Failed to restore revision. Please try again.");
+      } finally {
+        setIsRestoringRevision(false);
       }
     },
     [handleCloseRevisions, isAuthenticated, setNotes, setCurrentNote]
@@ -89,6 +93,7 @@ export function useNoteRevisions(
     revisions,
     isRevisionOpen,
     isLoadingRevisions,
+    isRestoringRevision,
     revisionTargetId,
     handleOpenRevisions,
     handleCloseRevisions,

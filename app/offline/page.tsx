@@ -12,8 +12,8 @@ export default function OfflinePage() {
         </div>
         <h1 className="text-2xl font-semibold text-foreground">You&apos;re offline</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          NoteMaster will reconnect when your network is available. Recently opened notes may
-          still be available from the app cache.
+          NoteMaster can still open cached content and store local changes. Reconnect to sync
+          authenticated notes.
         </p>
         <Button asChild className="mt-6">
           <Link href="/">Back to notes</Link>
