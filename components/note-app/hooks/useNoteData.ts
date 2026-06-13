@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "sonner";
-import type { NotePayload } from "@/types/note";
+import type { NoteSummaryPayload } from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
 import {
   getAllNotes,
-  saveNotes as saveNotesToDB,
   migrateFromLocalStorage,
   isIndexedDBAvailable,
-  getUserNotes,
-  saveUserNotes,
+  getUserNoteSummaries,
+  saveUserNoteSummaries,
 } from "@/lib/indexeddb";
 
 // Cache keys for stale-while-revalidate pattern
@@ -15,7 +15,7 @@ const CACHE_TIMESTAMP_PREFIX = "last-server-fetch-";
 const STALE_TIME = 5 * 60 * 1000; // 5 minutes - data older than this triggers background refresh
 
 type ServerActions = {
-  fetchNotesFromServer: () => Promise<NotePayload[]>;
+  fetchNoteSummariesFromServer: () => Promise<NoteSummaryPayload[]>;
 };
 
 export function useNoteData(
@@ -24,8 +24,8 @@ export function useNoteData(
   serverActions: ServerActions,
   userId?: string | null
 ) {
-  const { fetchNotesFromServer } = serverActions;
-  const [notes, setNotes] = useState<NotePayload[]>([]);
+  const { fetchNoteSummariesFromServer } = serverActions;
+  const [noteSummaries, setNoteSummaries] = useState<NoteSummaryPayload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useIndexedDB, setUseIndexedDB] = useState(true);
@@ -54,16 +54,16 @@ export function useNoteData(
   }, []);
 
   // Fetch and cache server data
-  const fetchFromServer = useCallback(async (): Promise<NotePayload[]> => {
-    const remoteNotes = await fetchNotesFromServer();
+  const fetchFromServer = useCallback(async (): Promise<NoteSummaryPayload[]> => {
+    const remoteSummaries = await fetchNoteSummariesFromServer();
 
     if (useIndexedDB && userId) {
-      await saveUserNotes(userId, remoteNotes);
+      await saveUserNoteSummaries(userId, remoteSummaries);
       setCacheTimestamp(userId);
     }
 
-    return remoteNotes;
-  }, [fetchNotesFromServer, useIndexedDB, userId, setCacheTimestamp]);
+    return remoteSummaries;
+  }, [fetchNoteSummariesFromServer, useIndexedDB, userId, setCacheTimestamp]);
 
   const loadNotes = useCallback(async () => {
     setIsLoading(true);
@@ -76,10 +76,10 @@ export function useNoteData(
 
         if (useIndexedDB && !initialLoadComplete.current) {
           try {
-            const cachedNotes = await getUserNotes(userId);
+            const cachedSummaries = await getUserNoteSummaries(userId);
 
-            if (cachedNotes.length > 0) {
-              setNotes(cachedNotes);
+            if (cachedSummaries.length > 0) {
+              setNoteSummaries(cachedSummaries);
               hasCachedData = true;
 
               const lastFetch = getCacheTimestamp(userId);
@@ -89,7 +89,7 @@ export function useNoteData(
                 setIsLoading(false);
                 fetchFromServer()
                   .then((freshNotes) => {
-                    setNotes(freshNotes);
+                    setNoteSummaries(freshNotes);
                   })
                   .catch((err) => {
                     console.error("Background refresh failed:", err);
@@ -105,7 +105,7 @@ export function useNoteData(
 
         if (!hasCachedData) {
           const freshNotes = await fetchFromServer();
-          setNotes(freshNotes);
+          setNoteSummaries(freshNotes);
         }
       } else if (typeof window !== "undefined") {
         // Guest users: load from IndexedDB (with localStorage migration).
@@ -113,19 +113,22 @@ export function useNoteData(
           const migrated = await migrateFromLocalStorage(storageKey);
 
           if (migrated.notes.length > 0) {
-            setNotes(migrated.notes);
+            setNoteSummaries(migrated.notes.map(deriveNoteSummary));
           } else {
             const dbNotes = await getAllNotes();
-            setNotes(dbNotes);
+            setNoteSummaries(dbNotes.map(deriveNoteSummary));
           }
         } else if (window.localStorage) {
           const rawNotes = window.localStorage.getItem(storageKey);
-          setNotes(rawNotes ? JSON.parse(rawNotes) : []);
+          const localNotes = rawNotes ? JSON.parse(rawNotes) : [];
+          setNoteSummaries(
+            Array.isArray(localNotes) ? localNotes.map(deriveNoteSummary) : []
+          );
         } else {
-          setNotes([]);
+          setNoteSummaries([]);
         }
       } else {
-        setNotes([]);
+        setNoteSummaries([]);
       }
 
       initialLoadComplete.current = true;
@@ -140,7 +143,7 @@ export function useNoteData(
       if (isAuthenticated) {
         toast.error("Failed to load your notes. Please refresh the page.");
       } else {
-        setNotes([]);
+        setNoteSummaries([]);
       }
     } finally {
       setIsLoading(false);
@@ -158,7 +161,7 @@ export function useNoteData(
     loadNotes();
   }, [loadNotes]);
 
-  // Persist notes to local storage/IndexedDB (debounced to avoid excessive writes)
+  // Persist authenticated summaries to IndexedDB (debounced to avoid excessive writes)
   const notesPersistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!initialLoadComplete.current || isLoading) {
@@ -173,14 +176,8 @@ export function useNoteData(
       try {
         if (typeof window === "undefined") return;
 
-        if (useIndexedDB) {
-          if (isAuthenticated && userId) {
-            await saveUserNotes(userId, notes);
-          } else {
-            await saveNotesToDB(notes);
-          }
-        } else if (!isAuthenticated && window.localStorage) {
-          window.localStorage.setItem(storageKey, JSON.stringify(notes));
+        if (useIndexedDB && isAuthenticated && userId) {
+          await saveUserNoteSummaries(userId, noteSummaries);
         }
       } catch (err) {
         console.error("Failed to save notes:", err);
@@ -195,7 +192,7 @@ export function useNoteData(
         clearTimeout(notesPersistTimer.current);
       }
     };
-  }, [notes, isLoading, isAuthenticated, userId, storageKey, useIndexedDB]);
+  }, [noteSummaries, isLoading, isAuthenticated, userId, useIndexedDB]);
 
   const forceRefresh = useCallback(async () => {
     if (!isAuthenticated) {
@@ -206,7 +203,7 @@ export function useNoteData(
     setError(null);
     try {
       const freshNotes = await fetchFromServer();
-      setNotes(freshNotes);
+      setNoteSummaries(freshNotes);
     } catch (error) {
       console.error("Failed to refresh notes", error);
       const errorMessage =
@@ -221,8 +218,8 @@ export function useNoteData(
   }, [isAuthenticated, fetchFromServer, loadNotes]);
 
   return {
-    notes,
-    setNotes,
+    notes: noteSummaries,
+    setNotes: setNoteSummaries,
     isLoading,
     error,
     retry: loadNotes,

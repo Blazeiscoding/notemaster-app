@@ -13,12 +13,18 @@ import { useUnsavedChangesWarning } from "./useUnsavedChangesWarning";
 import { useAutosave } from "./useAutosave";
 import { useNoteServerActions } from "./useNoteServerActions";
 import { useSharedNoteImport } from "./useSharedNoteImport";
-import type { NotePayload, SectionKey } from "@/types/note";
+import type { NotePayload, NoteSummaryPayload, SectionKey } from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
 import { buildNewNote } from "@/components/note-app/util";
 import { NOTE_ORDER_STORAGE_KEY } from "@/components/note-app/constants";
 import { hapticLight } from "@/lib/haptics";
 import { useSSE } from "@/lib/use-sse";
 import { addToPendingSync } from "@/lib/indexeddb";
+import {
+  deleteNoteDetail,
+  getNoteDetail,
+  saveNoteDetail,
+} from "@/lib/indexeddb";
 import { isOnline } from "@/lib/background-sync";
 
 export const useNoteApp = () => {
@@ -63,6 +69,7 @@ export const useNoteApp = () => {
   } = useAccent();
   const serverActions = useNoteServerActions();
 
+  // Data loading
   const {
     notes,
     setNotes,
@@ -73,7 +80,7 @@ export const useNoteApp = () => {
     isAuthenticated,
     storageKey,
     {
-      fetchNotesFromServer: serverActions.fetchNotesFromServer,
+      fetchNoteSummariesFromServer: serverActions.fetchNoteSummariesFromServer,
     },
     userId
   );
@@ -94,6 +101,58 @@ export const useNoteApp = () => {
     customOrder
   );
 
+  const openNote = useCallback(
+    async (summary: NoteSummaryPayload) => {
+      try {
+        if (isAuthenticated) {
+          const cached = await getNoteDetail(summary.id);
+          if (cached && cached.updatedAt === summary.updatedAt) {
+            setCurrentNote(cached);
+            setShowSidebar(false);
+            return;
+          }
+
+          try {
+            const fullNote = await serverActions.fetchNoteFromServer(summary.id);
+            await saveNoteDetail(fullNote);
+            setCurrentNote(fullNote);
+            setShowSidebar(false);
+          } catch (error) {
+            if (!cached) {
+              throw error;
+            }
+
+            setCurrentNote(cached);
+            setShowSidebar(false);
+            toast.info("Opened cached note", {
+              description: "Showing the last saved local copy.",
+            });
+          }
+          return;
+        }
+
+        const cached = await getNoteDetail(summary.id).catch(() => undefined);
+        if (cached) {
+          setCurrentNote(cached);
+          setShowSidebar(false);
+          return;
+        }
+
+        toast.error("Unable to open note. The full note was not found locally.");
+      } catch (error) {
+        console.error("Failed to open note", error);
+        toast.error("Failed to open note. Please try again.");
+      }
+    },
+    [
+      serverActions,
+      isAuthenticated,
+      setCurrentNote,
+      setShowSidebar,
+    ]
+  );
+
+  // Notes operations
   const notesHook = useNotes(
     { notes, setNotes, currentNote, setCurrentNote },
     isAuthenticated,
@@ -165,14 +224,15 @@ export const useNoteApp = () => {
   useSharedNoteImport(createNoteFromShare);
 
   const applyLocal = useCallback((note: NotePayload) => {
+    const summary = deriveNoteSummary(note);
     setNotes((prev) => {
-      const existingIndex = prev.findIndex((n) => n.id === note.id);
+      const existingIndex = prev.findIndex((n) => n.id === summary.id);
       if (existingIndex >= 0) {
         const next = [...prev];
-        next[existingIndex] = note;
+        next[existingIndex] = summary;
         return next;
       }
-      return [note, ...prev];
+      return [summary, ...prev];
     });
   }, [setNotes]);
 
@@ -201,6 +261,7 @@ export const useNoteApp = () => {
 
     if (!isAuthenticated) {
       applyLocal(baseNote);
+      await saveNoteDetail(baseNote);
       clearDraft(baseNote.id);
       setCurrentNote(null);
       setIsSavingNote(false);
@@ -240,6 +301,7 @@ export const useNoteApp = () => {
         ? await serverActions.updateNoteOnServer(baseNote.id, payload)
         : await serverActions.createNoteOnServer(baseNote);
       applyLocal(saved);
+      await saveNoteDetail(saved);
       clearDraft(baseNote.id);
       setCurrentNote(null);
       toast.success(exists ? "Note updated" : "Note created");
@@ -283,7 +345,7 @@ export const useNoteApp = () => {
       if (!data) return;
       setNotes((prev) => {
         if (prev.some((n) => n.id === noteId)) return prev;
-        return [data as NotePayload, ...prev];
+        return [deriveNoteSummary(data as NotePayload), ...prev];
       });
     },
     [setNotes]
@@ -296,9 +358,10 @@ export const useNoteApp = () => {
         const index = prev.findIndex((n) => n.id === noteId);
         if (index === -1) return prev;
         const next = [...prev];
-        next[index] = { ...next[index], ...data };
+        next[index] = deriveNoteSummary(data as NotePayload);
         return next;
       });
+      void saveNoteDetail(data as NotePayload);
     },
     [setNotes]
   );
@@ -309,6 +372,7 @@ export const useNoteApp = () => {
       if (currentNoteIdRef.current === noteId) {
         setCurrentNote(null);
       }
+      void deleteNoteDetail(noteId);
     },
     [setNotes]
   );
@@ -346,6 +410,7 @@ export const useNoteApp = () => {
     sortedNotes,
     currentNote,
     setCurrentNote,
+    openNote,
     showSidebar,
     setShowSidebar,
     sortBy,

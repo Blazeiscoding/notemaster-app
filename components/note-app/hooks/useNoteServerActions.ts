@@ -1,9 +1,13 @@
 import { useCallback } from "react";
-import type { NotePayload, NoteRevisionPayload } from "@/types/note";
+import type {
+  NotePayload,
+  NoteRevisionPayload,
+  NoteSummaryPayload,
+} from "@/types/note";
 import { apiRequest } from "@/lib/api-client";
 
 type PaginatedNotesResponse = {
-  notes: NotePayload[];
+  notes: NoteSummaryPayload[];
   nextCursor: string | null;
   hasMore: boolean;
 };
@@ -11,8 +15,8 @@ type PaginatedNotesResponse = {
 const NOTES_PAGE_SIZE = 100;
 
 export function useNoteServerActions() {
-  const fetchNotesFromServer = useCallback(async () => {
-    const allNotes: NotePayload[] = [];
+  const fetchNoteSummariesFromServer = useCallback(async () => {
+    const allNotes: NoteSummaryPayload[] = [];
     let cursor: string | null = null;
 
     while (true) {
@@ -24,7 +28,9 @@ export function useNoteServerActions() {
         params.set("cursor", cursor);
       }
 
-      const response = await apiRequest<NotePayload[] | PaginatedNotesResponse>(
+      const response = await apiRequest<
+        NoteSummaryPayload[] | PaginatedNotesResponse
+      >(
         `/api/notes?${params.toString()}`,
         {
           cache: "no-store",
@@ -45,6 +51,12 @@ export function useNoteServerActions() {
     }
 
     return allNotes;
+  }, []);
+
+  const fetchNoteFromServer = useCallback(async (id: string) => {
+    return apiRequest<NotePayload>(`/api/notes/${id}`, {
+      cache: "no-store",
+    });
   }, []);
 
   const fetchRevisionsFromServer = useCallback(async (id: string) => {
@@ -75,7 +87,8 @@ export function useNoteServerActions() {
   }, []);
 
   return {
-    fetchNotesFromServer,
+    fetchNoteSummariesFromServer,
+    fetchNoteFromServer,
     fetchRevisionsFromServer,
     createNoteOnServer,
     updateNoteOnServer,

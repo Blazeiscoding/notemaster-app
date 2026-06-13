@@ -39,7 +39,7 @@ export async function compressImage(
 
   const opts = { ...DEFAULT_OPTIONS, ...options };
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     // Use createObjectURL instead of readAsDataURL to avoid base64 encoding overhead (~33% less memory)
     const objectUrl = URL.createObjectURL(file);
     const img = new Image();

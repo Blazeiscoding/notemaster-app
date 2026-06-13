@@ -50,7 +50,7 @@ const NoteApp = () => {
     notes,
     sortedNotes,
     currentNote,
-    setCurrentNote,
+    openNote,
     showSidebar,
     setShowSidebar,
     sortBy,
@@ -314,7 +314,7 @@ const NoteApp = () => {
                 notes={sortedNotes}
                 activeSection={activeSection}
                 onCreateNote={createNote}
-                onOpenNote={setCurrentNote}
+                onOpenNote={openNote}
                 onPin={togglePin}
                 onArchive={archiveNote}
                 onTrash={trashNote}
@@ -323,7 +323,7 @@ const NoteApp = () => {
                 onDeleteForever={handleDeleteForeverRequest}
               />
             ) : (
-              <CalendarView notes={sortedNotes} onOpenNote={setCurrentNote} />
+              <CalendarView notes={sortedNotes} onOpenNote={openNote} />
             )}
           </main>
         </div>

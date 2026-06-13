@@ -16,11 +16,11 @@ import {
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { NotePayload } from "@/types/note";
+import type { NoteSummaryPayload } from "@/types/note";
 
 type CalendarViewProps = {
-  notes: NotePayload[];
-  onOpenNote: (note: NotePayload) => void;
+  notes: NoteSummaryPayload[];
+  onOpenNote: (note: NoteSummaryPayload) => void;
 };
 
 // Static — hoist outside component to avoid re-allocation every render
@@ -45,7 +45,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ notes, onOpenNote }) => {
 
   // Pre-build a date-to-notes map for O(1) lookups per cell instead of O(n)
   const notesByDate = useMemo(() => {
-    const map = new Map<string, NotePayload[]>();
+    const map = new Map<string, NoteSummaryPayload[]>();
     for (const note of notes) {
       if (note.createdAt) {
         const key = format(new Date(note.createdAt), "yyyy-MM-dd");

@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { toast } from "sonner";
-import type { NotePayload } from "@/types/note";
+import type { NotePayload, NoteSummaryPayload } from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
+import { deleteNoteDetail, getNoteDetail, saveNoteDetail } from "@/lib/indexeddb";
 import {
   hapticError,
   hapticLight,
@@ -11,8 +13,8 @@ import { addToPendingSync } from "@/lib/indexeddb";
 import { isOnline } from "@/lib/background-sync";
 
 type NotesState = {
-  notes: NotePayload[];
-  setNotes: React.Dispatch<React.SetStateAction<NotePayload[]>>;
+  notes: NoteSummaryPayload[];
+  setNotes: React.Dispatch<React.SetStateAction<NoteSummaryPayload[]>>;
   currentNote: NotePayload | null;
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
@@ -51,12 +53,12 @@ function makeOptimisticAction(
   updateNoteOnServer: ServerActions["updateNoteOnServer"]
 ) {
   return async (id: string, opts: OptimisticUpdateOptions) => {
-    let existing: NotePayload | undefined;
+    let existing: NoteSummaryPayload | undefined;
 
     setNotes((prev) => {
       existing = prev.find((n) => n.id === id);
       if (!existing) return prev;
-      const optimistic: NotePayload = {
+      const optimistic: NoteSummaryPayload = {
         ...existing,
         ...opts.updates,
         updatedAt: new Date().toISOString(),
@@ -68,20 +70,24 @@ function makeOptimisticAction(
     opts.haptic();
 
     const wasCurrent = currentNote?.id === id;
+    const currentBeforeClose = wasCurrent ? currentNote : null;
     if (opts.closeIfCurrent && wasCurrent) setCurrentNote(null);
 
     if (isAuthenticated) {
       if (!isOnline()) {
-        await addToPendingSync({
-          type: "update",
-          entity: "note",
-          entityId: id,
-          data: {
-            ...existing,
-            ...opts.updates,
-            updatedAt: new Date().toISOString(),
-          },
-        });
+        const cached = await getNoteDetail(id);
+        if (cached) {
+          await addToPendingSync({
+            type: "update",
+            entity: "note",
+            entityId: id,
+            data: {
+              ...cached,
+              ...opts.updates,
+              updatedAt: new Date().toISOString(),
+            },
+          });
+        }
         toast.success(`${opts.successMessage} and queued for sync`);
         return;
       }
@@ -89,22 +95,28 @@ function makeOptimisticAction(
       try {
         const saved = await updateNoteOnServer(id, opts.serverPayload);
         setNotes((prev) =>
-          prev.map((note) => (note.id === id ? saved : note))
+          prev.map((note) =>
+            note.id === id ? deriveNoteSummary(saved) : note
+          )
         );
+        await saveNoteDetail(saved);
         toast.success(opts.successMessage);
       } catch (error) {
         console.error(`Failed to ${opts.successMessage.toLowerCase()}`, error);
         if (error instanceof TypeError || error instanceof DOMException) {
-          await addToPendingSync({
-            type: "update",
-            entity: "note",
-            entityId: id,
-            data: {
-              ...existing,
-              ...opts.updates,
-              updatedAt: new Date().toISOString(),
-            },
-          });
+          const cachedForSync = await getNoteDetail(id);
+          if (cachedForSync) {
+            await addToPendingSync({
+              type: "update",
+              entity: "note",
+              entityId: id,
+              data: {
+                ...cachedForSync,
+                ...opts.updates,
+                updatedAt: new Date().toISOString(),
+              },
+            });
+          }
           toast.success(`${opts.successMessage} and queued for sync`);
           return;
         }
@@ -112,10 +124,20 @@ function makeOptimisticAction(
         setNotes((prev) =>
           prev.map((note) => (note.id === id ? rollback : note))
         );
-        if (opts.closeIfCurrent && wasCurrent) setCurrentNote(rollback);
+        if (opts.closeIfCurrent && wasCurrent && currentBeforeClose) {
+          setCurrentNote(currentBeforeClose);
+        }
         toast.error(`Failed to update note. Please try again.`);
       }
     } else {
+      const cached = await getNoteDetail(id).catch(() => undefined);
+      if (cached) {
+        await saveNoteDetail({
+          ...cached,
+          ...opts.updates,
+          updatedAt: new Date().toISOString(),
+        });
+      }
       toast.success(opts.successMessage);
     }
   };
@@ -206,7 +228,7 @@ export function useNotes(
 
   const deleteForever = useCallback(
     async (id: string) => {
-      let existing: NotePayload | undefined;
+      let existing: NoteSummaryPayload | undefined;
       let existingIndex = -1;
 
       setNotes((prev) => {
@@ -220,6 +242,7 @@ export function useNotes(
       hapticError();
 
       const wasCurrent = currentNote?.id === id;
+      const currentBeforeDelete = wasCurrent ? currentNote : null;
       if (wasCurrent) setCurrentNote(null);
 
       if (isAuthenticated) {
@@ -236,6 +259,7 @@ export function useNotes(
 
         try {
           await deleteNoteOnServer(id);
+          await deleteNoteDetail(id);
           toast.success("Note deleted permanently");
         } catch (error) {
           console.error("Failed to delete note", error);
@@ -256,10 +280,13 @@ export function useNotes(
             next.splice(rollbackIndex, 0, rollback);
             return next;
           });
-          if (wasCurrent) setCurrentNote(rollback);
+          if (wasCurrent && currentBeforeDelete) {
+            setCurrentNote(currentBeforeDelete);
+          }
           toast.error("Failed to delete note. Please try again.");
         }
       } else {
+        void deleteNoteDetail(id);
         toast.success("Note deleted permanently");
       }
     },
@@ -291,10 +318,14 @@ export function useNotes(
         try {
           const data = JSON.parse(String(reader.result));
           if (Array.isArray(data)) {
-            const map = new Map<string, NotePayload>(
+            const importedNotes = data as NotePayload[];
+            const map = new Map<string, NoteSummaryPayload>(
               notes.map((n) => [n.id, n])
             );
-            for (const n of data) map.set(n.id, n as NotePayload);
+            for (const note of importedNotes) {
+              map.set(note.id, deriveNoteSummary(note));
+              void saveNoteDetail(note);
+            }
             setNotes(Array.from(map.values()));
             toast.success(`Imported ${data.length} note(s)`);
           } else {

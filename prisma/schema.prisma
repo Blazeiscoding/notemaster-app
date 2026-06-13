@@ -29,8 +29,8 @@ model Note {
   @@index([archived])
   @@index([dueAt])
   // Composite indexes for common query patterns
-  @@index([userId, trashed, archived])
-  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, updatedAt(sort: Desc), id(sort: Desc)])
+  @@index([userId, trashed, archived, updatedAt(sort: Desc)])
 }
 
 model NoteRevision {

@@ -25,15 +25,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { NotePayload, SectionKey } from "@/types/note";
+import type { NoteSummaryPayload, SectionKey } from "@/types/note";
 import { useSwipe } from "./hooks/useSwipe";
 
 type NoteCardProps = {
-  note: NotePayload;
+  note: NoteSummaryPayload;
   activeSection: SectionKey;
   /** Index in the grid for priority loading optimization */
   index?: number;
-  onOpen: (note: NotePayload) => void;
+  onOpen: (note: NoteSummaryPayload) => void;
   onPin: (id: string) => void;
   onArchive: (id: string) => void;
   onTrash: (id: string) => void;
@@ -198,22 +198,6 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
     const formattedDate = useMemo(() => {
       return new Date(note.updatedAt).toLocaleDateString();
     }, [note.updatedAt]);
-
-    const strippedContent = useMemo(() => {
-      if (!note.content) return "No content yet";
-      // Truncate before stripping tags — only a short preview is displayed (line-clamp-3)
-      const truncated = note.content.length > 500 ? note.content.slice(0, 500) : note.content;
-      return truncated.replace(/<[^>]*>/g, "") || "No content yet";
-    }, [note.content]);
-
-
-    const checkedCount = useMemo(() => {
-      return note.checklist.filter((item) => item.checked).length;
-    }, [note.checklist]);
-
-    const firstImage = useMemo(() => {
-      return note.attachments.find((att) => att.type.startsWith("image/"));
-    }, [note.attachments]);
 
     return (
       <div className="relative cv-auto">
@@ -402,13 +386,13 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
           </CardHeader>
           <CardContent className="space-y-3 pt-0">
             <p className="line-clamp-3 text-sm text-muted-foreground leading-relaxed">
-              {strippedContent}
+              {note.preview}
             </p>
-            {firstImage && (
+            {note.firstImage && (
               <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-md bg-muted/30 border border-border/40">
                 <Image
-                  src={firstImage.data}
-                  alt={firstImage.name}
+                  src={note.firstImage.data}
+                  alt={note.firstImage.name}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -417,13 +401,13 @@ const NoteCard: React.FC<NoteCardProps> = React.memo(
                 />
               </div>
             )}
-            {note.checklist.length > 0 && (
+            {note.checklistTotalCount > 0 && (
               <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs font-medium border border-border/50">
                 <span className="text-foreground">
-                  {checkedCount}
+                  {note.checklistCompletedCount}
                 </span>
                 <span className="text-muted-foreground"> of </span>
-                <span className="text-foreground">{note.checklist.length}</span>
+                <span className="text-foreground">{note.checklistTotalCount}</span>
                 <span className="text-muted-foreground"> tasks complete</span>
               </div>
             )}

@@ -1,7 +1,12 @@
 import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import type { NotePayload } from "@/types/note"
-import { serializeNote, noteSelect } from "./utils"
+import {
+  noteSelect,
+  noteSummarySelect,
+  serializeNote,
+  serializeNoteSummary,
+} from "./utils"
 import {
   encryptAttachments,
   encryptChecklist,
@@ -25,15 +30,58 @@ export const GET = withAuth(
     const cursor = url.searchParams.get("cursor")
     const limitParam = url.searchParams.get("limit")
     const limit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : undefined
+    const includeFull = url.searchParams.get("include") === "full"
+
+    if (includeFull) {
+      const notes = await prisma.note.findMany({
+        where: { userId },
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        take: limit ? limit + 1 : undefined,
+        select: noteSelect,
+        ...(cursor && {
+          cursor: { id: cursor },
+          skip: 1,
+        }),
+      })
+
+      if (!limit) {
+        return successResponse(
+          notes.map(serializeNote),
+          200,
+          rateLimitHeaders,
+          requestId
+        )
+      }
+
+      const hasMore = notes.length > limit
+      const data = hasMore ? notes.slice(0, limit) : notes
+      const nextCursor = hasMore ? data[data.length - 1]?.id : null
+
+      return successResponse(
+        {
+          notes: data.map(serializeNote),
+          nextCursor,
+          hasMore,
+        },
+        200,
+        rateLimitHeaders,
+        requestId
+      )
+    }
 
     // If no limit specified, return all notes (backwards compatible)
     if (!limit) {
       const notes = await prisma.note.findMany({
         where: { userId },
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
-        select: noteSelect,
+        select: noteSummarySelect,
       })
-      return successResponse(notes.map(serializeNote), 200, rateLimitHeaders, requestId)
+      return successResponse(
+        notes.map(serializeNoteSummary),
+        200,
+        rateLimitHeaders,
+        requestId
+      )
     }
 
     // Paginated query with cursor-based pagination
@@ -41,7 +89,7 @@ export const GET = withAuth(
       where: { userId },
       orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
       take: limit + 1, // Fetch one extra to check if there are more
-      select: noteSelect,
+      select: noteSummarySelect,
       ...(cursor && {
         cursor: { id: cursor },
         skip: 1, // Skip the cursor itself
@@ -54,7 +102,7 @@ export const GET = withAuth(
 
     return successResponse(
       {
-        notes: data.map(serializeNote),
+        notes: data.map(serializeNoteSummary),
         nextCursor,
         hasMore,
       },

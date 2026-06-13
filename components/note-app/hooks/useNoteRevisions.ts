@@ -1,10 +1,15 @@
 import { useState, useCallback } from "react";
 import { toast } from "sonner";
-import type { NotePayload, NoteRevisionPayload } from "@/types/note";
+import type {
+  NotePayload,
+  NoteRevisionPayload,
+  NoteSummaryPayload,
+} from "@/types/note";
+import { deriveNoteSummary } from "@/types/note";
 import { apiRequest } from "@/lib/api-client";
 
 type RevisionsState = {
-  setNotes: React.Dispatch<React.SetStateAction<NotePayload[]>>;
+  setNotes: React.Dispatch<React.SetStateAction<NoteSummaryPayload[]>>;
   setCurrentNote: React.Dispatch<React.SetStateAction<NotePayload | null>>;
 };
 
@@ -67,7 +72,9 @@ export function useNoteRevisions(
           }
         );
         setNotes((prev) =>
-          prev.map((note) => (note.id === restored.id ? restored : note))
+          prev.map((note) =>
+            note.id === restored.id ? deriveNoteSummary(restored) : note
+          )
         );
         setCurrentNote(restored);
         handleCloseRevisions();
@@ -93,4 +100,3 @@ export function useNoteRevisions(
     handleRestoreRevision,
   };
 }
-
