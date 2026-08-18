@@ -15,6 +15,11 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 
+/** Expired rows are pruned on roughly this fraction of database-backed calls. */
+const PRUNE_PROBABILITY = 0.01;
+/** Cap on the in-memory fallback map, so it cannot grow without bound. */
+const MEMORY_STORE_MAX_KEYS = 10_000;
+
 let ensureTablePromise: Promise<void> | null = null;
 
 async function ensureRateLimitTable() {
@@ -29,6 +34,8 @@ async function ensureRateLimitTable() {
           count INTEGER NOT NULL,
           reset_at TIMESTAMPTZ NOT NULL
         );
+        CREATE INDEX IF NOT EXISTS app_rate_limits_reset_at_idx
+          ON app_rate_limits (reset_at);
       `)
       .then(() => undefined)
       .catch((error) => {
@@ -40,11 +47,39 @@ async function ensureRateLimitTable() {
   await ensureTablePromise;
 }
 
+/**
+ * Drop rows whose window has already elapsed.
+ *
+ * Every distinct identifier (one per user per route) left a permanent row
+ * behind, so the table grew without bound. Pruning opportunistically keeps it
+ * proportional to active users without needing a scheduled job.
+ */
+function pruneExpiredRows() {
+  const pool = getPgPool();
+  if (!pool) return;
+
+  void pool
+    .query("DELETE FROM app_rate_limits WHERE reset_at < NOW() - INTERVAL '1 hour'")
+    .catch((error) => {
+      console.error("Failed to prune expired rate limit rows", error);
+    });
+}
+
+function pruneMemoryStore() {
+  if (rateLimitStore.size <= MEMORY_STORE_MAX_KEYS) return;
+
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
+}
+
 function memoryRateLimit(identifier: string): RateLimitResult {
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 
   if (!entry || now > entry.resetAt) {
+    pruneMemoryStore();
     const newEntry = {
       count: 1,
       resetAt: now + RATE_LIMIT_WINDOW,
@@ -80,6 +115,10 @@ async function databaseRateLimit(identifier: string): Promise<RateLimitResult> {
   }
 
   await ensureRateLimitTable();
+
+  if (Math.random() < PRUNE_PROBABILITY) {
+    pruneExpiredRows();
+  }
 
   const result = await pool.query<{
     count: number;
