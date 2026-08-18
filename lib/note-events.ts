@@ -1,5 +1,6 @@
-import { Pool, type PoolClient } from "pg";
+import { type PoolClient } from "pg";
 import type { NotePayload } from "@/types/note";
+import { getPgListenPool, getPgPool } from "@/lib/pg-pool";
 
 export type NoteEventType = "note:created" | "note:updated" | "note:deleted";
 
@@ -28,15 +29,6 @@ const channelName = "notemaster_note_events";
 
 /** Postgres caps NOTIFY payloads at 8000 bytes; leave room for JSON framing. */
 const MAX_NOTIFY_PAYLOAD_BYTES = 7000;
-const connectionString = process.env.DATABASE_URL;
-const pgPool = connectionString
-  ? new Pool({
-      connectionString,
-      max: 2,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    })
-  : null;
 
 let listenerClientPromise: Promise<PoolClient | null> | null = null;
 
@@ -54,10 +46,13 @@ function broadcastLocal(userId: string, event: SSEEvent): void {
 }
 
 async function ensurePgListener(): Promise<PoolClient | null> {
-  if (!pgPool) return null;
+  const listenPool = getPgListenPool();
+  if (!listenPool) return null;
+
   if (!listenerClientPromise) {
     listenerClientPromise = (async () => {
-      const client = await pgPool.connect();
+      // Held for the process lifetime, hence its own dedicated pool.
+      const client = await listenPool.connect();
       await client.query(`LISTEN ${channelName}`);
       client.on("notification", (message) => {
         if (!message.payload) return;
@@ -113,7 +108,8 @@ export function emitNoteEvent(
 
   broadcastLocal(userId, event);
 
-  if (!pgPool) return;
+  const pool = getPgPool();
+  if (!pool) return;
 
   let payload = JSON.stringify({ userId, event } satisfies BroadcastPayload);
 
@@ -129,7 +125,7 @@ export function emitNoteEvent(
   }
 
   // Parameterized so the payload is never concatenated into SQL text.
-  void pgPool
+  void pool
     .query("SELECT pg_notify($1, $2)", [channelName, payload])
     .catch((error) => {
       console.error("Failed to publish note event notification:", error);

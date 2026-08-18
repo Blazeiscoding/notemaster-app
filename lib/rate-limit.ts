@@ -1,7 +1,13 @@
-import { Pool } from "pg";
+import { getPgPool } from "@/lib/pg-pool";
 
 interface RateLimitEntry {
   count: number;
+  resetAt: number;
+}
+
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
   resetAt: number;
 }
 
@@ -9,21 +15,14 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 
-const connectionString = process.env.DATABASE_URL;
-const pgPool = connectionString
-  ? new Pool({
-      connectionString,
-      max: 2,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    })
-  : null;
 let ensureTablePromise: Promise<void> | null = null;
 
 async function ensureRateLimitTable() {
-  if (!pgPool) return;
+  const pool = getPgPool();
+  if (!pool) return;
+
   if (!ensureTablePromise) {
-    ensureTablePromise = pgPool
+    ensureTablePromise = pool
       .query(`
         CREATE TABLE IF NOT EXISTS app_rate_limits (
           identifier TEXT PRIMARY KEY,
@@ -41,7 +40,7 @@ async function ensureRateLimitTable() {
   await ensureTablePromise;
 }
 
-function memoryRateLimit(identifier: string) {
+function memoryRateLimit(identifier: string): RateLimitResult {
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 
@@ -74,14 +73,15 @@ function memoryRateLimit(identifier: string) {
   };
 }
 
-async function databaseRateLimit(identifier: string) {
-  if (!pgPool) {
+async function databaseRateLimit(identifier: string): Promise<RateLimitResult> {
+  const pool = getPgPool();
+  if (!pool) {
     return memoryRateLimit(identifier);
   }
 
   await ensureRateLimitTable();
 
-  const result = await pgPool.query<{
+  const result = await pool.query<{
     count: number;
     reset_at_ms: string;
   }>(
@@ -114,7 +114,7 @@ async function databaseRateLimit(identifier: string) {
   };
 }
 
-export async function rateLimit(identifier: string) {
+export async function rateLimit(identifier: string): Promise<RateLimitResult> {
   try {
     return await databaseRateLimit(identifier);
   } catch (error) {
@@ -124,7 +124,7 @@ export async function rateLimit(identifier: string) {
 }
 
 export function getRateLimitHeaders(
-  result: Awaited<ReturnType<typeof rateLimit>>
+  result: RateLimitResult
 ): Record<string, string> {
   return {
     "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),
