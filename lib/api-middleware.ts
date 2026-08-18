@@ -281,7 +281,10 @@ export function successResponse<T>(
     headers: {
       ...rateLimitHeaders,
       ...(requestId && { "X-Request-Id": requestId }),
-      "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+      // Note data is per-user and mutable, and clients already hold their own
+      // IndexedDB cache with an explicit staleness check. A shared max-age here
+      // served stale lists after a write and applied to mutation responses too.
+      "Cache-Control": "private, no-store",
     },
   });
 }
