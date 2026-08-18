@@ -159,6 +159,7 @@ export const useNoteApp = () => {
     {
       updateNoteOnServer: serverActions.updateNoteOnServer,
       deleteNoteOnServer: serverActions.deleteNoteOnServer,
+      fetchNoteFromServer: serverActions.fetchNoteFromServer,
     }
   );
 

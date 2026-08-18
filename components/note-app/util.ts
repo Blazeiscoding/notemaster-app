@@ -28,6 +28,61 @@ export const buildNewNote = (
   };
 };
 
+const isIsoDate = (value: unknown): value is string =>
+  typeof value === "string" && !Number.isNaN(Date.parse(value));
+
+const asStringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+/**
+ * Coerce one entry of an imported JSON file into a NotePayload.
+ *
+ * Returns null for anything that is not a usable note — including summary
+ * objects (which carry `preview` instead of `content`), so an export produced
+ * by an older build is rejected loudly rather than importing empty notes.
+ */
+export const parseImportedNote = (value: unknown): NotePayload | null => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.id !== "string" || !candidate.id) return null;
+
+  // A summary has no `content` field at all; a real note always does.
+  if (typeof candidate.content !== "string") return null;
+
+  const now = new Date().toISOString();
+  const checklist = Array.isArray(candidate.checklist) ? candidate.checklist : [];
+  const attachments = Array.isArray(candidate.attachments) ? candidate.attachments : [];
+
+  return {
+    id: candidate.id,
+    userId: typeof candidate.userId === "string" ? candidate.userId : null,
+    title: typeof candidate.title === "string" ? candidate.title : "",
+    content: candidate.content,
+    tags: asStringArray(candidate.tags),
+    checklist: checklist.filter(
+      (item): item is NotePayload["checklist"][number] =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as { id?: unknown }).id === "string"
+    ),
+    attachments: attachments.filter(
+      (item): item is NotePayload["attachments"][number] =>
+        !!item &&
+        typeof item === "object" &&
+        typeof (item as { id?: unknown }).id === "string" &&
+        typeof (item as { data?: unknown }).data === "string"
+    ),
+    type: "note",
+    pinned: Boolean(candidate.pinned),
+    archived: Boolean(candidate.archived),
+    trashed: Boolean(candidate.trashed),
+    dueAt: isIsoDate(candidate.dueAt) ? (candidate.dueAt as string) : null,
+    createdAt: isIsoDate(candidate.createdAt) ? (candidate.createdAt as string) : now,
+    updatedAt: isIsoDate(candidate.updatedAt) ? (candidate.updatedAt as string) : now,
+  };
+};
+
 export const generateId = () => {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();

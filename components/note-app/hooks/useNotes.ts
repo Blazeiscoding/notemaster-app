@@ -11,6 +11,7 @@ import {
 } from "@/lib/haptics";
 import { addToPendingSync } from "@/lib/indexeddb";
 import { isOnline } from "@/lib/background-sync";
+import { parseImportedNote } from "@/components/note-app/util";
 
 type NotesState = {
   notes: NoteSummaryPayload[];
@@ -22,6 +23,7 @@ type NotesState = {
 type ServerActions = {
   updateNoteOnServer: (id: string, updates: Partial<NotePayload>) => Promise<NotePayload>;
   deleteNoteOnServer: (id: string) => Promise<void>;
+  fetchNoteFromServer: (id: string) => Promise<NotePayload>;
 };
 
 // ---------------------------------------------------------------------------
@@ -153,7 +155,8 @@ export function useNotes(
   serverActions: ServerActions
 ) {
   const { notes, setNotes, currentNote, setCurrentNote } = state;
-  const { updateNoteOnServer, deleteNoteOnServer } = serverActions;
+  const { updateNoteOnServer, deleteNoteOnServer, fetchNoteFromServer } =
+    serverActions;
 
   const optimisticAction = useCallback(
     (id: string, opts: OptimisticUpdateOptions) =>
@@ -294,9 +297,40 @@ export function useNotes(
     [currentNote, isAuthenticated, deleteNoteOnServer, setNotes, setCurrentNote]
   );
 
-  const exportNotes = useCallback(() => {
+  const exportNotes = useCallback(async () => {
     try {
-      const blob = new Blob([JSON.stringify(notes, null, 2)], {
+      // `notes` holds summaries, whose `preview` is a 240-char excerpt rather
+      // than the note body. Exporting them directly produced a file that could
+      // not be imported back without losing content, so resolve each note to
+      // its full payload first — from the local cache, else from the server.
+      const resolved = await Promise.all(
+        notes.map(async (summary): Promise<NotePayload | null> => {
+          const cached = await getNoteDetail(summary.id).catch(() => undefined);
+          if (cached && cached.updatedAt === summary.updatedAt) return cached;
+
+          if (isAuthenticated && isOnline()) {
+            try {
+              const full = await fetchNoteFromServer(summary.id);
+              await saveNoteDetail(full);
+              return full;
+            } catch (error) {
+              console.error("Failed to fetch note for export", error);
+            }
+          }
+
+          return cached ?? null;
+        })
+      );
+
+      const fullNotes = resolved.filter((note): note is NotePayload => note !== null);
+      const missing = notes.length - fullNotes.length;
+
+      if (fullNotes.length === 0) {
+        toast.error("Could not export: no note content is available offline.");
+        return;
+      }
+
+      const blob = new Blob([JSON.stringify(fullNotes, null, 2)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);
@@ -305,12 +339,17 @@ export function useNotes(
       a.download = `notemaster-notes-${new Date().toISOString()}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("Notes exported successfully");
+
+      toast.success(
+        missing > 0
+          ? `Exported ${fullNotes.length} note(s); ${missing} unavailable offline`
+          : `Exported ${fullNotes.length} note(s)`
+      );
     } catch (error) {
       console.error("Failed to export notes", error);
       toast.error("Failed to export notes. Please try again.");
     }
-  }, [notes]);
+  }, [notes, isAuthenticated, fetchNoteFromServer]);
 
   const importNotes = useCallback(
     (file: File) => {
@@ -318,20 +357,37 @@ export function useNotes(
       reader.onload = () => {
         try {
           const data = JSON.parse(String(reader.result));
-          if (Array.isArray(data)) {
-            const importedNotes = data as NotePayload[];
-            const map = new Map<string, NoteSummaryPayload>(
-              notes.map((n) => [n.id, n])
-            );
-            for (const note of importedNotes) {
-              map.set(note.id, deriveNoteSummary(note));
-              void saveNoteDetail(note);
-            }
-            setNotes(Array.from(map.values()));
-            toast.success(`Imported ${data.length} note(s)`);
-          } else {
+          if (!Array.isArray(data)) {
             toast.error("Invalid file format. Expected an array of notes.");
+            return;
           }
+
+          const importedNotes = data
+            .map(parseImportedNote)
+            .filter((note): note is NotePayload => note !== null);
+          const skipped = data.length - importedNotes.length;
+
+          if (importedNotes.length === 0) {
+            toast.error(
+              "No importable notes found. The file may be an export from an older version."
+            );
+            return;
+          }
+
+          const map = new Map<string, NoteSummaryPayload>(
+            notes.map((n) => [n.id, n])
+          );
+          for (const note of importedNotes) {
+            map.set(note.id, deriveNoteSummary(note));
+            void saveNoteDetail(note);
+          }
+          setNotes(Array.from(map.values()));
+
+          toast.success(
+            skipped > 0
+              ? `Imported ${importedNotes.length} note(s); skipped ${skipped} invalid`
+              : `Imported ${importedNotes.length} note(s)`
+          );
         } catch (error) {
           console.error("Failed to import notes", error);
           toast.error("Failed to import notes. Invalid file format.");
