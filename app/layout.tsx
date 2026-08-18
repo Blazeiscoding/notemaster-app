@@ -2,6 +2,7 @@ import { type Metadata, type Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SerwistProvider } from "@serwist/next/react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
@@ -72,30 +73,41 @@ export default function RootLayout({
           {/* Preconnect to Fontshare for faster Clash Display loading */}
           <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="anonymous" />
           <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
-          {/* Non-blocking load for Clash Display (not on Google Fonts) */}
+          {/*
+            Non-blocking load for Clash Display (not on Google Fonts).
+            React does not render string event handlers, so the previous
+            `onLoad="this.media='all'"` was dropped and the stylesheet stayed
+            at media="print" forever — the font never applied. Preloading the
+            stylesheet and swapping rel on load is the equivalent that works
+            without a client component.
+          */}
+          <link
+            rel="preload"
+            as="style"
+            href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
+          />
           <link
             rel="stylesheet"
             href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
-            media="print"
-            // @ts-expect-error -- onLoad reassigns media to make the stylesheet active after async load
-            onLoad="this.media='all'"
           />
-          <noscript>
-            <link
-              rel="stylesheet"
-              href="https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600&display=swap"
-            />
-          </noscript>
         </head>
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}
         >
-          <TooltipProvider delayDuration={300}>
-            <ErrorBoundary>
-              {children}
-              <Toaster position="top-right" richColors />
-            </ErrorBoundary>
-          </TooltipProvider>
+          <SerwistProvider
+            swUrl="/sw.js"
+            // The worker is only built for production; registering in dev would
+            // 404 and, worse, serve stale assets during development.
+            disable={process.env.NODE_ENV === "development"}
+            reloadOnOnline
+          >
+            <TooltipProvider delayDuration={300}>
+              <ErrorBoundary>
+                {children}
+                <Toaster position="top-right" richColors />
+              </ErrorBoundary>
+            </TooltipProvider>
+          </SerwistProvider>
           <Analytics />
         </body>
       </html>

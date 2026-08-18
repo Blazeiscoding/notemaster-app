@@ -1,4 +1,5 @@
 import type { Attachment, ChecklistItem, NotePayload } from "@/types/note";
+import { sanitizeHtml } from "@/lib/sanitize-html";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -6,7 +7,7 @@ const HTTP_URL_REGEX = /^https?:\/\//i;
 const DATA_URL_REGEX = /^data:image\/[a-zA-Z0-9.+-]+;base64,/i;
 
 type NoteValidationOptions = {
-  requireId?: boolean;
+  /** Validate only the fields present on the payload (PATCH semantics). */
   partial?: boolean;
 };
 
@@ -52,15 +53,12 @@ export function sanitizeId(input: unknown): string {
   return trimmed;
 }
 
+/**
+ * Length-check rich text and strip it down to the allowlisted tags/attributes
+ * in `lib/sanitize-html`. The result is safe to store and to re-render as HTML.
+ */
 export function sanitizeRichTextHtml(input: unknown, maxLength = 100000): string {
-  const value = sanitizeString(input, maxLength);
-
-  return value
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
-    .replace(/\son\w+="[^"]*"/gi, "")
-    .replace(/\son\w+='[^']*'/gi, "")
-    .replace(/\s(href|src)\s*=\s*(['"])javascript:[^'"]*\2/gi, "");
+  return sanitizeHtml(sanitizeString(input, maxLength));
 }
 
 function sanitizeChecklist(input: unknown): ChecklistItem[] {
@@ -145,7 +143,7 @@ export function validateNotePayload(
   payload: unknown,
   options: NoteValidationOptions = {}
 ): Partial<NotePayload> & Pick<NotePayload, "id"> {
-  const { requireId = true, partial = false } = options;
+  const { partial = false } = options;
 
   if (typeof payload !== "object" || payload === null) {
     throw new Error("Invalid payload: expected object");
@@ -153,7 +151,8 @@ export function validateNotePayload(
 
   const p = payload as Record<string, unknown>;
   const validated: Partial<NotePayload> & { id: string } = {
-    id: requireId ? sanitizeId(p.id) : sanitizeId(p.id),
+    // An id is always required: it is the client-generated UUID for the note.
+    id: sanitizeId(p.id),
   };
 
   if (!partial || p.title !== undefined) {

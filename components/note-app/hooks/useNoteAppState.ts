@@ -159,6 +159,7 @@ export const useNoteApp = () => {
     {
       updateNoteOnServer: serverActions.updateNoteOnServer,
       deleteNoteOnServer: serverActions.deleteNoteOnServer,
+      fetchNoteFromServer: serverActions.fetchNoteFromServer,
     }
   );
 
@@ -340,30 +341,59 @@ export const useNoteApp = () => {
     userId,
   ]);
 
-  const handleSseNoteCreated = useCallback(
-    (noteId: string, data?: Partial<NotePayload>) => {
-      if (!data) return;
+  const applyRemoteNote = useCallback(
+    (note: NotePayload, { insertIfMissing }: { insertIfMissing: boolean }) => {
+      const summary = deriveNoteSummary(note);
       setNotes((prev) => {
-        if (prev.some((n) => n.id === noteId)) return prev;
-        return [deriveNoteSummary(data as NotePayload), ...prev];
+        const index = prev.findIndex((n) => n.id === note.id);
+        if (index === -1) {
+          return insertIfMissing ? [summary, ...prev] : prev;
+        }
+        const next = [...prev];
+        next[index] = summary;
+        return next;
       });
+      void saveNoteDetail(note);
     },
     [setNotes]
   );
 
+  /**
+   * Events for large notes arrive without a payload (the Postgres NOTIFY size
+   * cap), so pull the note by id rather than dropping the update.
+   */
+  const fetchAndApplyRemoteNote = useCallback(
+    async (noteId: string, insertIfMissing: boolean) => {
+      try {
+        const note = await serverActions.fetchNoteFromServer(noteId);
+        applyRemoteNote(note, { insertIfMissing });
+      } catch (error) {
+        console.error("Failed to fetch note for realtime event", error);
+      }
+    },
+    [applyRemoteNote, serverActions]
+  );
+
+  const handleSseNoteCreated = useCallback(
+    (noteId: string, data?: Partial<NotePayload>) => {
+      if (!data) {
+        void fetchAndApplyRemoteNote(noteId, true);
+        return;
+      }
+      applyRemoteNote(data as NotePayload, { insertIfMissing: true });
+    },
+    [applyRemoteNote, fetchAndApplyRemoteNote]
+  );
+
   const handleSseNoteUpdated = useCallback(
     (noteId: string, data?: Partial<NotePayload>) => {
-      if (!data) return;
-      setNotes((prev) => {
-        const index = prev.findIndex((n) => n.id === noteId);
-        if (index === -1) return prev;
-        const next = [...prev];
-        next[index] = deriveNoteSummary(data as NotePayload);
-        return next;
-      });
-      void saveNoteDetail(data as NotePayload);
+      if (!data) {
+        void fetchAndApplyRemoteNote(noteId, false);
+        return;
+      }
+      applyRemoteNote(data as NotePayload, { insertIfMissing: false });
     },
-    [setNotes]
+    [applyRemoteNote, fetchAndApplyRemoteNote]
   );
 
   const handleSseNoteDeleted = useCallback(

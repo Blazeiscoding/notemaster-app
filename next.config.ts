@@ -1,80 +1,29 @@
 import type { NextConfig } from "next";
-import nextPWA from "next-pwa";
 
-const withPWA = ((nextPWA as unknown as { default?: unknown }).default ?? nextPWA) as (
-  options?: Record<string, unknown>
-) => (config: NextConfig) => NextConfig;
-
-// Runtime caching strategies for PWA
-const runtimeCaching = [
-  {
-    // Cache images with CacheFirst strategy
-    urlPattern: /^https:\/\/ik\.imagekit\.io\/.*$/,
-    handler: "CacheFirst",
-    options: {
-      cacheName: "imagekit-cache",
-      expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
-      },
-      cacheableResponse: {
-        statuses: [0, 200],
-      },
-    },
-  },
-  {
-    // Cache static assets with StaleWhileRevalidate
-    urlPattern: /\.(?:js|css|woff2?|ttf|eot)$/,
-    handler: "StaleWhileRevalidate",
-    options: {
-      cacheName: "static-assets",
-      expiration: {
-        maxEntries: 100,
-        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
-      },
-    },
-  },
-  {
-    // Cache page navigation with NetworkFirst
-    urlPattern: /^https?:\/\/.*\/(?!api\/).*$/,
-    handler: "NetworkFirst",
-    options: {
-      cacheName: "pages-cache",
-      networkTimeoutSeconds: 5,
-      expiration: {
-        maxEntries: 50,
-        maxAgeSeconds: 24 * 60 * 60, // 24 hours
-      },
-    },
-  },
-];
-
-const withPWAFn = withPWA({
-  dest: "public",
-  disable: process.env.NODE_ENV === "development",
-  register: true,
-  skipWaiting: true,
-  runtimeCaching,
-  fallbacks: {
-    document: "/offline", // Offline fallback page (optional)
-  },
-  // Enable background sync for offline operations
-  buildExcludes: [/middleware-manifest\.json$/],
-});
-
+/**
+ * Service worker wiring lives outside this file.
+ *
+ * This project previously used `next-pwa`, a webpack plugin. Next 16 builds
+ * with Turbopack, so the plugin never ran and no service worker was emitted at
+ * all — silently disabling offline page loads, the /offline fallback, runtime
+ * caching, and install prompts (Chrome will not fire `beforeinstallprompt`
+ * without a fetch-handling worker).
+ *
+ * The worker is now built by Serwist in "configurator mode", which is
+ * Turbopack-compatible: `serwist.config.mjs` drives a `serwist build` step run
+ * after `next build` (see the `build` script), the caching strategies live in
+ * `app/sw.ts`, and registration happens via `<SerwistProvider>` in the layout.
+ */
 const nextConfig: NextConfig = {
-  // Enable Turbopack with default settings; required when a webpack plugin is present
-  // so Next doesn't error out.
-  // Turbopack is used in dev; next-pwa augments webpack only for prod builds.
   turbopack: {},
-  
+
   // Build optimizations
   compiler: {
     removeConsole: process.env.NODE_ENV === "production" ? {
       exclude: ["error", "warn"],
     } : false,
   },
-  
+
   // Optimize images
   images: {
     formats: ["image/avif", "image/webp"],
@@ -89,7 +38,7 @@ const nextConfig: NextConfig = {
     // Increase timeout for slow connections
     minimumCacheTTL: 60,
   },
-  
+
   // Experimental features for better performance
   experimental: {
     optimizePackageImports: [
@@ -109,4 +58,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWAFn(nextConfig);
+export default nextConfig;

@@ -11,8 +11,38 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
+/**
+ * Returned in place of a field that could not be decrypted (usually a changed
+ * or missing NOTES_ENCRYPTION_KEY).
+ *
+ * Writers must never persist this value: the underlying ciphertext is still
+ * intact and recoverable once the right key is restored, but overwriting it
+ * with the placeholder destroys the note for good. See `isDecryptionFailure`.
+ */
+export const DECRYPTION_FAILED_PLACEHOLDER = "[Unable to decrypt content]";
+
+/** True if a value is the placeholder produced by a failed decryption. */
+export const isDecryptionFailure = (value: unknown): boolean =>
+  typeof value === "string" && value.trim() === DECRYPTION_FAILED_PLACEHOLDER;
+
+/**
+ * Minimum key length before we warn.
+ *
+ * The AES key is SHA-256 of this value, so a short or guessable string is
+ * brute-forceable regardless of the 256-bit key it expands to — the entropy of
+ * the input is what matters.
+ */
+const MIN_KEY_LENGTH = 32;
+
 const rawKey = process.env.NOTES_ENCRYPTION_KEY;
 const hasEncryptionKey = typeof rawKey === "string" && rawKey.trim().length > 0;
+
+if (hasEncryptionKey && rawKey!.trim().length < MIN_KEY_LENGTH) {
+  console.warn(
+    `NOTES_ENCRYPTION_KEY is shorter than ${MIN_KEY_LENGTH} characters. ` +
+      "Use high-entropy random data (e.g. `openssl rand -base64 32`)."
+  );
+}
 
 if (!hasEncryptionKey) {
   const message =
@@ -110,7 +140,7 @@ export const decryptString = (encrypted: string): string => {
     return decrypted.toString("utf8");
   } catch (error) {
     console.error("Failed to decrypt note field", error);
-    return "[Unable to decrypt content]";
+    return DECRYPTION_FAILED_PLACEHOLDER;
   }
 };
 

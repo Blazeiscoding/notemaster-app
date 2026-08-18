@@ -1,7 +1,13 @@
-import { Pool } from "pg";
+import { getPgPool } from "@/lib/pg-pool";
 
 interface RateLimitEntry {
   count: number;
+  resetAt: number;
+}
+
+export interface RateLimitResult {
+  success: boolean;
+  remaining: number;
   resetAt: number;
 }
 
@@ -9,27 +15,27 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 60;
 
-const connectionString = process.env.DATABASE_URL;
-const pgPool = connectionString
-  ? new Pool({
-      connectionString,
-      max: 2,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-    })
-  : null;
+/** Expired rows are pruned on roughly this fraction of database-backed calls. */
+const PRUNE_PROBABILITY = 0.01;
+/** Cap on the in-memory fallback map, so it cannot grow without bound. */
+const MEMORY_STORE_MAX_KEYS = 10_000;
+
 let ensureTablePromise: Promise<void> | null = null;
 
 async function ensureRateLimitTable() {
-  if (!pgPool) return;
+  const pool = getPgPool();
+  if (!pool) return;
+
   if (!ensureTablePromise) {
-    ensureTablePromise = pgPool
+    ensureTablePromise = pool
       .query(`
         CREATE TABLE IF NOT EXISTS app_rate_limits (
           identifier TEXT PRIMARY KEY,
           count INTEGER NOT NULL,
           reset_at TIMESTAMPTZ NOT NULL
         );
+        CREATE INDEX IF NOT EXISTS app_rate_limits_reset_at_idx
+          ON app_rate_limits (reset_at);
       `)
       .then(() => undefined)
       .catch((error) => {
@@ -41,11 +47,39 @@ async function ensureRateLimitTable() {
   await ensureTablePromise;
 }
 
-function memoryRateLimit(identifier: string) {
+/**
+ * Drop rows whose window has already elapsed.
+ *
+ * Every distinct identifier (one per user per route) left a permanent row
+ * behind, so the table grew without bound. Pruning opportunistically keeps it
+ * proportional to active users without needing a scheduled job.
+ */
+function pruneExpiredRows() {
+  const pool = getPgPool();
+  if (!pool) return;
+
+  void pool
+    .query("DELETE FROM app_rate_limits WHERE reset_at < NOW() - INTERVAL '1 hour'")
+    .catch((error) => {
+      console.error("Failed to prune expired rate limit rows", error);
+    });
+}
+
+function pruneMemoryStore() {
+  if (rateLimitStore.size <= MEMORY_STORE_MAX_KEYS) return;
+
+  const now = Date.now();
+  for (const [key, entry] of rateLimitStore) {
+    if (now > entry.resetAt) rateLimitStore.delete(key);
+  }
+}
+
+function memoryRateLimit(identifier: string): RateLimitResult {
   const now = Date.now();
   const entry = rateLimitStore.get(identifier);
 
   if (!entry || now > entry.resetAt) {
+    pruneMemoryStore();
     const newEntry = {
       count: 1,
       resetAt: now + RATE_LIMIT_WINDOW,
@@ -74,14 +108,19 @@ function memoryRateLimit(identifier: string) {
   };
 }
 
-async function databaseRateLimit(identifier: string) {
-  if (!pgPool) {
+async function databaseRateLimit(identifier: string): Promise<RateLimitResult> {
+  const pool = getPgPool();
+  if (!pool) {
     return memoryRateLimit(identifier);
   }
 
   await ensureRateLimitTable();
 
-  const result = await pgPool.query<{
+  if (Math.random() < PRUNE_PROBABILITY) {
+    pruneExpiredRows();
+  }
+
+  const result = await pool.query<{
     count: number;
     reset_at_ms: string;
   }>(
@@ -114,7 +153,7 @@ async function databaseRateLimit(identifier: string) {
   };
 }
 
-export async function rateLimit(identifier: string) {
+export async function rateLimit(identifier: string): Promise<RateLimitResult> {
   try {
     return await databaseRateLimit(identifier);
   } catch (error) {
@@ -124,7 +163,7 @@ export async function rateLimit(identifier: string) {
 }
 
 export function getRateLimitHeaders(
-  result: Awaited<ReturnType<typeof rateLimit>>
+  result: RateLimitResult
 ): Record<string, string> {
   return {
     "X-RateLimit-Limit": String(RATE_LIMIT_MAX_REQUESTS),

@@ -6,6 +6,7 @@ import {
   encryptChecklist,
   encryptString,
   encryptStringArray,
+  isDecryptionFailure,
 } from "@/lib/encryption";
 import type { NotePayload } from "@/types/note";
 import {
@@ -21,6 +22,17 @@ type ParamsPromise = Promise<{ id: string }>;
 
 export const GET = withAuthAndParams<ParamsPromise>(
   async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    try {
+      sanitizeId(id);
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
     const note = await prisma.note.findUnique({
       where: { id },
       select: noteSelect,
@@ -69,6 +81,25 @@ export const PATCH = withAuthJsonAndParams<ParamsPromise>(
       return errorResponse(
         error instanceof Error ? error.message : "Invalid payload",
         400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
+    // If a field failed to decrypt on read, the client is holding the
+    // placeholder rather than the real text. Writing it back would destroy
+    // ciphertext that is still recoverable once the correct encryption key is
+    // restored, so refuse the whole update instead.
+    if (
+      isDecryptionFailure(payload.title) ||
+      isDecryptionFailure(payload.content)
+    ) {
+      logger.error("Note update refused: payload contains undecryptable content", null, {
+        noteId: id,
+      });
+      return errorResponse(
+        "This note could not be decrypted and cannot be overwritten. Check NOTES_ENCRYPTION_KEY.",
+        409,
         rateLimitHeaders,
         requestId
       );
