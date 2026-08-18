@@ -164,13 +164,14 @@ export function useNotes(
 
   const togglePin = useCallback(
     async (id: string) => {
-      let newPinned = false;
-      setNotes((prev) => {
-        const note = prev.find((n) => n.id === id);
-        if (!note) return prev;
-        newPinned = !note.pinned;
-        return prev; // actual update handled by optimisticAction below
-      });
+      // Read the current value straight from state. Reading it inside a
+      // setNotes updater relied on React eagerly evaluating the updater, which
+      // it only does when the queue is empty — otherwise the pin flag was still
+      // its initial value by the time the server call was made.
+      const note = notes.find((n) => n.id === id);
+      if (!note) return;
+
+      const newPinned = !note.pinned;
       await optimisticAction(id, {
         updates: { pinned: newPinned },
         serverPayload: { pinned: newPinned },
@@ -178,7 +179,7 @@ export function useNotes(
         haptic: hapticLight,
       });
     },
-    [setNotes, optimisticAction]
+    [notes, optimisticAction]
   );
 
   const archiveNote = useCallback(
