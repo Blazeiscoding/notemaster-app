@@ -21,6 +21,17 @@ type ParamsPromise = Promise<{ id: string }>;
 
 export const GET = withAuthAndParams<ParamsPromise>(
   async ({ userId, rateLimitHeaders, requestId, logger }, { id }) => {
+    try {
+      sanitizeId(id);
+    } catch (error) {
+      return errorResponse(
+        error instanceof Error ? error.message : "Invalid note ID",
+        400,
+        rateLimitHeaders,
+        requestId
+      );
+    }
+
     const note = await prisma.note.findUnique({
       where: { id },
       select: noteSelect,
