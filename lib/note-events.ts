@@ -25,6 +25,9 @@ type BroadcastPayload = {
 
 const listeners = new Map<string, Set<EventListener>>();
 const channelName = "notemaster_note_events";
+
+/** Postgres caps NOTIFY payloads at 8000 bytes; leave room for JSON framing. */
+const MAX_NOTIFY_PAYLOAD_BYTES = 7000;
 const connectionString = process.env.DATABASE_URL;
 const pgPool = connectionString
   ? new Pool({
@@ -110,12 +113,25 @@ export function emitNoteEvent(
 
   broadcastLocal(userId, event);
 
-  if (pgPool) {
-    const payload = JSON.stringify({ userId, event } satisfies BroadcastPayload).replace(/'/g, "''");
-    void pgPool
-      .query(`SELECT pg_notify('${channelName}', '${payload}')`)
-      .catch((error) => {
-        console.error("Failed to publish note event notification:", error);
-      });
+  if (!pgPool) return;
+
+  let payload = JSON.stringify({ userId, event } satisfies BroadcastPayload);
+
+  // Postgres rejects NOTIFY payloads over 8000 bytes. A note carrying its full
+  // body and attachment URLs blows past that, so the whole event used to be
+  // dropped for exactly the notes most worth syncing. Fall back to a
+  // data-less event; receivers re-fetch the note by id.
+  if (Buffer.byteLength(payload, "utf8") > MAX_NOTIFY_PAYLOAD_BYTES) {
+    payload = JSON.stringify({
+      userId,
+      event: { type, noteId, timestamp: event.timestamp },
+    } satisfies BroadcastPayload);
   }
+
+  // Parameterized so the payload is never concatenated into SQL text.
+  void pgPool
+    .query("SELECT pg_notify($1, $2)", [channelName, payload])
+    .catch((error) => {
+      console.error("Failed to publish note event notification:", error);
+    });
 }
