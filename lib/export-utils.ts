@@ -194,6 +194,15 @@ export function printNote(note: NotePayload): void {
     <html>
       <head>
         <title>${safeTitle}</title>
+        <!--
+          The print window is same-origin, so it can reach this app's session.
+          Content is allowlist-sanitized before it gets here; this CSP is a
+          second line of defence that blocks script execution outright.
+        -->
+        <meta
+          http-equiv="Content-Security-Policy"
+          content="default-src 'none'; img-src https: data:; style-src 'unsafe-inline'; font-src https: data:"
+        />
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
