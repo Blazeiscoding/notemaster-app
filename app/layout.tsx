@@ -2,6 +2,7 @@ import { type Metadata, type Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
+import { SerwistProvider } from "@serwist/next/react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
@@ -93,12 +94,20 @@ export default function RootLayout({
         <body
           className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} antialiased`}
         >
-          <TooltipProvider delayDuration={300}>
-            <ErrorBoundary>
-              {children}
-              <Toaster position="top-right" richColors />
-            </ErrorBoundary>
-          </TooltipProvider>
+          <SerwistProvider
+            swUrl="/sw.js"
+            // The worker is only built for production; registering in dev would
+            // 404 and, worse, serve stale assets during development.
+            disable={process.env.NODE_ENV === "development"}
+            reloadOnOnline
+          >
+            <TooltipProvider delayDuration={300}>
+              <ErrorBoundary>
+                {children}
+                <Toaster position="top-right" richColors />
+              </ErrorBoundary>
+            </TooltipProvider>
+          </SerwistProvider>
           <Analytics />
         </body>
       </html>

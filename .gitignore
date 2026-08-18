@@ -17,6 +17,10 @@
 /.next/
 /out/
 
+# generated service worker (built by `npm run build:sw`)
+/public/sw.js
+/public/sw.js.map
+
 # production
 /build
 
