@@ -19,6 +19,7 @@ export function useNoteFiltering(
     updatedAtMs: number;
     titleLower: string;
     previewLower: string;
+    tagsLower: string;
   };
 
   // Defer filtering to keep UI responsive during rapid updates (e.g., typing in search)
@@ -36,6 +37,7 @@ export function useNoteFiltering(
           updatedAtMs: Number.isFinite(updatedAtMs) ? updatedAtMs : 0,
           titleLower: note.title?.toLowerCase() ?? "",
           previewLower: note.preview.toLowerCase(),
+          tagsLower: note.tags.join(" ").toLowerCase(),
         };
       }),
     [deferredNotes]
@@ -81,10 +83,14 @@ export function useNoteFiltering(
       if (!matchesSection) continue;
       if (hasTagFilter && !note.tags.includes(deferredCriteria.tag)) continue;
 
+      // Note bodies are encrypted at rest and only a 240-char preview reaches
+      // the client, so search covers title, preview and tags. Matching the full
+      // body would need the server to hold a searchable index of plaintext.
       if (hasSearch) {
         if (
           !prepared.titleLower.includes(normalizedSearch) &&
-          !prepared.previewLower.includes(normalizedSearch)
+          !prepared.previewLower.includes(normalizedSearch) &&
+          !prepared.tagsLower.includes(normalizedSearch)
         ) {
           continue;
         }
