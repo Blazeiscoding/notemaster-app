@@ -38,7 +38,10 @@ jobs:
       - name: Build
         run: bun run build
         env:
-          # Build-time placeholders; no real credentials are needed to compile.
+          # Build-time placeholders. Nothing is contacted during the build, but
+          # the values must be well-formed: Clerk parses the publishable key
+          # (`pk_test_` + base64 of the frontend API host) and rejects it
+          # outright if it does not decode, which fails prerendering.
           DATABASE_URL: postgresql://user:password@localhost:5432/placeholder
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_cGxhY2Vob2xkZXIuY2xlcmsuYWNjb3VudHMuZGV2JA==
           CLERK_SECRET_KEY: sk_test_placeholder
