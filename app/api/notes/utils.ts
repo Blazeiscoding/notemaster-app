@@ -35,22 +35,15 @@ export const noteSelect = {
   updatedAt: true,
 } as const satisfies Prisma.NoteSelect
 
-export const noteSummarySelect = {
-  id: true,
-  userId: true,
-  title: true,
-  content: true,
-  tags: true,
-  checklist: true,
-  attachments: true,
-  type: true,
-  pinned: true,
-  archived: true,
-  trashed: true,
-  dueAt: true,
-  createdAt: true,
-  updatedAt: true,
-} as const satisfies Prisma.NoteSelect
+/**
+ * Summaries select the same columns as full notes, and deliberately so:
+ * `content`, `checklist` and `attachments` are encrypted at rest, so the
+ * preview text, checklist counts and first-image lookup can only be derived
+ * after decrypting them in `serializeNoteSummary`. The saving is in the
+ * response payload, not the query — aliased rather than duplicated so the two
+ * cannot drift apart.
+ */
+export const noteSummarySelect = noteSelect
 
 type SerializableNote = {
   id: string
