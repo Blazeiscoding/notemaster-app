@@ -7,7 +7,7 @@ const HTTP_URL_REGEX = /^https?:\/\//i;
 const DATA_URL_REGEX = /^data:image\/[a-zA-Z0-9.+-]+;base64,/i;
 
 type NoteValidationOptions = {
-  requireId?: boolean;
+  /** Validate only the fields present on the payload (PATCH semantics). */
   partial?: boolean;
 };
 
@@ -143,7 +143,7 @@ export function validateNotePayload(
   payload: unknown,
   options: NoteValidationOptions = {}
 ): Partial<NotePayload> & Pick<NotePayload, "id"> {
-  const { requireId = true, partial = false } = options;
+  const { partial = false } = options;
 
   if (typeof payload !== "object" || payload === null) {
     throw new Error("Invalid payload: expected object");
@@ -151,7 +151,8 @@ export function validateNotePayload(
 
   const p = payload as Record<string, unknown>;
   const validated: Partial<NotePayload> & { id: string } = {
-    id: requireId ? sanitizeId(p.id) : sanitizeId(p.id),
+    // An id is always required: it is the client-generated UUID for the note.
+    id: sanitizeId(p.id),
   };
 
   if (!partial || p.title !== undefined) {
